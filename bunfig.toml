@@ -1,0 +1,15 @@
+# Bun is the package manager, workspace tool, and dev/test runner for CLOSER.
+# Node.js 24 is the production runtime; Bun does not execute production code.
+
+[install]
+# Pin exact versions. A benchmark whose dependency tree drifts between runs
+# is not reproducible, and reproducibility is the product claim.
+exact = true
+
+# Bun does not run lifecycle scripts for dependencies unless they are listed in
+# `trustedDependencies` in package.json. That list is empty on purpose: this project
+# ingests untrusted repositories, so arbitrary postinstall code is not acceptable.
+# Adding an entry there is a reviewable security decision.
+
+[test]
+coverage = false

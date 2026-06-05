@@ -1,0 +1,38 @@
+{
+  "name": "closer",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "benchmarks"
+  ],
+  "engines": {
+    "node": ">=24",
+    "bun": ">=1.4.0"
+  },
+  "trustedDependencies": [],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "bun run typecheck && bun run lint && bun run format:check",
+    "test": "bun test packages apps/server benchmarks",
+    "contracts:generate": "bun run scripts/generate-contracts.ts",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.yml down",
+    "db:logs": "docker compose -f infra/docker-compose.yml logs -f db"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/bun": "1.4.0",
+    "eslint": "10.9.1",
+    "globals": "17.12.0",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.69.0"
+  }
+}

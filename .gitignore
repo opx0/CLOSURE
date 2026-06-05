@@ -1,0 +1,31 @@
+# --- Documents: private, kept out of git during development ---
+# All planning, strategy, and decision records live under /docs/ and stay out of the
+# repository. README.md is the only public narrative; the decision records themselves
+# (PROJECT.md, STACK.md, the wayfinder map, etc.) remain private for now. This is the
+# developer's call per docs/STACK.md §21, and matches README's "kept private" note.
+/docs/
+
+# Contributor/agent rules stay out of git too. Kept at the repository root rather than
+# under /docs/, because agent tooling reads AGENTS.md from the root by convention.
+/AGENTS.md
+
+# --- Dependencies and build output ---
+node_modules/
+dist/
+*.tsbuildinfo
+# bun.lock IS committed and installed --frozen-lockfile (bunfig.toml): a drifting
+# dependency tree is not reproducible, and reproducibility is the product claim.
+# It is deliberately NOT ignored.
+
+# --- Environment (config validated at boot, ADR-022) ---
+.env
+.env.*
+!.env.example
+
+# --- Local artifacts and snapshots (content-addressed object store, ADR-017 / STACK §11) ---
+/var/
+/.artifacts/
+
+# --- Python research (offline only, under research/, ADR-019) ---
+research/.venv/
+__pycache__/

@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:18
+    container_name: closer-db
+    environment:
+      POSTGRES_USER: closer
+      POSTGRES_PASSWORD: closer
+      POSTGRES_DB: closer
+    ports:
+      - '5432:5432'
+    volumes:
+      - closer-db-data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U closer -d closer']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  closer-db-data:
