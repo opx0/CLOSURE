@@ -13,6 +13,10 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# --- Browser end-to-end artifacts (traces are kept only for a failure, locally) ---
+test-results/
+playwright-report/
 # bun.lock IS committed and installed --frozen-lockfile (bunfig.toml): a drifting
 # dependency tree is not reproducible, and reproducibility is the product claim.
 # It is deliberately NOT ignored.
@@ -29,3 +33,7 @@ dist/
 # --- Python research (offline only, under research/, ADR-019) ---
 research/.venv/
 __pycache__/
+
+# Local self-use loop state: append-only event log, private fixtures.
+.closer/
+fixtures/private/

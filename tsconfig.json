@@ -1,16 +1,18 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["bun"],
-    "jsx": "react-jsx"
+    "types": ["bun"]
   },
   "include": [
     "packages/*/src/**/*.ts",
+    "apps/cli/src/**/*.ts",
     "apps/server/src/**/*.ts",
-    "apps/web/src/**/*.ts",
-    "apps/web/src/**/*.tsx",
+    "apps/worker/src/**/*.ts",
+    "apps/mcp/src/**/*.ts",
     "benchmarks/src/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "playwright.config.ts"
   ],
   "exclude": ["node_modules", "**/dist", "**/*.gen.ts"]
 }

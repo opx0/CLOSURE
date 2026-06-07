@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "timezone": "Asia/Kolkata",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 3,
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": { "labels": ["security"], "schedule": ["at any time"] },
+  "packageRules": [
+    {
+      "description": "Grouped, so a solo developer reviews one PR a week rather than nine.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "non-major dependencies"
+    },
+    {
+      "description": "The provider SDK path, the Postgres driver and the parser are benchmark-affecting. Each one moves on its own PR so the change that moved a number is identifiable (STACK §3, §10.1).",
+      "matchPackageNames": ["pg", "drizzle-orm", "@sinclair/typebox"],
+      "groupName": null,
+      "labels": ["dependencies", "benchmark-affecting"]
+    },
+    {
+      "description": "A major bump is a decision, never an automatic merge.",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "lockFileMaintenance": { "enabled": false }
+}

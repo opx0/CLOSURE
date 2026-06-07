@@ -3,12 +3,13 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/*.gen.ts', 'node_modules/**'] },
+  { ignores: ['**/dist/**', '**/*.gen.ts', 'node_modules/**', '.claude/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { languageOptions: { globals: { ...globals.node } } },
   {
-    // core stays framework-independent: it may import @closer/contracts only.
+    // core stays framework-independent: it may import @closer/contracts and @closer/prompts
+    // (both are plain domain packages) and nothing that carries a framework or a driver.
     files: ['packages/core/**/*.ts'],
     rules: {
       'no-restricted-imports': [
@@ -28,7 +29,7 @@ export default tseslint.config(
                 '@closer/web',
               ],
               message:
-                'packages/core must stay framework-independent; import @closer/contracts only.',
+                'packages/core must stay framework-independent; import @closer/contracts or @closer/prompts.',
             },
           ],
         },
