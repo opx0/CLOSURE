@@ -1,2 +1,13 @@
-// Framework-independent core. Empty until the domain model is defined.
-export {}
+// Framework-independent core: domain policy, evaluation, replay. Adapters live outside it.
+export * from './ports/event-store.ts'
+export * from './ports/conductor.ts'
+export * from './ports/evaluator.ts'
+export * from './ports/clock.ts'
+export * from './ports/repository.ts'
+export * from './ports/job-queue.ts'
+export * from './ports/retrieval.ts'
+export * from './ports/object-store.ts'
+export * from './ports/logger.ts'
+export * from './errors.ts'
+export * from './ceilings.ts'
+export * from './events/index.ts'
