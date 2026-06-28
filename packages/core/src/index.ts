@@ -22,3 +22,6 @@ export * from './formats/index.ts'
 export * from './delivery/index.ts'
 export * from './retention/index.ts'
 export * from './export/index.ts'
+// The interview loop itself. It imports no transport — that is the seam rule (ticket 08), and the
+// proof is that a CLI and an HTTP API both drive this one function without either owning it.
+export * from './session/index.ts'
