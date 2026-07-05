@@ -1,0 +1,19 @@
+{
+  "name": "@closer/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@closer/contracts": "workspace:*",
+    "@closer/core": "workspace:*",
+    "@sinclair/typebox": "0.34.52",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0"
+  }
+}
