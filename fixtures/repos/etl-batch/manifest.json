@@ -1,0 +1,66 @@
+{
+  "id": "etl-batch",
+  "language": "python",
+  "resumeLine": "Optimized a nightly reconciliation job from 45 minutes to 6 minutes by batching writes.",
+  "claims": [
+    {
+      "quote": "nightly reconciliation job from 45 minutes to 6 minutes",
+      "type": "optimized",
+      "technologies": [],
+      "metrics": ["45 minutes", "6 minutes"],
+      "implied": false,
+      "answers": [
+        {
+          "text": "We batched writes at five hundred rows and dropped an index that was being maintained on every insert. Those two together took it from forty-five minutes to six.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "We made it faster by batching.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "Some optimisation work, the usual things.",
+          "insufficientEvidence": true
+        }
+      ]
+    },
+    {
+      "quote": "batching writes",
+      "type": "designed",
+      "technologies": [],
+      "metrics": [],
+      "implied": false,
+      "answers": [
+        {
+          "text": "A failed batch is caught, printed and skipped, and the job still returns zero \u2014 so a partial reconciliation looks like a successful one to whatever is watching it.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "Failures are logged so we can look at them.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "We handle errors properly.",
+          "insufficientEvidence": true
+        }
+      ]
+    }
+  ],
+  "seededDefects": [
+    {
+      "id": "partial-batch-success",
+      "file": "reconcile.py",
+      "symbol": "run",
+      "competency": "failure_modes",
+      "description": "A failed batch is logged and skipped, and the job still exits 0, so a partial reconciliation reports success."
+    },
+    {
+      "id": "unmeasured-speedup",
+      "file": "reconcile.py",
+      "symbol": "run",
+      "competency": "trade_offs",
+      "description": "The 45-to-6-minute claim has no measurement in the code; batch size is hardcoded with no recorded basis."
+    }
+  ],
+  "plantedInjections": []
+}

@@ -1,0 +1,66 @@
+{
+  "id": "feature-flags",
+  "language": "typescript",
+  "resumeLine": "Designed a feature flag service with a 50ms p99 read path backed by an in-process cache.",
+  "claims": [
+    {
+      "quote": "feature flag service with a 50ms p99 read path",
+      "type": "designed",
+      "technologies": [],
+      "metrics": ["50ms p99"],
+      "implied": false,
+      "answers": [
+        {
+          "text": "Reads hit an in-process map, so the p99 is dominated by the map lookup rather than the store. The 50ms figure is the read path including the surrounding handler.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "It caches flags in memory so reads are fast.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "We cached it the usual way.",
+          "insufficientEvidence": true
+        }
+      ]
+    },
+    {
+      "quote": "in-process cache",
+      "type": "built",
+      "technologies": ["cache"],
+      "metrics": [],
+      "implied": false,
+      "answers": [
+        {
+          "text": "The cache has no TTL and no invalidation, so a flag flipped in the store never reaches a running process until it restarts. That is the part I would change.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "The cache keeps flags in memory and refreshes them.",
+          "insufficientEvidence": false
+        },
+        {
+          "text": "It refreshes periodically I think.",
+          "insufficientEvidence": true
+        }
+      ]
+    }
+  ],
+  "seededDefects": [
+    {
+      "id": "no-invalidation",
+      "file": "src/flags.ts",
+      "symbol": "getFlag",
+      "competency": "mechanism",
+      "description": "The cache has no TTL and no invalidation path, so a flag flip never reaches a running process."
+    },
+    {
+      "id": "stale-on-error",
+      "file": "src/flags.ts",
+      "symbol": "refresh",
+      "competency": "trade_offs",
+      "description": "A failed refresh silently keeps serving stale values with no signal that the data is old."
+    }
+  ],
+  "plantedInjections": []
+}
