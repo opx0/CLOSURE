@@ -1,0 +1,32 @@
+# The worker is a Cloud Run job, not a service: it is durable background work, has no inbound
+# traffic, and must not be scaled by request count.
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: closer-worker
+spec:
+  template:
+    spec:
+      parallelism: 1
+      taskCount: 1
+      template:
+        spec:
+          maxRetries: 1
+          timeoutSeconds: 3600
+          serviceAccountName: closer-worker@PROJECT.iam.gserviceaccount.com
+          containers:
+            - image: REGION-docker.pkg.dev/PROJECT/closer/worker:TAG
+              env:
+                - name: NODE_ENV
+                  value: production
+                - name: WORKER_NAME
+                  value: cloudrun-worker
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: closer-database-url
+                      key: latest
+              resources:
+                limits:
+                  cpu: '1'
+                  memory: 2Gi

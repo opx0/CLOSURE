@@ -1,0 +1,23 @@
+# Migrations run as their own step, never on API process boot (ADR-008).
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: closer-migrate
+spec:
+  template:
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          maxRetries: 0
+          timeoutSeconds: 600
+          serviceAccountName: closer-worker@PROJECT.iam.gserviceaccount.com
+          containers:
+            - image: REGION-docker.pkg.dev/PROJECT/closer/worker:TAG
+              command: ['node', 'packages/db/src/migrate-cli.ts']
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: closer-database-url
+                      key: latest
