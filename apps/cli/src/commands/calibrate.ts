@@ -1,5 +1,5 @@
-import { CLAIM_VERDICT_ORDER, type ClaimVerdict } from '@closer/contracts'
-import { replay } from '@closer/core'
+import { CLAIM_VERDICT_ORDER, type ClaimVerdict } from '@levelhead/contracts'
+import { replay } from '@levelhead/core'
 import {
   FIXED_COVERAGE_LEVELS,
   LabelIndex,
@@ -15,7 +15,7 @@ import {
   loadLabels,
   riskCoverage,
   withModelRater,
-} from '@closer/benchmarks'
+} from '@levelhead/benchmarks'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line } from '../terminal.ts'
@@ -39,7 +39,7 @@ export async function calibrate(argv: readonly string[]): Promise<number> {
   try {
     const parsed = await loadLabels(path).catch(() => null)
     if (parsed === null) {
-      line(`no label file at ${path} — write one with: closer label`)
+      line(`no label file at ${path} — write one with: levelhead label`)
       return 1
     }
     for (const error of parsed.errors) dim(`  ${path}: ${error}`)

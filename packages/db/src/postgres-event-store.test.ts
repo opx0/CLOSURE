@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'bun:test'
-import { EVENT_SCHEMA_VERSION, LOCAL_OWNER_ID, type AnyEvent } from '@closer/contracts'
-import { AppendOnlyViolation } from '@closer/core'
+import { EVENT_SCHEMA_VERSION, LOCAL_OWNER_ID, type AnyEvent } from '@levelhead/contracts'
+import { AppendOnlyViolation } from '@levelhead/core'
 import { runMigrations } from './migrations/runner.ts'
 import {
   PostgresEventStore,
@@ -146,7 +146,7 @@ test('read maps every row and listSessions returns the ids', async () => {
 })
 
 const url = process.env['DATABASE_URL']
-const database = url === undefined ? undefined : await openTestDatabase(url, 'closer_test_store')
+const database = url === undefined ? undefined : await openTestDatabase(url, 'levelhead_test_store')
 if (database === undefined) {
   console.log(
     '[skipped] packages/db Postgres integration tests: DATABASE_URL is unset or unreachable',

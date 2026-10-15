@@ -3,8 +3,8 @@ import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { Artifact } from '@closer/contracts'
-import type { Clock, IdSource, PinnedRepository } from '@closer/core'
+import type { Artifact } from '@levelhead/contracts'
+import type { Clock, IdSource, PinnedRepository } from '@levelhead/core'
 import { GitRepository } from './git-repository.ts'
 
 const QUEUE_TS = [
@@ -37,9 +37,9 @@ async function commitAll(dir: string, message: string): Promise<void> {
   // Configured per invocation so the test needs no global git identity to exist.
   await run(dir, [
     '-c',
-    'user.email=test@closer.invalid',
+    'user.email=test@levelhead.invalid',
     '-c',
-    'user.name=CLOSER Test',
+    'user.name=Levelhead Test',
     '-c',
     'commit.gpgsign=false',
     'commit',
@@ -53,7 +53,7 @@ async function withRepo(
   files: Readonly<Record<string, string>>,
   body: (dir: string) => Promise<void>,
 ): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-repo-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-repo-'))
   try {
     await run(dir, ['init', '-q', '-b', 'main'])
     for (const [path, content] of Object.entries(files)) {

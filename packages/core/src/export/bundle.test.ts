@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { EVENT_SCHEMA_VERSION, EXPORT_FORMAT_VERSION, type AnyEvent } from '@closer/contracts'
+import { EVENT_SCHEMA_VERSION, EXPORT_FORMAT_VERSION, type AnyEvent } from '@levelhead/contracts'
 import { buildExportBundle, exportSession } from './bundle.ts'
 
 const AT = '2026-09-09T10:00:00.000Z'

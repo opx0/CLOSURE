@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from 'bun:test'
-import { LOCAL_OWNER_ID, type Artifact, type Snapshot } from '@closer/contracts'
+import { LOCAL_OWNER_ID, type Artifact, type Snapshot } from '@levelhead/contracts'
 import { PostgresRetrieval, searchStatement, splitIdentifiers } from './retrieval.ts'
 import { toQuery } from './postgres-event-store.ts'
 import { runMigrations } from './migrations/runner.ts'
@@ -28,7 +28,7 @@ test('identifiers and prose are split into the same word stream', () => {
 
 const url = process.env.DATABASE_URL
 const database =
-  url === undefined ? undefined : await openTestDatabase(url, 'closer_retrieval_test')
+  url === undefined ? undefined : await openTestDatabase(url, 'levelhead_retrieval_test')
 
 if (database === undefined) {
   test.skip('packages/db retrieval integration tests: DATABASE_URL is unset or unreachable', () => {})

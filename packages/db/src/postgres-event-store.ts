@@ -1,7 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
-import { LOCAL_OWNER_ID, type AnyEvent, type OwnerId } from '@closer/contracts'
-import { AppendOnlyViolation, readEvent, type EventStore } from '@closer/core'
+import { LOCAL_OWNER_ID, type AnyEvent, type OwnerId } from '@levelhead/contracts'
+import { AppendOnlyViolation, readEvent, type EventStore } from '@levelhead/core'
 import { APPEND_ONLY_CONSTRAINT, EVENT_ID_CONSTRAINT, events } from './schema.ts'
 import { UNIQUE_VIOLATION, driverFault, type SqlExecutor } from './sql.ts'
 

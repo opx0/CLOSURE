@@ -1,4 +1,4 @@
-import type { Artifact, OwnerId } from '@closer/contracts'
+import type { Artifact, OwnerId } from '@levelhead/contracts'
 
 export interface IndexedArtifact {
   artifact: Artifact

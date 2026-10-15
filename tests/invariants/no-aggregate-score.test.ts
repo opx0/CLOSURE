@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 // Ticket 05 §3: "no aggregate score exists" is an invariant, checked mechanically, because
 // PROJECT.md §12's promise is worth exactly as much as the check that enforces it. An aggregate is
-// the single field that would turn CLOSER back into the thing it was built to replace, and it
+// the single field that would turn Levelhead back into the thing it was built to replace, and it
 // arrives by accident — someone adds `overallScore` to make a table sort nicely.
 const BANNED = /\b(readiness|overall|composite|aggregate|total)_?[Ss]core\b|\bscore(Percent|Pct)\b/
 

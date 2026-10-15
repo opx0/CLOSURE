@@ -1,6 +1,6 @@
 import { test, expect, afterEach } from 'bun:test'
 import { Type } from '@sinclair/typebox'
-import type { StructuredRequest } from '@closer/core'
+import type { StructuredRequest } from '@levelhead/core'
 import { StructuredEvaluator } from './evaluator-structured.ts'
 
 const realFetch = globalThis.fetch

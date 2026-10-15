@@ -1,6 +1,6 @@
-import { backoffMs, type JobQueuePort, type Logger } from '@closer/core'
-import { JOB_ATTEMPTS, JOB_DURATION, metrics } from '@closer/observability'
-import type { JobKind, JobRecord } from '@closer/contracts'
+import { backoffMs, type JobQueuePort, type Logger } from '@levelhead/core'
+import { JOB_ATTEMPTS, JOB_DURATION, metrics } from '@levelhead/observability'
+import type { JobKind, JobRecord } from '@levelhead/contracts'
 import { HANDLERS, type HandlerContext } from './handlers/index.ts'
 
 export interface RunnerOptions {

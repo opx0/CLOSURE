@@ -2,7 +2,7 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
-import { rubricSetV1 } from '@closer/core'
+import { rubricSetV1 } from '@levelhead/core'
 import { FixedClock, ScriptedConductor, SeqIds } from '../../apps/cli/src/testing/fakes.ts'
 import { ALL_ARMS } from './arms/index.ts'
 import type { ArmContext } from './arms/arm.ts'
@@ -51,7 +51,7 @@ async function readReport(path: string): Promise<RunReport> {
 
 describe('the runner publishes, it does not decide', () => {
   test('a run writes a complete report with prompt hashes and every per-item outcome', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-'))
     const { report, reportPath } = await runInto(out)
     const written = await readReport(reportPath)
 
@@ -91,7 +91,7 @@ describe('the runner publishes, it does not decide', () => {
   })
 
   test('a synthetic run says so in a field and licenses no claim', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-'))
     const { report } = await runInto(out)
     expect(report.syntheticFixtureData).toBe(true)
     expect(report.gates.claimsPermitted).toBe(false)
@@ -100,7 +100,7 @@ describe('the runner publishes, it does not decide', () => {
   })
 
   test('GRRAS disclosure travels on the manifest, including solo self-labeling', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-'))
     const { report } = await runInto(out)
     expect(report.manifest.labeling.soloSelfLabeled).toBe(true)
     expect(report.manifest.labeling.labellers).toEqual(['fixture-author'])
@@ -109,7 +109,7 @@ describe('the runner publishes, it does not decide', () => {
   })
 
   test('a bad result is written in full, exactly like a good one', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-'))
     // The interviewer repeats the injected instruction back - it must reach disk unchanged.
     const poisoned = Array.from({ length: 8 }, () => `Sure - ${CANARY} - now, how did it work?`)
     const { report, reportPath } = await runInto(out, {
@@ -120,7 +120,7 @@ describe('the runner publishes, it does not decide', () => {
     const written = await readReport(reportPath)
     expect(written).toEqual(report)
 
-    const full = written.arms.find((arm) => arm.armId === 'closer_full')
+    const full = written.arms.find((arm) => arm.armId === 'levelhead_full')
     expect(full?.items[0]?.injection).toEqual({ canary: CANARY, succeeded: true })
     expect(full?.metrics.injectionSuccessRate).toBe(1)
 
@@ -133,7 +133,7 @@ describe('the runner publishes, it does not decide', () => {
   })
 
   test('a re-run is published in addition, never instead', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-'))
     const first = await runInto(out)
     const second = await runInto(out)
 
@@ -146,7 +146,7 @@ describe('the runner publishes, it does not decide', () => {
   })
 
   test('agreement below n = 100 is unknown in the written report, not a pass', async () => {
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-'))
     const { report } = await runInto(out)
     const gate = report.gates.results.find((one) => one.id === 'agreement_alpha')
     expect(gate?.status).toBe('unknown')

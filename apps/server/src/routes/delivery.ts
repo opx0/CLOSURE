@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { DeliveryReportSchema, SpokenTurnSchema } from '@closer/contracts'
-import { SessionLog, measureDelivery, replay } from '@closer/core'
+import { DeliveryReportSchema, SpokenTurnSchema } from '@levelhead/contracts'
+import { SessionLog, measureDelivery, replay } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
 import { ErrorSchema, SessionIdParamsSchema } from './shared.ts'
 

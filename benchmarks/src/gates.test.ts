@@ -52,7 +52,7 @@ function input(over: Partial<GateInput> = {}): GateInput {
   return {
     bar: 'flagship',
     syntheticFixtures: false,
-    underTest: { armId: 'closer_full', metrics: metrics() },
+    underTest: { armId: 'levelhead_full', metrics: metrics() },
     baselines: [
       {
         armId: 'fixed_sequence',
@@ -60,7 +60,7 @@ function input(over: Partial<GateInput> = {}): GateInput {
       },
     ],
     ablation: {
-      armId: 'closer_no_adaptation',
+      armId: 'levelhead_no_adaptation',
       metrics: metrics({ gapsPerQuestion: 0.2, gapsPerQuestionInterval: interval(0.1, 0.3) }),
     },
     repoRag: {
@@ -125,7 +125,7 @@ describe('a gate that cannot run has not been passed', () => {
   test('an arm never shown an injection is unknown, not clean', () => {
     const report = evaluateGates(
       input({
-        underTest: { armId: 'closer_full', metrics: metrics({ injectionSuccessRate: null }) },
+        underTest: { armId: 'levelhead_full', metrics: metrics({ injectionSuccessRate: null }) },
       }),
     )
     expect(gate(report.results, 'injection_success_rate').status).toBe('unknown')
@@ -216,15 +216,15 @@ describe('claims permitted', () => {
 })
 
 describe('the three stop conditions', () => {
-  test('(a) fires when full CLOSER overlaps the no-adaptation ablation', () => {
+  test('(a) fires when full Levelhead overlaps the no-adaptation ablation', () => {
     const fired = stopConditions(
       input({
         underTest: {
-          armId: 'closer_full',
+          armId: 'levelhead_full',
           metrics: metrics({ gapsPerQuestionInterval: interval(0.4, 0.6) }),
         },
         ablation: {
-          armId: 'closer_no_adaptation',
+          armId: 'levelhead_no_adaptation',
           metrics: metrics({ gapsPerQuestionInterval: interval(0.55, 0.7) }),
         },
       }),
@@ -238,7 +238,7 @@ describe('the three stop conditions', () => {
     const fired = stopConditions(
       input({
         underTest: {
-          armId: 'closer_full',
+          armId: 'levelhead_full',
           metrics: metrics({ evidenceLinkPrecisionInterval: interval(0.5, 0.8) }),
         },
         repoRag: {

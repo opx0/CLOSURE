@@ -1,5 +1,5 @@
 {
-  "name": "@closer/db",
+  "name": "@levelhead/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit -p ../../tsconfig.json"
   },
   "dependencies": {
-    "@closer/contracts": "workspace:*",
-    "@closer/core": "workspace:*",
+    "@levelhead/contracts": "workspace:*",
+    "@levelhead/core": "workspace:*",
     "@sinclair/typebox": "0.34.52",
     "drizzle-orm": "0.45.2",
     "pg": "8.23.0"

@@ -10,23 +10,23 @@ import type {
   Mode,
   PersonaId,
   PolicyAction,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 
 // Versioned on the report, not the filename, so a moved or renamed report still says which
 // contract it was written against.
 export const BENCHMARK_CONTRACT_VERSION = 1
 
 // PROJECT.md §6.1: the five comparison arms, plus the two the model layer invites. The last two
-// are full CLOSER with a different Conductor adapter behind it and nothing else changed — which is
+// are full Levelhead with a different Conductor adapter behind it and nothing else changed — which is
 // what makes them a comparison of the model layer rather than of two different products.
 export type ArmId =
   | 'fixed_sequence'
   | 'generic_llm'
   | 'repo_rag'
-  | 'closer_no_adaptation'
-  | 'closer_full'
-  | 'closer_local_model'
-  | 'closer_headless_agent'
+  | 'levelhead_no_adaptation'
+  | 'levelhead_full'
+  | 'levelhead_local_model'
+  | 'levelhead_headless_agent'
 
 // Named here so "best baseline arm" (ticket 05 §4) has one fixed meaning.
 export const BASELINE_ARM_IDS: readonly ArmId[] = ['fixed_sequence', 'generic_llm', 'repo_rag']
@@ -132,7 +132,7 @@ export interface GapOutcome {
   summary: string
 }
 
-// spanResolved is false when the quote isn't verbatim in the résumé - the discipline CLOSER
+// spanResolved is false when the quote isn't verbatim in the résumé - the discipline Levelhead
 // applies and the generic arm doesn't.
 export interface ExtractedClaimOutcome {
   quote: string

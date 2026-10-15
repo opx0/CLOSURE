@@ -1,8 +1,8 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { GapEntrySchema, RoundKindSchema } from '@closer/contracts'
-import type { GapEntry } from '@closer/contracts'
-import { planNextSession, replay } from '@closer/core'
+import { GapEntrySchema, RoundKindSchema } from '@levelhead/contracts'
+import type { GapEntry } from '@levelhead/contracts'
+import { planNextSession, replay } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
 
 const PlannedWorkSchema = Type.Object({

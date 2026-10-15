@@ -2,8 +2,8 @@ import { expect, test } from 'bun:test'
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { LOCAL_OWNER_ID, EVENT_SCHEMA_VERSION, type AnyEvent } from '@closer/contracts'
-import { AppendOnlyViolation, SessionLog, replay, type Clock, type IdSource } from '@closer/core'
+import { LOCAL_OWNER_ID, EVENT_SCHEMA_VERSION, type AnyEvent } from '@levelhead/contracts'
+import { AppendOnlyViolation, SessionLog, replay, type Clock, type IdSource } from '@levelhead/core'
 import { JsonlEventStore } from './jsonl.ts'
 
 const AT = '2026-09-09T10:00:00.000Z'
@@ -23,7 +23,7 @@ function event(seq: number, reason: string, sessionId = 'ses_1'): AnyEvent {
 async function withStore(
   run: (store: JsonlEventStore, dir: string) => Promise<void>,
 ): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-events-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-events-'))
   try {
     const owned = join(dir, LOCAL_OWNER_ID)
     await mkdir(owned, { recursive: true })
@@ -120,7 +120,7 @@ test('a session written, reopened and replayed comes back whole', async () => {
 })
 
 test('one owner never reads another owner’s log', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-owners-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-owners-'))
   try {
     const mine = new JsonlEventStore(dir, 'abhisek')
     const theirs = new JsonlEventStore(dir, 'friend')
@@ -139,7 +139,7 @@ test('one owner never reads another owner’s log', async () => {
 // The boundary landed after logs already existed. The local owner still reads them; a second owner
 // never does, because inheriting someone else's log by being first is the failure this prevents.
 test('the local owner still reads a log written before the boundary existed', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-legacy-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-legacy-'))
   try {
     await writeFile(join(dir, 'ses_1.jsonl'), `${JSON.stringify(event(0, 'legacy'))}\n`, 'utf8')
 
@@ -153,5 +153,5 @@ test('the local owner still reads a log written before the boundary existed', as
 })
 
 test('an owner id that could escape the log directory is refused', () => {
-  expect(() => new JsonlEventStore('.closer/events', '../../etc')).toThrow(/not usable/)
+  expect(() => new JsonlEventStore('.levelhead/events', '../../etc')).toThrow(/not usable/)
 })

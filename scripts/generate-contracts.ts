@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import openapiTS, { astToString } from 'openapi-typescript'
-import { silentLogger } from '@closer/core'
+import { silentLogger } from '@levelhead/core'
 import { buildApp } from '../apps/server/src/app.ts'
 import { loadConfig } from '../apps/server/src/config.ts'
 import {

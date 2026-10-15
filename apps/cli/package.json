@@ -1,20 +1,20 @@
 {
-  "name": "@closer/cli",
+  "name": "@levelhead/cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "bin": {
-    "closer": "./src/index.ts"
+    "levelhead": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ../../tsconfig.json"
   },
   "dependencies": {
-    "@closer/benchmarks": "workspace:*",
-    "@closer/contracts": "workspace:*",
-    "@closer/core": "workspace:*",
-    "@closer/db": "workspace:*",
-    "@closer/prompts": "workspace:*",
+    "@levelhead/benchmarks": "workspace:*",
+    "@levelhead/contracts": "workspace:*",
+    "@levelhead/core": "workspace:*",
+    "@levelhead/db": "workspace:*",
+    "@levelhead/prompts": "workspace:*",
     "@sinclair/typebox": "0.34.52",
     "pg": "8.23.0"
   }

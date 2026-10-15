@@ -1,7 +1,7 @@
 import type { Static, TSchema } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
-import type { AnyEvent, InvocationRecord } from '@closer/contracts'
-import { AppendOnlyViolation } from '@closer/core'
+import type { AnyEvent, InvocationRecord } from '@levelhead/contracts'
+import { AppendOnlyViolation } from '@levelhead/core'
 import type {
   Clock,
   ConductorPort,
@@ -12,7 +12,7 @@ import type {
   RenderedQuestion,
   StructuredRequest,
   StructuredResult,
-} from '@closer/core'
+} from '@levelhead/core'
 
 // Not a convenience — replay identity is only testable if time and ids are injected.
 export class FixedClock implements Clock {

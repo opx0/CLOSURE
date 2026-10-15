@@ -11,7 +11,7 @@ import {
   StateChangeSchema,
   type AnyEvent,
   type EventKind,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 
 // TypeBox reports a failed union as a bare error at the root; re-running against the `kind`-selected
 // branch gives a real path.

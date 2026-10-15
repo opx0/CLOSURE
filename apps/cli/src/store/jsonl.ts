@@ -1,9 +1,9 @@
 import { appendFile, mkdir, readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { LOCAL_OWNER_ID, type AnyEvent, type OwnerId } from '@closer/contracts'
-import { AppendOnlyViolation, readEvent, type EventStore } from '@closer/core'
+import { LOCAL_OWNER_ID, type AnyEvent, type OwnerId } from '@levelhead/contracts'
+import { AppendOnlyViolation, readEvent, type EventStore } from '@levelhead/core'
 
-const DEFAULT_DIR = '.closer/events'
+const DEFAULT_DIR = '.levelhead/events'
 const EXTENSION = '.jsonl'
 const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 

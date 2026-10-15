@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import type { Span } from '@closer/contracts'
+import type { Span } from '@levelhead/contracts'
 
 export type SpanResolution =
   | { readonly ok: true; readonly bytes: Uint8Array }

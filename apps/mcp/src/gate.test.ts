@@ -15,7 +15,7 @@ async function withReports(
   reports: Record<string, Report>,
   run: (dir: string) => Promise<void>,
 ): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-gate-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-gate-'))
   try {
     for (const [runId, report] of Object.entries(reports)) {
       await mkdir(join(dir, runId), { recursive: true })
@@ -46,13 +46,13 @@ async function withReports(
 }
 
 test('with no benchmark run at all the gate is closed', async () => {
-  const verdict = await agentInterfaceGate(join(tmpdir(), 'closer-gate-does-not-exist'))
+  const verdict = await agentInterfaceGate(join(tmpdir(), 'levelhead-gate-does-not-exist'))
 
   expect(verdict.open).toBe(false)
   expect(verdict.reason).toContain('nothing has been run')
 })
 
-// A run over constructed inputs proves the pipeline works, not that CLOSER beats anything. It must
+// A run over constructed inputs proves the pipeline works, not that Levelhead beats anything. It must
 // never be the thing that opens a gate.
 test('a run over synthetic fixtures does not open the gate', async () => {
   await withReports(

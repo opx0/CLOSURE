@@ -8,8 +8,8 @@ import type {
   JobQueuePort,
   Logger,
   RetrievalPort,
-} from '@closer/core'
-import type { OwnerId, Principal } from '@closer/contracts'
+} from '@levelhead/core'
+import type { OwnerId, Principal } from '@levelhead/contracts'
 
 // Built once at the edge and handed down — a route reaching for `process.env` itself would be a
 // second composition root, drifting from this one the first time they disagreed about a ceiling.

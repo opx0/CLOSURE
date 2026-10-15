@@ -1,5 +1,5 @@
-import type { ComposureSignal, Mode, PolicyAction } from '@closer/contracts'
-import { COMPOSURE_HELD } from '@closer/contracts'
+import type { ComposureSignal, Mode, PolicyAction } from '@levelhead/contracts'
+import { COMPOSURE_HELD } from '@levelhead/contracts'
 
 export type PressureLevel = 0 | 1 | 2 | 3
 

@@ -1,4 +1,4 @@
-import type { GapEntry } from '@closer/contracts'
+import type { GapEntry } from '@levelhead/contracts'
 import { nextReviewAt, reviewCountAfter } from './spacing.ts'
 
 // Read off the ledger's recorded attempts rather than off a field invented for the schedule.

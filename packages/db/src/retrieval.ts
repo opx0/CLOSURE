@@ -1,6 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm'
-import { LOCAL_OWNER_ID, type Artifact, type OwnerId, type Snapshot } from '@closer/contracts'
-import type { IndexedArtifact, RetrievalHit, RetrievalPort } from '@closer/core'
+import { LOCAL_OWNER_ID, type Artifact, type OwnerId, type Snapshot } from '@levelhead/contracts'
+import type { IndexedArtifact, RetrievalHit, RetrievalPort } from '@levelhead/core'
 import { artifactIndex, snapshots } from './schema.ts'
 import { toQuery } from './postgres-event-store.ts'
 import type { SqlExecutor } from './sql.ts'

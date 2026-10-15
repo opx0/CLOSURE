@@ -1,7 +1,7 @@
 import { join } from 'node:path'
-import { buildExportBundle } from '@closer/core'
+import { buildExportBundle } from '@levelhead/core'
 import { LocalObjectStore } from '../../../cli/src/store/objects.ts'
-import type { JobRecord } from '@closer/contracts'
+import type { JobRecord } from '@levelhead/contracts'
 import type { HandlerContext } from './context.ts'
 
 export async function buildExport(job: JobRecord, context: HandlerContext): Promise<void> {
@@ -22,7 +22,7 @@ export async function buildExport(job: JobRecord, context: HandlerContext): Prom
 
   // Through the object-store port (ADR-017): the local filesystem here, an S3-compatible bucket
   // wherever this is deployed, with no change above this line.
-  const objects = new LocalObjectStore(context.config.CLOSER_EXPORT_DIR)
+  const objects = new LocalObjectStore(context.config.LEVELHEAD_EXPORT_DIR)
   const key = `${job.ownerId}/${job.payload.destination}.json`
   const written = await objects.put(key, `${JSON.stringify(bundle, null, 2)}\n`)
 
@@ -30,7 +30,7 @@ export async function buildExport(job: JobRecord, context: HandlerContext): Prom
     jobId: job.id,
     ownerId: job.ownerId,
     sessions: bundle.sessions.length,
-    file: join(context.config.CLOSER_EXPORT_DIR, key),
+    file: join(context.config.LEVELHEAD_EXPORT_DIR, key),
     bytes: written.bytes,
     contentHash: written.contentHash,
   })

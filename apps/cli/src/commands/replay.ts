@@ -1,4 +1,4 @@
-import { replay as fold, spanViolations } from '@closer/core'
+import { replay as fold, spanViolations } from '@levelhead/core'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line, quote } from '../terminal.ts'

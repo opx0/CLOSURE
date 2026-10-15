@@ -8,7 +8,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   { languageOptions: { globals: { ...globals.node } } },
   {
-    // core stays framework-independent: it may import @closer/contracts and @closer/prompts
+    // core stays framework-independent: it may import @levelhead/contracts and @levelhead/prompts
     // (both are plain domain packages) and nothing that carries a framework or a driver.
     files: ['packages/core/**/*.ts'],
     rules: {
@@ -25,11 +25,11 @@ export default tseslint.config(
                 'drizzle-orm',
                 'drizzle-orm/*',
                 'pg',
-                '@closer/server',
-                '@closer/web',
+                '@levelhead/server',
+                '@levelhead/web',
               ],
               message:
-                'packages/core must stay framework-independent; import @closer/contracts or @closer/prompts.',
+                'packages/core must stay framework-independent; import @levelhead/contracts or @levelhead/prompts.',
             },
           ],
         },

@@ -1,4 +1,4 @@
-import type { EvaluatorPort } from '@closer/core'
+import type { EvaluatorPort } from '@levelhead/core'
 import { ScriptedEvaluator } from '../../../apps/cli/src/testing/fakes.ts'
 import type { FixtureSet } from '../contract.ts'
 import type { LabelRecord } from '../labels.ts'
@@ -87,7 +87,7 @@ export function syntheticLabels(labeller = 'fixture-author'): LabelRecord[] {
   ]
 }
 
-// One claim verbatim in the resume, one not: CLOSER drops the second for an unresolved span, the
+// One claim verbatim in the resume, one not: Levelhead drops the second for an unresolved span, the
 // generic arm keeps it - the citation discipline the extraction metric shows.
 export const SCRIPTED_EXTRACTION = {
   claims: [

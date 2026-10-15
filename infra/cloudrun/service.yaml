@@ -3,7 +3,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: closer-showcase
+  name: levelhead-showcase
   annotations:
     run.googleapis.com/ingress: all
 spec:
@@ -12,36 +12,36 @@ spec:
       annotations:
         autoscaling.knative.dev/minScale: '0'
         autoscaling.knative.dev/maxScale: '2'
-        run.googleapis.com/cloudsql-instances: PROJECT:REGION:closer
+        run.googleapis.com/cloudsql-instances: PROJECT:REGION:levelhead
     spec:
       containerConcurrency: 20
       timeoutSeconds: 120
-      serviceAccountName: closer-showcase@PROJECT.iam.gserviceaccount.com
+      serviceAccountName: levelhead-showcase@PROJECT.iam.gserviceaccount.com
       containers:
-        - image: REGION-docker.pkg.dev/PROJECT/closer/server:TAG
+        - image: REGION-docker.pkg.dev/PROJECT/levelhead/server:TAG
           ports:
             - containerPort: 3001
           env:
             - name: NODE_ENV
               value: production
-            - name: CLOSER_STORE
+            - name: LEVELHEAD_STORE
               value: postgres
-            - name: CLOSER_DEMO_MODE
+            - name: LEVELHEAD_DEMO_MODE
               value: 'true'
-            - name: CLOSER_RATE_LIMIT_PER_MINUTE
+            - name: LEVELHEAD_RATE_LIMIT_PER_MINUTE
               value: '60'
             - name: LOG_LEVEL
               value: info
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: closer-database-url
+                  name: levelhead-database-url
                   key: latest
             # The key itself never appears in a manifest, a log, or an image layer.
             - name: MODEL_PROVIDER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: closer-model-key
+                  name: levelhead-model-key
                   key: latest
           resources:
             limits:

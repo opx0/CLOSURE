@@ -1,4 +1,4 @@
-import type { ConductorPort, EvaluatorPort } from '@closer/core'
+import type { ConductorPort, EvaluatorPort } from '@levelhead/core'
 import { OpenAiCompatibleConductor } from './conductor-openai.ts'
 import { StructuredEvaluator } from './evaluator-structured.ts'
 import { LOCAL_MODEL_ALIAS } from './pricing.ts'

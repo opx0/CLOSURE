@@ -1,8 +1,8 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { FindingSchema, GapEntrySchema } from '@closer/contracts'
-import type { GapEntry } from '@closer/contracts'
-import { replay, spanViolations } from '@closer/core'
+import { FindingSchema, GapEntrySchema } from '@levelhead/contracts'
+import type { GapEntry } from '@levelhead/contracts'
+import { replay, spanViolations } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
 import {
   ErrorSchema,

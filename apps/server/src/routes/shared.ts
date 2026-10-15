@@ -1,6 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox'
-import { FindingSchema, type Finding } from '@closer/contracts'
-import type { SessionView } from '@closer/core'
+import { FindingSchema, type Finding } from '@levelhead/contracts'
+import type { SessionView } from '@levelhead/core'
 
 // The id becomes a filename in the JSONL store — this pattern turns `../../etc/passwd` into a 400
 // here, not a 500 from the adapter that refused to open it.

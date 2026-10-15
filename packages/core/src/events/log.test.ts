@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { AnyEvent } from '@closer/contracts'
+import type { AnyEvent } from '@levelhead/contracts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 import { AppendOnlyViolation, type EventStore } from '../ports/event-store.ts'
 import { SessionLog } from './log.ts'

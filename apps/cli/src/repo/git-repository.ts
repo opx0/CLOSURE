@@ -1,14 +1,14 @@
 import { execFile } from 'node:child_process'
 import type { Buffer } from 'node:buffer'
 import { resolve } from 'node:path'
-import type { Artifact, Snapshot } from '@closer/contracts'
+import type { Artifact, Snapshot } from '@levelhead/contracts'
 import {
   extractSymbols,
   type Clock,
   type IdSource,
   type PinnedRepository,
   type RepositoryPort,
-} from '@closer/core'
+} from '@levelhead/core'
 import { SystemClock } from '../runtime.ts'
 
 // Snapshots are read via `rev-parse`/`ls-tree`/`show` at the pinned commit, never `checkout` — so
@@ -232,7 +232,7 @@ export class GitRepository implements RepositoryPort {
       if (kind !== 'blob') continue
       entries.push({ path: record.slice(tab + 1), size: Number(size) })
     }
-    // Tree order is git's, not the ingest order CLOSER wants to be able to reproduce.
+    // Tree order is git's, not the ingest order Levelhead wants to be able to reproduce.
     return entries.sort((a, b) => a.path.localeCompare(b.path))
   }
 

@@ -1,5 +1,5 @@
-import { DELIVERY_BOUNDARY, FILLER_WORDS } from '@closer/contracts'
-import type { DeliveryReport, SpokenTurn } from '@closer/contracts'
+import { DELIVERY_BOUNDARY, FILLER_WORDS } from '@levelhead/contracts'
+import type { DeliveryReport, SpokenTurn } from '@levelhead/contracts'
 
 export const LONG_PAUSE_MS = 1_500
 

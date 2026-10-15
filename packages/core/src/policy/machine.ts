@@ -1,4 +1,4 @@
-import type { SessionState } from '@closer/contracts'
+import type { SessionState } from '@levelhead/contracts'
 
 // Facts about what happened, not commands — the machine is driven by the same events the log
 // records, so a replayed session walks the same path as a live one.

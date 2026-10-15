@@ -13,7 +13,7 @@ import {
 function item(over: Partial<ItemOutcome>): ItemOutcome {
   return {
     itemId: 'item-1',
-    armId: 'closer_full',
+    armId: 'levelhead_full',
     transcript: [],
     actions: [],
     questionsAsked: 0,

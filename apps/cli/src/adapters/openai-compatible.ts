@@ -1,7 +1,7 @@
-import type { StopReason } from '@closer/contracts'
+import type { StopReason } from '@levelhead/contracts'
 import { guarded, type ProviderResilience } from './resilience.ts'
 
-// Only the fields CLOSER reads are typed — a crash-looped local server can still return HTML with a 200.
+// Only the fields Levelhead reads are typed — a crash-looped local server can still return HTML with a 200.
 export interface ChatCompletionRequest {
   model: string
   messages: { role: 'system' | 'user'; content: string }[]

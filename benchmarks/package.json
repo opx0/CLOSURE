@@ -1,5 +1,5 @@
 {
-  "name": "@closer/benchmarks",
+  "name": "@levelhead/benchmarks",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit -p ../tsconfig.json"
   },
   "dependencies": {
-    "@closer/contracts": "workspace:*",
-    "@closer/core": "workspace:*"
+    "@levelhead/contracts": "workspace:*",
+    "@levelhead/core": "workspace:*"
   }
 }

@@ -5,13 +5,13 @@ import { loadCliConfig } from '../../cli/src/config.ts'
 import { agentInterfaceGate } from './gate.ts'
 import { buildMcpServer } from './server.ts'
 
-const REPORTS_DIR = process.env.CLOSER_BENCHMARK_DIR ?? '.closer/benchmarks'
+const REPORTS_DIR = process.env.LEVELHEAD_BENCHMARK_DIR ?? '.levelhead/benchmarks'
 
 const gate = await agentInterfaceGate(REPORTS_DIR)
 if (!gate.open) {
   process.stderr.write(
     [
-      'The CLOSER agent interface is gated behind the benchmark beating a baseline (ADR-011).',
+      'The Levelhead agent interface is gated behind the benchmark beating a baseline (ADR-011).',
       `It is closed: ${gate.reason}`,
       '',
       'This is not a configuration error and there is no flag that opens it. Run the benchmark',
@@ -29,5 +29,5 @@ const server = buildMcpServer({
   gate,
 })
 
-process.stderr.write(`closer mcp ready — gate opened by ${gate.runId ?? 'unknown run'}\n`)
+process.stderr.write(`levelhead mcp ready — gate opened by ${gate.runId ?? 'unknown run'}\n`)
 await server.connect(new StdioServerTransport())

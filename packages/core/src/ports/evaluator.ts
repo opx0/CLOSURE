@@ -1,5 +1,5 @@
 import type { Static, TSchema } from '@sinclair/typebox'
-import type { InvocationRecord } from '@closer/contracts'
+import type { InvocationRecord } from '@levelhead/contracts'
 
 // ADR-011's controlled path: one call, strict schema, no tool-using agent loop — an agent chewing on
 // untrusted résumé text is a prompt-injection amplifier.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { CLAIM_VERDICT_ORDER } from '@closer/contracts'
+import { CLAIM_VERDICT_ORDER } from '@levelhead/contracts'
 import {
   FLAGSHIP_AGREEMENT_MIN_N,
   LabelIndex,

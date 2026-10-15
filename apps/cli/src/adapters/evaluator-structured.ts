@@ -1,12 +1,12 @@
 import type { Static, TSchema } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
-import type { InvocationRecord, StopReason } from '@closer/contracts'
+import type { InvocationRecord, StopReason } from '@levelhead/contracts'
 import type {
   EvaluatorPort,
   StructuredFailure,
   StructuredRequest,
   StructuredResult,
-} from '@closer/core'
+} from '@levelhead/core'
 import {
   mapFinishReason,
   postChatCompletion,

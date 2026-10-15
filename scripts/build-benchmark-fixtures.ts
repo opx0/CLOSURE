@@ -85,6 +85,6 @@ for (const id of ids) {
 await mkdir('fixtures/benchmark', { recursive: true })
 await writeFile(
   OUT,
-  `${JSON.stringify({ id: 'closer-fixtures', version: 1, synthetic: true, resumes, items }, null, 2)}\n`,
+  `${JSON.stringify({ id: 'levelhead-fixtures', version: 1, synthetic: true, resumes, items }, null, 2)}\n`,
 )
 process.stdout.write(`${OUT}: ${resumes.length} résumés, ${items.length} items\n`)

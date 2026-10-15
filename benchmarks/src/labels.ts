@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
-import { CLAIM_VERDICT_ORDER } from '@closer/contracts'
-import type { ClaimType, ClaimVerdict, Competency } from '@closer/contracts'
+import { CLAIM_VERDICT_ORDER } from '@levelhead/contracts'
+import type { ClaimType, ClaimVerdict, Competency } from '@levelhead/contracts'
 import { isEvaluatorErrorClass, type EvaluatorErrorClass } from './error-taxonomy.ts'
 import type { FixtureSet, LabelingDisclosure } from './contract.ts'
 import type { GoldClaim } from './metrics.ts'
@@ -150,7 +150,7 @@ export async function loadLabels(path: string): Promise<ParsedLabels> {
 // Emits no verdicts: a template that pre-filled one would be a label nobody made.
 export function labelTemplate(fixtures: FixtureSet, labeller: string, date: string): string {
   const lines = [
-    `# CLOSER Bench labels for fixture set ${fixtures.id} v${fixtures.version}`,
+    `# Levelhead Bench labels for fixture set ${fixtures.id} v${fixtures.version}`,
     '# One JSON object per line. Blank lines and lines starting with # are ignored.',
     '#',
     '#   {"kind":"resume_claim","resumeId":"...","quote":"verbatim from the resume",',

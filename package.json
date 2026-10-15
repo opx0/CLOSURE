@@ -1,5 +1,5 @@
 {
-  "name": "closer",
+  "name": "levelhead",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -28,7 +28,7 @@
     "llama:up:gpu": "docker compose -f infra/docker-compose.yml -f infra/docker-compose.gpu.yml --profile models up -d llama",
     "llama:down": "docker compose -f infra/docker-compose.yml --profile models down",
     "llama:logs": "docker compose -f infra/docker-compose.yml logs -f llama",
-    "closer": "bun run apps/cli/src/index.ts",
+    "levelhead": "bun run apps/cli/src/index.ts",
     "fixtures:build": "bun run scripts/build-fixtures.ts",
     "db:migrate": "bun run packages/db/src/migrate-cli.ts",
     "fixtures:benchmark": "bun run scripts/build-benchmark-fixtures.ts",
@@ -41,7 +41,7 @@
     "showcase:up": "bash scripts/showcase.sh up",
     "showcase:down": "bash scripts/showcase.sh down",
     "showcase:url": "bash scripts/showcase.sh url",
-    "docker:build": "docker build -f infra/Dockerfile --target runtime -t closer-server:local .",
+    "docker:build": "docker build -f infra/Dockerfile --target runtime -t levelhead-server:local .",
     "mcp": "bun run apps/mcp/src/index.ts",
     "db:reset": "bash scripts/db-reset.sh",
     "smoke": "bun run scripts/smoke.ts",
@@ -49,8 +49,8 @@
     "e2e:install": "playwright install chromium"
   },
   "devDependencies": {
-    "@closer/contracts": "workspace:*",
-    "@closer/core": "workspace:*",
+    "@levelhead/contracts": "workspace:*",
+    "@levelhead/core": "workspace:*",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/bun": "1.4.0",

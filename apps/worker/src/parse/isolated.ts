@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import type { Artifact, Snapshot } from '@closer/contracts'
+import type { Artifact, Snapshot } from '@levelhead/contracts'
 
 const CHILD = fileURLToPath(new URL('./child.ts', import.meta.url))
 

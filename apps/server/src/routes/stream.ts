@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { widenFindings } from '@closer/contracts'
+import { widenFindings } from '@levelhead/contracts'
 import type { SessionHost } from '../session-host.ts'
 import { SessionIdParamsSchema } from './shared.ts'
 

@@ -3,10 +3,10 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "closer",
+      "name": "levelhead",
       "devDependencies": {
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
         "@eslint/js": "10.0.1",
         "@playwright/test": "1.63.0",
         "@types/bun": "1.4.0",
@@ -20,38 +20,38 @@
       },
     },
     "apps/cli": {
-      "name": "@closer/cli",
+      "name": "@levelhead/cli",
       "version": "0.0.0",
       "bin": {
-        "closer": "./src/index.ts",
+        "levelhead": "./src/index.ts",
       },
       "dependencies": {
-        "@closer/benchmarks": "workspace:*",
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
-        "@closer/db": "workspace:*",
-        "@closer/prompts": "workspace:*",
+        "@levelhead/benchmarks": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
+        "@levelhead/db": "workspace:*",
+        "@levelhead/prompts": "workspace:*",
         "@sinclair/typebox": "0.34.52",
         "pg": "8.23.0",
       },
     },
     "apps/mcp": {
-      "name": "@closer/mcp",
+      "name": "@levelhead/mcp",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
         "@modelcontextprotocol/sdk": "1.30.0",
       },
     },
     "apps/server": {
-      "name": "@closer/server",
+      "name": "@levelhead/server",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
-        "@closer/db": "workspace:*",
-        "@closer/observability": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
+        "@levelhead/db": "workspace:*",
+        "@levelhead/observability": "workspace:*",
         "@fastify/cors": "11.3.0",
         "@fastify/helmet": "13.1.1",
         "@fastify/rate-limit": "11.2.0",
@@ -65,7 +65,7 @@
       },
     },
     "apps/web": {
-      "name": "@closer/web",
+      "name": "@levelhead/web",
       "version": "0.0.0",
       "dependencies": {
         "@tanstack/react-query": "5.102.8",
@@ -83,55 +83,55 @@
       },
     },
     "apps/worker": {
-      "name": "@closer/worker",
+      "name": "@levelhead/worker",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/cli": "workspace:*",
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
-        "@closer/db": "workspace:*",
-        "@closer/observability": "workspace:*",
+        "@levelhead/cli": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
+        "@levelhead/db": "workspace:*",
+        "@levelhead/observability": "workspace:*",
         "@sinclair/typebox": "0.34.52",
         "pg": "8.23.0",
       },
     },
     "benchmarks": {
-      "name": "@closer/benchmarks",
+      "name": "@levelhead/benchmarks",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
       },
     },
     "packages/contracts": {
-      "name": "@closer/contracts",
+      "name": "@levelhead/contracts",
       "version": "0.0.0",
       "dependencies": {
         "@sinclair/typebox": "0.34.52",
       },
     },
     "packages/core": {
-      "name": "@closer/core",
+      "name": "@levelhead/core",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/contracts": "workspace:*",
-        "@closer/prompts": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/prompts": "workspace:*",
         "@sinclair/typebox": "0.34.52",
       },
     },
     "packages/db": {
-      "name": "@closer/db",
+      "name": "@levelhead/db",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/contracts": "workspace:*",
-        "@closer/core": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
+        "@levelhead/core": "workspace:*",
         "@sinclair/typebox": "0.34.52",
         "drizzle-orm": "0.45.2",
         "pg": "8.23.0",
       },
     },
     "packages/observability": {
-      "name": "@closer/observability",
+      "name": "@levelhead/observability",
       "version": "0.0.0",
       "dependencies": {
         "@opentelemetry/api": "1.9.1",
@@ -143,10 +143,10 @@
       },
     },
     "packages/prompts": {
-      "name": "@closer/prompts",
+      "name": "@levelhead/prompts",
       "version": "0.0.0",
       "dependencies": {
-        "@closer/contracts": "workspace:*",
+        "@levelhead/contracts": "workspace:*",
         "@sinclair/typebox": "0.34.52",
       },
     },
@@ -159,27 +159,27 @@
 
     "@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.29.7", "", {}, "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="],
 
-    "@closer/benchmarks": ["@closer/benchmarks@workspace:benchmarks"],
+    "@levelhead/benchmarks": ["@levelhead/benchmarks@workspace:benchmarks"],
 
-    "@closer/cli": ["@closer/cli@workspace:apps/cli"],
+    "@levelhead/cli": ["@levelhead/cli@workspace:apps/cli"],
 
-    "@closer/contracts": ["@closer/contracts@workspace:packages/contracts"],
+    "@levelhead/contracts": ["@levelhead/contracts@workspace:packages/contracts"],
 
-    "@closer/core": ["@closer/core@workspace:packages/core"],
+    "@levelhead/core": ["@levelhead/core@workspace:packages/core"],
 
-    "@closer/db": ["@closer/db@workspace:packages/db"],
+    "@levelhead/db": ["@levelhead/db@workspace:packages/db"],
 
-    "@closer/mcp": ["@closer/mcp@workspace:apps/mcp"],
+    "@levelhead/mcp": ["@levelhead/mcp@workspace:apps/mcp"],
 
-    "@closer/observability": ["@closer/observability@workspace:packages/observability"],
+    "@levelhead/observability": ["@levelhead/observability@workspace:packages/observability"],
 
-    "@closer/prompts": ["@closer/prompts@workspace:packages/prompts"],
+    "@levelhead/prompts": ["@levelhead/prompts@workspace:packages/prompts"],
 
-    "@closer/server": ["@closer/server@workspace:apps/server"],
+    "@levelhead/server": ["@levelhead/server@workspace:apps/server"],
 
-    "@closer/web": ["@closer/web@workspace:apps/web"],
+    "@levelhead/web": ["@levelhead/web@workspace:apps/web"],
 
-    "@closer/worker": ["@closer/worker@workspace:apps/worker"],
+    "@levelhead/worker": ["@levelhead/worker@workspace:apps/worker"],
 
     "@eslint-community/eslint-utils": ["@eslint-community/eslint-utils@4.10.1", "", { "dependencies": { "eslint-visitor-keys": "^3.4.3" }, "peerDependencies": { "eslint": "^6.0.0 || ^7.0.0 || >=8.0.0" } }, "sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg=="],
 

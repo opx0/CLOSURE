@@ -1,4 +1,4 @@
-import type { AnyEvent } from '@closer/contracts'
+import type { AnyEvent } from '@levelhead/contracts'
 
 // Append-only is what makes replay possible — each adapter enforces it itself (O_APPEND in JSONL, a
 // unique constraint + trigger in Postgres), not this interface.
