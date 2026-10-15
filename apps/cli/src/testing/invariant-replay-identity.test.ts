@@ -1,9 +1,10 @@
 import { test, expect } from 'bun:test'
 import { Buffer } from 'node:buffer'
-import { replay } from '@closer/core'
-import type { SessionView } from '@closer/core'
-import type { AnyEvent, Claim } from '@closer/contracts'
-import { MemoryEventStore, ScriptedConductor, ScriptedEvaluator } from './fakes.ts'
+import { replay, topicById } from '@levelhead/core'
+import type { SessionView } from '@levelhead/core'
+import type { RenderedQuestion } from '@levelhead/core'
+import type { AnyEvent, Claim, Topic } from '@levelhead/contracts'
+import { MemoryEventStore, ScriptedConductor, ScriptedEvaluator, fakeInvocation } from './fakes.ts'
 import { citationFailures, runHarnessSession } from './harness.ts'
 import { RecordedConductor, RecordedEvaluator, recordedAnswers } from './recorded.ts'
 
@@ -179,4 +180,123 @@ test('a replay whose log runs out fails loudly instead of inventing the rest of 
       store: new MemoryEventStore(),
     }),
   ).rejects.toThrow(/no further/)
+})
+
+function topic(id: string): Topic {
+  const found = topicById(id)
+  if (found === undefined) throw new Error(`no topic ${id} in the catalog`)
+  return found
+}
+
+test('a topic interview with an abstention replays from its own log byte-for-byte', async () => {
+  const answers = [
+    'Each thread holds one lock and waits for the lock the other one holds.',
+    'You could maybe order the locks somehow, I am not sure.',
+  ]
+  const evaluations = [
+    {
+      findings: [
+        {
+          kind: 'competency',
+          competency: 'mechanism',
+          levelMet: 'junior',
+          rationale: 'hold-and-wait on two locks is described',
+          confidence: 0.7,
+          quotes: ['holds one lock and waits for the lock the other one holds'],
+        },
+      ],
+    },
+    {
+      findings: [
+        {
+          kind: 'competency_abstained',
+          competency: 'trade_offs',
+          abstention: 'insufficient_evidence',
+          rationale: 'lock ordering is named but not described',
+          confidence: 0.5,
+          quotes: ['order the locks somehow'],
+        },
+      ],
+    },
+  ]
+  const session = {
+    claims: [],
+    rounds: ['cs_fundamentals' as const],
+    topics: [topic('os.deadlock')],
+    level: 'junior' as const,
+    turnsPerRound: answers.length,
+  }
+
+  const first = await runHarnessSession({
+    ...session,
+    answers,
+    conductor: new ScriptedConductor(['Walk me through a deadlock.', 'How would you prevent it?']),
+    evaluator: new ScriptedEvaluator(evaluations),
+  })
+  const second = await runHarnessSession({
+    ...session,
+    answers: recordedAnswers(first.events),
+    conductor: new RecordedConductor(first.events),
+    evaluator: new RecordedEvaluator(first.events),
+    store: new MemoryEventStore(),
+  })
+
+  expect(first.result.view.findings.map((finding) => finding.kind)).toEqual([
+    'competency',
+    'competency_abstained',
+  ])
+  expect(JSON.stringify(second.events)).toBe(JSON.stringify(first.events))
+})
+
+// Shaped like the production conductor, which opens each round with a spoken line; the second
+// line echoes the persona's own description and is refused, so it is logged without its text.
+class BriefingConductor extends ScriptedConductor {
+  readonly #briefs: string[]
+
+  constructor(questions: readonly string[], briefs: readonly string[]) {
+    super(questions)
+    this.#briefs = [...briefs]
+  }
+
+  async renderRoundBrief(): Promise<RenderedQuestion> {
+    return {
+      text: this.#briefs.shift() ?? '',
+      invocation: fakeInvocation({ port: 'conductor', promptId: 'round-brief' }),
+    }
+  }
+}
+
+test('round briefs are logged with their invocations and replay from the log byte-for-byte', async () => {
+  const session = {
+    claims: [CLAIM],
+    rounds: ['project_deep_dive' as const, 'design_extension' as const],
+    turnsPerRound: 1,
+  }
+  const first = await runHarnessSession({
+    ...session,
+    answers: [ANSWERS[0] ?? '', ANSWERS[2] ?? ''],
+    conductor: new BriefingConductor(QUESTIONS, ['Tell me about the queue.', 'voice: doubtful']),
+    evaluator: new ScriptedEvaluator([EVALUATIONS[0], EVALUATIONS[2]]),
+  })
+  const second = await runHarnessSession({
+    ...session,
+    answers: recordedAnswers(first.events),
+    conductor: new RecordedConductor(first.events),
+    evaluator: new RecordedEvaluator(first.events),
+    store: new MemoryEventStore(),
+  })
+
+  const opened = first.events.flatMap((event) =>
+    event.kind === 'state_change' && event.payload.change === 'round_started'
+      ? [[event.payload.brief, event.payload.briefInvocation?.promptId]]
+      : [],
+  )
+  expect(opened).toEqual([
+    ['Tell me about the queue.', 'round-brief'],
+    [undefined, 'round-brief'],
+  ])
+  expect(
+    first.result.view.invocations.filter((call) => call.promptId === 'round-brief'),
+  ).toHaveLength(2)
+  expect(JSON.stringify(second.events)).toBe(JSON.stringify(first.events))
 })

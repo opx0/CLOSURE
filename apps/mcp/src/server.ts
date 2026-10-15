@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import type { GapEntry } from '@closer/contracts'
-import { planNextSession, replay, type EventStore } from '@closer/core'
+import type { GapEntry } from '@levelhead/contracts'
+import { planNextSession, replay, type EventStore } from '@levelhead/core'
 import type { GateVerdict } from './gate.ts'
 
 export interface McpDeps {
@@ -12,13 +12,13 @@ export interface McpDeps {
 
 const TOOLS = [
   {
-    name: 'closer_gap_ledger',
+    name: 'levelhead_gap_ledger',
     description:
       'The candidate’s open, drilled, unverified and closed gaps, with the exact words each was found in. There is no readiness score and no aggregate.',
     inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
   },
   {
-    name: 'closer_due',
+    name: 'levelhead_due',
     description: 'What is due for drill, transfer or unannounced retrieval within a horizon.',
     inputSchema: {
       type: 'object' as const,
@@ -27,7 +27,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'closer_session',
+    name: 'levelhead_session',
     description:
       'One session replayed from its append-only log: transcript, findings with citations, and the plan behind every question.',
     inputSchema: {
@@ -44,10 +44,13 @@ function text(value: unknown) {
 }
 
 // A thin adapter over the same use cases the CLI and the HTTP API drive — never a second
-// architecture (ADR-011). It is read-only on purpose: an external agent may inspect what CLOSER
+// architecture (ADR-011). It is read-only on purpose: an external agent may inspect what Levelhead
 // found, and may not run an interview on the candidate's behalf.
 export function buildMcpServer(deps: McpDeps): Server {
-  const server = new Server({ name: 'closer', version: '0.0.0' }, { capabilities: { tools: {} } })
+  const server = new Server(
+    { name: 'levelhead', version: '0.0.0' },
+    { capabilities: { tools: {} } },
+  )
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 
@@ -55,7 +58,7 @@ export function buildMcpServer(deps: McpDeps): Server {
     const args = (request.params.arguments ?? {}) as Record<string, unknown>
 
     switch (request.params.name) {
-      case 'closer_gap_ledger': {
+      case 'levelhead_gap_ledger': {
         const gaps = new Map<string, GapEntry>()
         const quotes = new Map<string, string>()
         for (const sessionId of await deps.store.listSessions()) {
@@ -77,7 +80,7 @@ export function buildMcpServer(deps: McpDeps): Server {
         })
       }
 
-      case 'closer_due': {
+      case 'levelhead_due': {
         const gaps = new Map<string, GapEntry>()
         for (const sessionId of await deps.store.listSessions()) {
           for (const gap of replay(await deps.store.read(sessionId)).gaps.values()) {
@@ -97,7 +100,7 @@ export function buildMcpServer(deps: McpDeps): Server {
         )
       }
 
-      case 'closer_session': {
+      case 'levelhead_session': {
         const sessionId = String(args['sessionId'] ?? '')
         const events = await deps.store.read(sessionId)
         if (events.length === 0) {

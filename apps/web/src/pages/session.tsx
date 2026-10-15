@@ -1,30 +1,229 @@
-import { useEffect, useRef, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
-import { api } from '../api/client.ts'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ApiError, api, type StartSessionBody } from '../api/client.ts'
 import type { Finding, QuotedEvidence, TurnUpdate } from '../api/types.ts'
 import { EvidenceProvider, Highlighted, useEvidence } from '../components/evidence.tsx'
 import { FindingCard } from '../components/finding-card.tsx'
+import { ClaimChip, FilePanel, TopicChip } from '../components/question.tsx'
 import { Recorder } from '../components/recorder.tsx'
-import { Button, Failed, Panel, Quiet, Tag } from '../components/primitives.tsx'
-import { speak, type SpokenAnswer } from '../lib/voice.ts'
+import { Button, Empty, Failed, Loading, Panel, Quiet, Tag } from '../components/primitives.tsx'
+import { JourneyIcon, JourneyLink, PageIntro, PracticeFlow } from '../components/journey.tsx'
+import { useClaimSet } from '../lib/claim-set.ts'
+import {
+  LEVEL_LABEL,
+  ROUND_BLURB,
+  ROUND_LABEL,
+  inRoundOrder,
+  isRound,
+  roleAreasLabel,
+  roundsAbout,
+  subjectOf,
+  topicsFor,
+  useTopicCatalog,
+  type Level,
+  type Role,
+  type RoundKind,
+  type SubjectKind,
+  type TopicSummary,
+} from '../lib/catalog.ts'
 import { words } from '../lib/format.ts'
+import { speak, type SpokenAnswer } from '../lib/voice.ts'
 
-const LEVELS = ['junior', 'mid', 'senior', 'staff'] as const
-const PERSONAS = ['collaborator', 'skeptic', 'bar_raiser', 'rusher'] as const
-const MODES = ['simulation', 'coach', 'drill', 'transfer'] as const
-const ROUNDS = ['project_deep_dive', 'design_extension', 'behavioral'] as const
+type Question = NonNullable<TurnUpdate['question']>
+type RoundInfo = NonNullable<TurnUpdate['round']>
+type Persona = NonNullable<StartSessionBody['personaId']>
+type Mode = NonNullable<StartSessionBody['mode']>
+
+const PERSONAS: readonly { id: Persona; label: string }[] = [
+  { id: 'collaborator', label: 'Collaborator: warm, builds on your answers' },
+  { id: 'skeptic', label: 'Skeptic: assumes nothing, asks for evidence' },
+  { id: 'bar_raiser', label: 'Bar raiser: probes for the level above yours' },
+  { id: 'rusher', label: 'Rusher: terse, cuts in, moves on sooner' },
+]
+
+const MODES: readonly { id: Mode; label: string }[] = [
+  { id: 'coach', label: 'Coach: findings after every answer' },
+  { id: 'simulation', label: 'Simulation: findings held until each round ends' },
+  { id: 'drill', label: 'Drill: repeated practice on a weak spot' },
+  { id: 'transfer', label: 'Transfer: the same idea under changed constraints' },
+]
+
+const STOPPED: Record<string, string> = {
+  turns: 'every planned question was asked',
+  end_topic: 'the interviewer ran out of new ground to cover',
+  ceiling: 'a cost or model-call ceiling was reached, so it stopped rather than degrade',
+  evaluator_failure: 'the evaluator failed, so it stopped rather than guess',
+  practice_outcome_rejected:
+    'an invalid or conflicting practice outcome was rejected; earlier gap progress was preserved',
+}
 
 interface Exchange {
-  question: string
-  action: string
-  pressureLevel: number
+  question: Question
+  opened?: RoundInfo
+  notices: string[]
   answer: string | null
+}
+
+interface Room {
+  mode: Mode
+  exchanges: Exchange[]
+  findings: Finding[]
+  quotes: QuotedEvidence[]
+  tail: string[]
+  round: RoundInfo | null
+  pressure: number
+  ceiling: number
+  closedBy: string | null
+}
+
+interface Opening {
+  mode: Mode
+  update: TurnUpdate
+  ceiling: number
+}
+
+function absorb(room: Room, update: TurnUpdate): Room {
+  const asked = update.question
+  return {
+    mode: room.mode,
+    exchanges:
+      asked === undefined
+        ? room.exchanges
+        : [
+            ...room.exchanges,
+            {
+              question: asked,
+              ...(update.round === undefined ? {} : { opened: update.round }),
+              notices: update.notices,
+              answer: null,
+            },
+          ],
+    findings: [...room.findings, ...update.findings],
+    quotes: [...room.quotes, ...update.quotes],
+    tail: asked === undefined ? update.notices : [],
+    round: update.round ?? room.round,
+    pressure: asked?.pressureLevel ?? room.pressure,
+    ceiling: room.ceiling,
+    closedBy: update.status === 'closed' ? (update.stoppedBy ?? 'closed') : room.closedBy,
+  }
+}
+
+function opened({ update, ceiling, mode }: Opening): Room {
+  const empty: Room = {
+    mode,
+    exchanges: [],
+    findings: [],
+    quotes: [],
+    tail: [],
+    round: null,
+    pressure: 0,
+    ceiling,
+    closedBy: null,
+  }
+  return absorb(empty, update)
+}
+
+async function excerpt(
+  snapshotId: string | undefined,
+  artifactId: string,
+): Promise<readonly [string, Question['artifact']]> {
+  if (snapshotId === undefined) return [artifactId, undefined]
+  try {
+    return [artifactId, (await api.artifact(snapshotId, artifactId)).artifact]
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return [artifactId, undefined]
+    throw error
+  }
+}
+
+async function restore(sessionId: string, topics: readonly TopicSummary[]): Promise<Room> {
+  const [view, events, claimSet] = await Promise.all([
+    api.session(sessionId),
+    api.events(sessionId),
+    api.claimSet(),
+  ])
+  const total = view.session?.rounds.length ?? 1
+  const artifactIds = new Set(
+    events.flatMap((event) =>
+      event.kind === 'policy_action' && event.payload.artifactId !== undefined
+        ? [event.payload.artifactId]
+        : [],
+    ),
+  )
+  const shown = new Map(
+    await Promise.all([...artifactIds].map((id) => excerpt(view.session?.snapshotId, id))),
+  )
+  const answers = new Map(
+    view.transcript
+      .filter((entry) => entry.role === 'candidate')
+      .map((entry) => [entry.attemptId, entry.text]),
+  )
+  const exchanges: Exchange[] = []
+  const actions = new Map<string, Extract<(typeof events)[number], { kind: 'policy_action' }>>()
+  const attemptRounds = new Map<string, number>()
+  let round: RoundInfo | null = null
+  let pending: RoundInfo | undefined
+
+  for (const event of events) {
+    if (event.kind === 'policy_action') {
+      actions.set(event.payload.attemptId, event)
+      if (round !== null) attemptRounds.set(event.payload.attemptId, round.index)
+    }
+    if (event.kind === 'state_change' && event.payload.change === 'round_started') {
+      const { kind, index, brief } = event.payload
+      round = { kind, index, total, ...(brief === undefined ? {} : { brief }) }
+      pending = round
+    }
+    if (event.kind !== 'question') continue
+    const { attemptId, text } = event.payload
+    const policy = actions.get(attemptId)?.payload
+    const topic = topics.find((entry) => entry.id === policy?.topicId)
+    const claim = claimSet.claims.find((entry) => entry.id === policy?.claimId)
+    const artifact = policy?.artifactId === undefined ? undefined : shown.get(policy.artifactId)
+    exchanges.push({
+      question: {
+        attemptId,
+        text,
+        turn: exchanges.length,
+        action: policy?.action ?? 'PROBE_MECHANISM',
+        pressureLevel: policy?.pressureLevel ?? 0,
+        round: policy?.round ?? round?.kind ?? 'cs_fundamentals',
+        ...(topic === undefined
+          ? {}
+          : { topic: { id: topic.id, area: topic.area, title: topic.title } }),
+        ...(claim === undefined ? {} : { claim: { id: claim.id, assertion: claim.assertion } }),
+        ...(artifact === undefined ? {} : { artifact }),
+      },
+      ...(pending === undefined ? {} : { opened: pending }),
+      notices: [],
+      answer: answers.get(attemptId) ?? null,
+    })
+    pending = undefined
+  }
+
+  return {
+    exchanges,
+    mode: view.session?.mode ?? 'coach',
+    findings:
+      view.session?.mode === 'simulation' && view.state !== 'closed'
+        ? view.findings.filter((finding) => {
+            const completedIn = attemptRounds.get(finding.attemptId)
+            return completedIn !== undefined && completedIn < (round?.index ?? 0)
+          })
+        : view.findings,
+    quotes: view.quotes,
+    tail: [],
+    round,
+    pressure: view.pressureLevel,
+    ceiling: view.session?.pressureCeiling ?? 3,
+    closedBy: view.state === 'closed' ? (view.closed?.reason ?? 'closed') : null,
+  }
 }
 
 function PressureLadder({ level, ceiling }: { level: number; ceiling: number }) {
   return (
-    <span className="flex items-center gap-1" title="Pressure is dosed, not maximal (§4.3)">
+    <span className="flex items-center gap-1" title="Pressure is dosed, never maximal">
       {[0, 1, 2, 3].map((rung) => (
         <span
           key={rung}
@@ -44,117 +243,577 @@ function PressureLadder({ level, ceiling }: { level: number; ceiling: number }) 
   )
 }
 
-function Transcript({ exchanges }: { exchanges: readonly Exchange[] }) {
-  const evidence = useEvidence()
+function Section({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <ol className="space-y-3">
-      {exchanges.map((exchange, index) => (
-        <li key={index} className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Tag tone="accent">{words(exchange.action.toLowerCase())}</Tag>
-            <Tag>pressure {exchange.pressureLevel}</Tag>
+    <div className="setup-section border-t border-edge pt-5 first:border-t-0 first:pt-0">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-quiet">
+          {label}
+        </h2>
+        {hint !== undefined && <p className="text-[12px] text-quiet">{hint}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Choice({
+  pressed,
+  onClick,
+  badge,
+  children,
+}: {
+  pressed: boolean
+  onClick: () => void
+  badge?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`setup-choice ring-focus relative rounded-xl border p-3.5 pr-9 text-left transition-all ${
+        pressed
+          ? 'border-accent/60 bg-accent/10 shadow-[inset_0_0_0_1px_rgba(139,123,255,0.25)]'
+          : 'border-edge bg-white/[0.02] hover:border-edge-strong hover:bg-white/[0.04]'
+      }`}
+    >
+      {children}
+      {pressed && (
+        <span
+          aria-hidden
+          className="absolute right-3 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-full bg-accent text-[11px] font-bold text-white"
+        >
+          {badge ?? '✓'}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block text-[12px] text-quiet">
+      {label}
+      <span className="mt-1 block">{children}</span>
+    </label>
+  )
+}
+
+const INPUT =
+  'ring-focus w-full rounded-lg border border-edge bg-ink-2 px-2.5 py-1.5 text-sm text-body'
+
+function roundBlurb(round: RoundKind, role: Role): string {
+  return round === 'role_knowledge'
+    ? `${roleAreasLabel(role)}: what this role leans on every day.`
+    : ROUND_BLURB[round]
+}
+
+const RESUME_LINK = 'text-accent-soft underline underline-offset-2'
+
+// The server's refusals name its routes; the candidate is owed the page that fixes them.
+function StartFailed({ error }: { error: Error }) {
+  const missing =
+    error instanceof ApiError && error.message === 'no confirmed claims'
+      ? 'Cross-questioning needs at least one résumé claim you have confirmed.'
+      : error instanceof ApiError && error.message === 'pin a repository first'
+        ? 'A walkthrough opens files from a project you have pinned, and none is pinned.'
+        : null
+  if (missing === null) return <Failed error={error} />
+  return (
+    <p className="rounded-lg border border-shaky/40 bg-shaky/5 px-3 py-2 text-[13px] text-muted">
+      {missing}{' '}
+      <Link to="/resume" className={RESUME_LINK}>
+        Open Résumé &amp; projects
+      </Link>
+    </p>
+  )
+}
+
+function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
+  const [params] = useSearchParams()
+  const catalog = useTopicCatalog()
+  const snapshotId = params.get('snapshotId')
+
+  const [roleId, setRoleId] = useState(params.get('role'))
+  const [picked, setPicked] = useState<RoundKind[] | null>(null)
+  const [chosenLevel, setLevel] = useState<Level | null>(null)
+  const [persona, setPersona] = useState<Persona>('collaborator')
+  const [mode, setMode] = useState<Mode>(
+    MODES.find((entry) => entry.id === params.get('mode'))?.id ?? 'coach',
+  )
+  const [ceiling, setCeiling] = useState(1)
+  const [turns, setTurns] = useState(4)
+
+  const snapshots = useQuery({ queryKey: ['snapshots'], queryFn: api.snapshots })
+  const claimSet = useClaimSet()
+
+  const start = useMutation({
+    mutationFn: (body: StartSessionBody) => api.startSession(body),
+    onSuccess: (update) => onOpened({ update, ceiling, mode }),
+  })
+
+  if (catalog.isLoading) return <Loading what="roles and rounds" />
+  if (catalog.isError) return <Failed error={catalog.error} />
+  const data = catalog.data
+  if (data === undefined) return null
+  const role = data.roles.find((entry) => entry.id === roleId) ?? data.roles[0]
+  if (role === undefined) return <Empty>No roles are configured on this server.</Empty>
+
+  const requested = inRoundOrder(
+    data,
+    (params.get('rounds') ?? '').split(',').filter((round) => isRound(data, round)),
+  )
+  const interviewRounds = roundsAbout(data, 'topic')
+  const resumeRounds = [...roundsAbout(data, 'claim'), ...roundsAbout(data, 'artifact')]
+  const fromResume =
+    requested.length > 0 && requested.every((round) => resumeRounds.includes(round))
+  const offered = fromResume
+    ? resumeRounds
+    : requested.some((round) => resumeRounds.includes(round))
+      ? [...interviewRounds, ...resumeRounds]
+      : interviewRounds
+
+  const loop = role.defaultRounds.filter((round) => interviewRounds.includes(round))
+  const rounds = picked ?? (requested.length > 0 ? requested : loop.slice(0, 1))
+  const level =
+    chosenLevel ?? data.levels.find((entry) => entry === params.get('level')) ?? role.defaultLevel
+  const asks = (subject: SubjectKind) => rounds.some((round) => subjectOf(data, round) === subject)
+  const project = snapshots.data?.snapshots.find((entry) =>
+    snapshotId === null ? !entry.deleted : entry.id === snapshotId && !entry.deleted,
+  )
+  const noProject = asks('artifact') && snapshots.data !== undefined && project === undefined
+  const noClaims =
+    asks('claim') &&
+    claimSet.data !== undefined &&
+    !claimSet.data.claims.some((claim) => claimSet.data.confirmed.has(claim.id))
+
+  const toggle = (round: RoundKind) => {
+    const next = rounds.includes(round)
+      ? rounds.filter((entry) => entry !== round)
+      : inRoundOrder(data, [...rounds, round])
+    setPicked(next)
+  }
+
+  const begin = () =>
+    start.mutate({
+      roleId: role.id,
+      rounds,
+      level,
+      personaId: persona,
+      mode,
+      pressureCeiling: ceiling,
+      turnsPerRound: turns,
+      drill: true,
+      ...(snapshotId !== null && asks('artifact') ? { snapshotId } : {}),
+    })
+  const preparation = new URLSearchParams(params)
+  preparation.delete('id')
+  preparation.set('role', role.id)
+  preparation.set('level', level)
+  preparation.set('rounds', rounds.join(','))
+  preparation.set('mode', mode)
+
+  return (
+    <div className="journey-page">
+      <PageIntro
+        eyebrow="Ready when you are"
+        title={fromResume ? 'Cross-question your own work' : 'Set up your interview'}
+        displayTitle={
+          fromResume ? (
+            <>
+              Your work,
+              <br />
+              <em>in focus.</em>
+            </>
+          ) : (
+            <>
+              One more
+              <br />
+              <em>look.</em>
+            </>
+          )
+        }
+        description={
+          fromResume
+            ? 'The interviewer picks from the claims you confirmed and the project you pinned.'
+            : 'Your preparation is here. Review the rounds and level, then let the interviewer lead.'
+        }
+        action={
+          <Link to={`/prepare?${preparation}`} className="journey-secondary">
+            Back to Prepare
+          </Link>
+        }
+      />
+
+      <section className="setup-form rise space-y-5">
+        <Section label="Role" hint="Sets the role-knowledge round and the full loop.">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {data.roles.map((entry) => (
+              <Choice
+                key={entry.id}
+                pressed={entry.id === role.id}
+                onClick={() => setRoleId(entry.id)}
+              >
+                <span className="block text-[14px] font-semibold text-body">{entry.label}</span>
+                <span className="mt-1 block text-[12px] text-quiet">{roleAreasLabel(entry)}</span>
+              </Choice>
+            ))}
           </div>
-          <p className="text-sm">{exchange.question}</p>
-          {exchange.answer !== null && (
-            <p className="whitespace-pre-wrap rounded-md border border-edge bg-[#0f141b] p-2 text-sm text-quiet">
-              <Highlighted text={exchange.answer} quotes={evidence.active} />
+        </Section>
+
+        <Section
+          label={fromResume ? 'From your résumé & projects' : 'Rounds'}
+          hint="Pick several to chain them into a loop."
+        >
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {offered.map((round) => {
+              const at = rounds.indexOf(round)
+              return (
+                <Choice
+                  key={round}
+                  pressed={at >= 0}
+                  onClick={() => toggle(round)}
+                  badge={rounds.length > 1 ? at + 1 : undefined}
+                >
+                  <span className="block text-[14px] font-semibold text-body">
+                    {ROUND_LABEL[round]}
+                  </span>
+                  <span className="mt-1 block text-[12px] leading-snug text-quiet">
+                    {roundBlurb(round, role)}
+                  </span>
+                </Choice>
+              )
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-quiet">
+            {rounds.length > 0 && (
+              <span>In order: {rounds.map((round) => ROUND_LABEL[round]).join(' → ')}</span>
+            )}
+            {!fromResume && (
+              <button
+                type="button"
+                onClick={() => setPicked(loop)}
+                className="text-accent-soft underline underline-offset-2 hover:text-body"
+              >
+                Use the full loop for this role
+              </button>
+            )}
+            {fromResume ? (
+              <Link to="/session" className="text-accent-soft underline underline-offset-2">
+                Practise an interview round instead
+              </Link>
+            ) : (
+              <Link to="/resume" className="text-accent-soft underline underline-offset-2">
+                Questions about your own résumé or code start from Résumé &amp; projects
+              </Link>
+            )}
+          </div>
+          {asks('artifact') && (
+            <p className="mt-3 rounded-lg border border-edge bg-ink-2 px-3 py-2 text-[13px] text-muted">
+              {project !== undefined ? (
+                <>
+                  Project: <span className="mono text-body">{project.repoPath}</span> at commit{' '}
+                  <span className="mono">{project.commit.slice(0, 7)}</span>
+                </>
+              ) : noProject ? (
+                <>
+                  No project pinned yet.{' '}
+                  <Link to="/resume" className={RESUME_LINK}>
+                    Pin one under Résumé &amp; projects
+                  </Link>
+                </>
+              ) : (
+                'Looking for your pinned project…'
+              )}
             </p>
           )}
-        </li>
-      ))}
+          {noClaims && (
+            <p className="mt-3 rounded-lg border border-edge bg-ink-2 px-3 py-2 text-[13px] text-muted">
+              No résumé claim is confirmed yet, so there is nothing to cross-question.{' '}
+              <Link to="/resume" className={RESUME_LINK}>
+                Confirm some under Résumé &amp; projects
+              </Link>
+            </p>
+          )}
+          {!fromResume && rounds.length > 0 && (
+            <details className="mt-3 text-[13px]">
+              <summary className="cursor-pointer text-quiet hover:text-body">
+                What these rounds can ask about
+              </summary>
+              <div className="mt-3 space-y-3">
+                {rounds.map((round) => (
+                  <div key={round}>
+                    <p className="mb-1.5 text-[12px] text-quiet">{ROUND_LABEL[round]}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {topicsFor(data, role, round, level).map((topic) => (
+                        <TopicChip key={topic.id} topic={topic} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </Section>
+
+        <Section label="Level" hint="The bar every answer is judged against.">
+          <div className="flex flex-wrap gap-2">
+            {data.levels.map((entry) => (
+              <Choice key={entry} pressed={entry === level} onClick={() => setLevel(entry)}>
+                <span className="text-[13px] font-medium text-body">{LEVEL_LABEL[entry]}</span>
+              </Choice>
+            ))}
+          </div>
+        </Section>
+
+        <div className="border-t border-edge pt-4">
+          <details>
+            <summary className="cursor-pointer text-[12px] font-semibold uppercase tracking-[0.14em] text-quiet hover:text-body">
+              Advanced options
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Field label="Interviewer">
+                <select
+                  value={persona}
+                  onChange={(event) => setPersona(event.target.value as Persona)}
+                  className={INPUT}
+                >
+                  {PERSONAS.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Mode">
+                <select
+                  value={mode}
+                  onChange={(event) => setMode(event.target.value as Mode)}
+                  className={INPUT}
+                >
+                  {MODES.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Pressure ceiling">
+                <span className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={3}
+                    value={ceiling}
+                    onChange={(event) => setCeiling(Number(event.target.value))}
+                    className="w-32 accent-body"
+                  />
+                  <span className="text-[11px] text-quiet">ceiling {ceiling} of 3</span>
+                </span>
+              </Field>
+              <Field label="Questions per round">
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={turns}
+                  onChange={(event) => setTurns(Number(event.target.value))}
+                  className={`${INPUT} w-24`}
+                />
+              </Field>
+            </div>
+          </details>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 border-t border-edge pt-5">
+          <Button
+            tone="primary"
+            onClick={begin}
+            disabled={start.isPending || rounds.length === 0 || noProject || noClaims}
+          >
+            {start.isPending ? 'starting…' : 'Start the interview'}
+          </Button>
+          <Quiet>
+            {rounds.length === 0
+              ? 'Pick at least one round.'
+              : `${role.label} · ${LEVEL_LABEL[level]} · ${turns} questions per round, and one drill if an answer opens a gap`}
+          </Quiet>
+        </div>
+        {start.isError && <StartFailed error={start.error} />}
+      </section>
+    </div>
+  )
+}
+
+function RoundDivider({ round }: { round: RoundInfo }) {
+  return (
+    <div className="pt-2">
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-soft">
+          Round {round.index + 1} of {round.total} · {ROUND_LABEL[round.kind]}
+        </span>
+        <span className="h-px flex-1 bg-edge" />
+      </div>
+      {round.brief !== undefined && (
+        <p className="mt-1.5 text-[13px] italic text-quiet">{round.brief}</p>
+      )}
+    </div>
+  )
+}
+
+function Transcript({
+  exchanges,
+  findings,
+  quotes,
+  live,
+}: {
+  exchanges: readonly Exchange[]
+  findings: readonly Finding[]
+  quotes: readonly QuotedEvidence[]
+  live: boolean
+}) {
+  const evidence = useEvidence()
+  return (
+    <ol className="space-y-4">
+      {exchanges.map((exchange, index) => {
+        const { question } = exchange
+        const current = live && index === exchanges.length - 1
+        const judged = findings.filter((finding) => finding.attemptId === question.attemptId)
+        return (
+          <li key={index} className="space-y-2">
+            {exchange.opened !== undefined && <RoundDivider round={exchange.opened} />}
+            {exchange.notices.map((notice, at) => (
+              <p key={at} className="text-[12px] text-quiet">
+                — {notice}
+              </p>
+            ))}
+            <div
+              className="dialogue-turn"
+              data-current={current}
+              id={current ? 'current-question' : undefined}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                {question.topic !== undefined && <TopicChip topic={question.topic} />}
+                {question.claim !== undefined && <ClaimChip assertion={question.claim.assertion} />}
+                <Tag tone="accent">{words(question.action.toLowerCase())}</Tag>
+                <Tag>pressure {question.pressureLevel}</Tag>
+              </div>
+              {question.artifact !== undefined && (
+                <div className="mt-3">
+                  <FilePanel artifact={question.artifact} />
+                </div>
+              )}
+              <p className="prompt-text mt-3 text-[15px] leading-relaxed text-body">
+                {question.text}
+              </p>
+              {exchange.answer !== null && (
+                <div className="candidate-answer mt-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-quiet/80">
+                    you
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-muted">
+                    <Highlighted text={exchange.answer} quotes={evidence.active} />
+                  </p>
+                </div>
+              )}
+              {judged.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {judged.map((finding) => (
+                    <FindingCard key={finding.id} finding={finding} quotes={quotes} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </li>
+        )
+      })}
     </ol>
   )
 }
 
-export function SessionPage() {
-  const [params, setParams] = useSearchParams()
-  const [level, setLevel] = useState<(typeof LEVELS)[number]>('mid')
-  const [persona, setPersona] = useState<(typeof PERSONAS)[number]>('collaborator')
-  const [mode, setMode] = useState<(typeof MODES)[number]>('coach')
-  const [round, setRound] = useState<(typeof ROUNDS)[number]>('project_deep_dive')
-  const [ceiling, setCeiling] = useState(1)
-  const [turns, setTurns] = useState(4)
+function Closing({
+  sessionId,
+  reason,
+  onRestart,
+}: {
+  sessionId: string
+  reason: string
+  onRestart: () => void
+}) {
+  const link =
+    'ring-focus inline-flex items-center rounded-xl border border-edge bg-raised px-4 py-2 text-sm font-medium text-muted transition hover:border-edge-strong hover:text-body'
+  return (
+    <div className="mt-5 rounded-xl border border-edge bg-white/[0.02] p-4">
+      <p className="text-[15px] font-semibold text-body">That is the interview.</p>
+      <p className="mt-1 text-[13px] text-quiet">
+        It stopped because {STOPPED[reason] ?? words(reason)}.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link to={`/debrief?id=${sessionId}`} className={link}>
+          Read the debrief
+        </Link>
+        <Link to="/ledger" className={link}>
+          See your gaps
+        </Link>
+        <Link to={`/replay?id=${sessionId}`} className={link}>
+          Replay it
+        </Link>
+        <Button tone="primary" onClick={onRestart}>
+          Start another interview
+        </Button>
+      </div>
+    </div>
+  )
+}
 
-  const [sessionId, setSessionId] = useState<string | null>(params.get('id'))
-  const [exchanges, setExchanges] = useState<Exchange[]>([])
-  const [findings, setFindings] = useState<Finding[]>([])
-  const [quotes, setQuotes] = useState<QuotedEvidence[]>([])
-  const [notices, setNotices] = useState<string[]>([])
-  const [pressure, setPressure] = useState(1)
-  const [closedBy, setClosedBy] = useState<string | null>(null)
+function InterviewRoom({
+  sessionId,
+  opening,
+  onRestart,
+}: {
+  sessionId: string
+  opening: Opening | null
+  onRestart: () => void
+}) {
+  const catalog = useTopicCatalog()
+  const queryClient = useQueryClient()
+  const [room, setRoom] = useState<Room | null>(opening === null ? null : opened(opening))
   const [answer, setAnswer] = useState('')
   const [spoken, setSpoken] = useState<SpokenAnswer | null>(null)
   const [voice, setVoice] = useState(false)
   const [delivery, setDelivery] = useState<Record<string, number | string> | null>(null)
   const answerBox = useRef<HTMLTextAreaElement>(null)
-  const lastAttempt = useRef<string | null>(null)
 
-  const absorb = (update: TurnUpdate) => {
-    setSessionId(update.sessionId)
-    setFindings((current) => [...current, ...update.findings])
-    setQuotes((current) => [...current, ...update.quotes])
-    setNotices(update.notices)
-    if (update.question !== undefined) {
-      setPressure(update.question.pressureLevel)
-      if (voice) void speak(update.question.text).catch(() => {})
-      setExchanges((current) => [
-        ...current,
-        {
-          question: update.question?.text ?? '',
-          action: update.question?.action ?? '',
-          pressureLevel: update.question?.pressureLevel ?? 0,
-          answer: null,
-        },
-      ])
-    }
-    if (update.status === 'closed') setClosedBy(update.stoppedBy ?? 'closed')
-  }
+  const restored = useQuery({
+    queryKey: ['interview', sessionId],
+    queryFn: () => restore(sessionId, catalog.data?.topics ?? []),
+    enabled: room === null && catalog.data !== undefined,
+    gcTime: 0,
+  })
+  useEffect(() => {
+    if (room === null && restored.data !== undefined) setRoom(restored.data)
+  }, [room, restored.data])
 
-  const start = useMutation({
-    mutationFn: () =>
-      api.startSession({
-        mode,
-        level,
-        personaId: persona,
-        pressureCeiling: ceiling,
-        rounds: [round],
-        turnsPerRound: turns,
-        drill: true,
-      }),
+  const reply = useMutation({
+    mutationFn: (text: string) => api.answer(sessionId, text),
     onSuccess: (update) => {
-      setExchanges([])
-      setFindings([])
-      setQuotes([])
-      setClosedBy(null)
-      absorb(update as TurnUpdate)
+      setRoom((current) => (current === null ? current : absorb(current, update)))
+      if (voice && update.question !== undefined) void speak(update.question.text).catch(() => {})
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'topics' })
     },
   })
 
-  const reply = useMutation({
-    mutationFn: (text: string) => api.answer(sessionId ?? '', text),
-    onSuccess: (update) => absorb(update as TurnUpdate),
-  })
-
-  useEffect(() => {
-    if (sessionId !== null) setParams({ id: sessionId }, { replace: true })
-  }, [sessionId, setParams])
-
   // Delivery is recorded against the attempt the answer belonged to, after the turn is judged, and
   // never travels with the answer — the Evaluator receives the same string a typed answer produces.
-  const recordDelivery = async () => {
-    if (sessionId === null || spoken === null) return
+  const recordDelivery = async (attemptId: string, heard: SpokenAnswer) => {
     try {
-      const view = await api.session(sessionId)
-      const attemptId = view.transcript
-        .filter((entry) => entry.role === 'candidate')
-        .at(-1)?.attemptId
-      if (attemptId === undefined || attemptId === lastAttempt.current) return
-      lastAttempt.current = attemptId
       const recorded = await api.recordDelivery(sessionId, {
         attemptId,
-        transcript: spoken.transcript,
-        audioMs: spoken.audioMs,
-        pauses: spoken.pauses,
+        transcript: heard.transcript,
+        audioMs: heard.audioMs,
+        pauses: heard.pauses,
       })
       setDelivery(recorded.report as unknown as Record<string, number | string>)
     } catch {
@@ -163,208 +822,264 @@ export function SessionPage() {
   }
 
   const send = () => {
-    if (answer.trim() === '' || sessionId === null) return
-    setExchanges((current) =>
-      current.map((exchange, index) =>
-        index === current.length - 1 ? { ...exchange, answer } : exchange,
+    if (answer.trim() === '' || room === null || reply.isPending) return
+    const attemptId = room.exchanges.at(-1)?.question.attemptId
+    const heard = spoken
+    setRoom({
+      ...room,
+      exchanges: room.exchanges.map((exchange, index) =>
+        index === room.exchanges.length - 1 ? { ...exchange, answer } : exchange,
       ),
-    )
-    reply.mutate(answer, { onSuccess: () => void recordDelivery() })
-    setAnswer('')
-    setSpoken(null)
-    answerBox.current?.focus()
+    })
+    reply.mutate(answer, {
+      onSuccess: () => {
+        if (attemptId !== undefined && heard !== null) void recordDelivery(attemptId, heard)
+        setAnswer('')
+        setSpoken(null)
+        answerBox.current?.focus()
+      },
+      onError: () => setRoom(room),
+    })
   }
 
-  const live = sessionId !== null && closedBy === null
+  if (room === null) {
+    if (restored.isError) return <Failed error={restored.error} />
+    if (catalog.isError) return <Failed error={catalog.error} />
+    return <Loading what="the interview" />
+  }
+
+  const live = room.closedBy === null
+  const feedbackAvailable = room.mode !== 'simulation' || !live
 
   return (
     <EvidenceProvider>
-      <div className="space-y-4">
-        {!live && (
-          <Panel
-            title="Set up the interview"
-            subtitle="A persona is a configuration of the policy, not a prompt vibe — the difference shows up in the plan."
-          >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Field label="Level">
-                <Select value={level} options={LEVELS} onChange={setLevel} />
-              </Field>
-              <Field label="Persona">
-                <Select value={persona} options={PERSONAS} onChange={setPersona} />
-              </Field>
-              <Field label="Mode">
-                <Select value={mode} options={MODES} onChange={setMode} />
-              </Field>
-              <Field label="Round">
-                <Select value={round} options={ROUNDS} onChange={setRound} />
-              </Field>
-              <Field label="Pressure ceiling">
-                <input
-                  type="range"
-                  min={0}
-                  max={3}
-                  value={ceiling}
-                  onChange={(event) => setCeiling(Number(event.target.value))}
-                  className="w-full"
+      <div className="journey-page">
+        <PageIntro
+          eyebrow="One question at a time"
+          title="Interview"
+          displayTitle={
+            live ? (
+              <>
+                Stay with
+                <br />
+                <em>the question.</em>
+              </>
+            ) : (
+              <>
+                Leave with
+                <br />
+                <em>the evidence.</em>
+              </>
+            )
+          }
+          description={
+            live
+              ? 'Follow the question. Explain your reasoning. Take the time you need.'
+              : 'Your interview is saved. Review the findings, then choose what to practise next.'
+          }
+          action={
+            <Link to="/history" className="journey-secondary">
+              View history
+            </Link>
+          }
+        />
+        <div className="interview-status">
+          <span className="journey-icon">
+            <JourneyIcon name="interview" />
+          </span>
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              {!live ? 'Interview complete' : reply.isPending ? 'Reading your answer' : 'Your turn'}
+            </p>
+            <p className="text-xs text-quiet">
+              {!live
+                ? 'The transcript and findings stay together.'
+                : 'Text and recorded answers use the same interview.'}
+            </p>
+          </div>
+          <PressureLadder level={room.pressure} ceiling={room.ceiling} />
+        </div>
+        <div className="conversation-layout">
+          <div className="space-y-4">
+            <section className="conversation-panel">
+              <header className="mb-5">
+                <h2 className="text-sm font-semibold">Conversation</h2>
+                <p className="mt-1 text-xs text-quiet">
+                  Each finding cites your words. Hover a finding to see its evidence. There is no
+                  score.
+                </p>
+              </header>
+              {room.exchanges.length === 0 ? (
+                <Empty>No question was asked in this session.</Empty>
+              ) : (
+                <Transcript
+                  exchanges={room.exchanges}
+                  findings={room.findings}
+                  quotes={room.quotes}
+                  live={live && !reply.isPending}
                 />
-              </Field>
-              <Field label="Turns">
-                <input
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={turns}
-                  onChange={(event) => setTurns(Number(event.target.value))}
-                  className="w-full rounded border border-edge bg-[#0f141b] px-2 py-1"
-                />
-              </Field>
-            </div>
-            <div className="mt-3 flex items-center gap-3">
-              <Button tone="primary" onClick={() => start.mutate()} disabled={start.isPending}>
-                {start.isPending ? 'starting…' : 'Start interview'}
-              </Button>
-              <PressureLadder level={ceiling} ceiling={3} />
-            </div>
-            {start.isError && (
-              <div className="mt-3">
-                <Failed error={start.error} />
-              </div>
-            )}
-          </Panel>
-        )}
+              )}
+              {!live && room.findings.length === 0 && (
+                <p className="mt-3 text-[13px] text-quiet">Nothing was judged in this session.</p>
+              )}
+              {room.tail.length > 0 && (
+                <ul className="mt-3 space-y-1">
+                  {room.tail.map((notice, index) => (
+                    <li key={index} className="text-[12px] text-quiet">
+                      — {notice}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-        {sessionId !== null && (
-          <Panel
-            title="Interview"
-            subtitle={`session ${sessionId}`}
-            actions={<PressureLadder level={pressure} ceiling={ceiling} />}
-          >
-            <Transcript exchanges={exchanges} />
+              {reply.isPending && (
+                <p className="pulse-soft mt-4 text-[13px] text-quiet">
+                  The evaluator is reading your answer…
+                </p>
+              )}
 
-            {live && (
-              <div className="mt-4">
-                <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-2 text-xs text-quiet">
-                    <input
-                      type="checkbox"
-                      checked={voice}
-                      onChange={(event) => setVoice(event.target.checked)}
-                    />
-                    read questions aloud and let me answer by voice
-                  </label>
-                  {voice && (
-                    <Recorder
-                      onAnswer={(heard) => {
-                        setSpoken(heard)
-                        setAnswer(heard.transcript)
-                      }}
-                    />
-                  )}
-                </div>
-                <textarea
-                  ref={answerBox}
-                  value={answer}
-                  onChange={(event) => setAnswer(event.target.value)}
-                  rows={4}
-                  placeholder="Answer in your own words. The evaluator can only cite what appears here."
-                  className="w-full rounded-md border border-edge bg-[#0f141b] p-3 text-sm outline-none focus:border-accent/50"
-                />
-                <div className="mt-2 flex items-center gap-3">
-                  <Button tone="primary" onClick={send} disabled={reply.isPending}>
-                    {reply.isPending ? 'judging…' : 'Send answer'}
-                  </Button>
-                  <Quiet>
-                    Say &ldquo;I don&rsquo;t know&rdquo; when you don&rsquo;t. That is scored as
-                    composure holding, not as a miss.
-                  </Quiet>
-                </div>
-                {reply.isError && (
-                  <div className="mt-3">
-                    <Failed error={reply.error} />
+              {live && !reply.isPending && (
+                <div className="mt-5">
+                  <textarea
+                    ref={answerBox}
+                    aria-label="Your answer"
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) send()
+                    }}
+                    rows={5}
+                    placeholder="Answer in your own words. The evaluator can only cite what appears here."
+                    className="ring-focus w-full rounded-xl border border-edge bg-ink-2 p-3.5 text-sm leading-relaxed text-body outline-none placeholder:text-quiet/60 focus:border-accent/50"
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <Button tone="primary" onClick={send} disabled={answer.trim() === ''}>
+                      Send answer
+                    </Button>
+                    <span className="text-[12px] text-quiet">Ctrl + Enter sends</span>
+                    <label className="ml-auto flex items-center gap-2 text-[12px] text-quiet">
+                      <input
+                        type="checkbox"
+                        checked={voice}
+                        onChange={(event) => setVoice(event.target.checked)}
+                      />
+                      read questions aloud and let me answer by voice
+                    </label>
                   </div>
-                )}
-              </div>
-            )}
+                  {voice && (
+                    <div className="mt-2">
+                      <Recorder
+                        onAnswer={(heard) => {
+                          setSpoken(heard)
+                          setAnswer(heard.transcript)
+                        }}
+                      />
+                    </div>
+                  )}
+                  <p className="mt-3 text-[12px] leading-relaxed text-quiet">
+                    Say &ldquo;I don&rsquo;t know&rdquo; when you don&rsquo;t: that counts as
+                    composure holding, not as a miss. Want to practise saying it out loud?{' '}
+                    <Link
+                      to={`/studio?id=${sessionId}`}
+                      className="text-accent-soft underline underline-offset-2"
+                    >
+                      Answer this one aloud
+                    </Link>
+                    .
+                  </p>
+                </div>
+              )}
+              {reply.isError && (
+                <div className="mt-3">
+                  <Failed error={reply.error} />
+                </div>
+              )}
 
-            {closedBy !== null && (
-              <p className="mt-3 text-sm text-quiet">
-                session closed — stopped by {words(closedBy)}
+              {room.closedBy !== null && (
+                <Closing sessionId={sessionId} reason={room.closedBy} onRestart={onRestart} />
+              )}
+            </section>
+
+            {delivery !== null && (
+              <Panel
+                title="Delivery"
+                subtitle="Observations about how you spoke. They say nothing about whether the answer was any good, and they never reach a finding or the gap ledger."
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Tag>{Number(delivery['wordsPerMinute']).toFixed(0)} words/min</Tag>
+                  <Tag>{delivery['longPauseCount']} long pauses</Tag>
+                  <Tag>
+                    {Number(delivery['fillerRatePerHundredWords']).toFixed(1)} fillers per 100 words
+                  </Tag>
+                </div>
+              </Panel>
+            )}
+          </div>
+          <aside className="room-aside space-y-4">
+            <PracticeFlow />
+            <section className="card p-5">
+              <p className="journey-eyebrow">Your interview room</p>
+              <h2 className="mt-3 text-sm font-semibold">Make your reasoning visible</h2>
+              <p className="mt-2 text-xs leading-relaxed text-quiet">
+                Explain what you know and say when you are unsure. Nothing is submitted until you
+                choose Send answer.
               </p>
+              <div className="mt-4 border-t border-edge pt-4 text-[11px] leading-relaxed text-quiet">
+                Questions, answers, policy choices and findings are recorded together.
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-muted">Session details</summary>
+                  <p className="mono mt-2 break-all">{sessionId}</p>
+                </details>
+              </div>
+            </section>
+            {feedbackAvailable ? (
+              <JourneyLink
+                to={`/improve?id=${encodeURIComponent(sessionId)}`}
+                title="Your practice workspace"
+                description="Open saved feedback and your practice schedule."
+                icon="improve"
+              />
+            ) : (
+              <section className="card p-5">
+                <h2 className="text-sm font-medium">Feedback after the round</h2>
+                <p className="mt-2 text-xs leading-relaxed text-quiet">
+                  Your simulation keeps new findings out of view while you answer. The full debrief
+                  opens when the interview ends.
+                </p>
+              </section>
             )}
-          </Panel>
-        )}
-
-        {delivery !== null && (
-          <Panel
-            title="Delivery"
-            subtitle="Observations about how you spoke. They say nothing about whether the answer was any good, and they never reach a finding or the gap ledger."
-          >
-            <div className="flex flex-wrap gap-2">
-              <Tag>{Number(delivery['wordsPerMinute']).toFixed(0)} words/min</Tag>
-              <Tag>{delivery['longPauseCount']} long pauses</Tag>
-              <Tag>
-                {Number(delivery['fillerRatePerHundredWords']).toFixed(1)} fillers per 100 words
-              </Tag>
-            </div>
-          </Panel>
-        )}
-
-        {notices.length > 0 && (
-          <Panel title="Notices">
-            <ul className="space-y-1 text-sm text-quiet">
-              {notices.map((notice, index) => (
-                <li key={index}>{notice}</li>
-              ))}
-            </ul>
-          </Panel>
-        )}
-
-        {findings.length > 0 && (
-          <Panel
-            title="Findings"
-            subtitle="Hover one to see the exact words it came from, highlighted in what you said."
-          >
-            <div className="space-y-2">
-              {findings.map((finding) => (
-                <FindingCard key={finding.id} finding={finding} quotes={quotes} />
-              ))}
-            </div>
-          </Panel>
-        )}
+          </aside>
+        </div>
       </div>
     </EvidenceProvider>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs text-quiet">
-      {label}
-      <span className="mt-1 block">{children}</span>
-    </label>
-  )
-}
+export function SessionPage() {
+  const [params, setParams] = useSearchParams()
+  const [opening, setOpening] = useState<Opening | null>(null)
+  const sessionId = params.get('id')
 
-function Select<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T
-  options: readonly T[]
-  onChange: (next: T) => void
-}) {
+  if (sessionId !== null) {
+    return (
+      <InterviewRoom
+        key={sessionId}
+        sessionId={sessionId}
+        opening={opening?.update.sessionId === sessionId ? opening : null}
+        onRestart={() => {
+          setOpening(null)
+          setParams({})
+        }}
+      />
+    )
+  }
+
   return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value as T)}
-      className="w-full rounded border border-edge bg-[#0f141b] px-2 py-1 text-sm"
-    >
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option.replace(/_/g, ' ')}
-        </option>
-      ))}
-    </select>
+    <Setup
+      onOpened={(next) => {
+        setOpening(next)
+        setParams({ id: next.update.sessionId })
+      }}
+    />
   )
 }

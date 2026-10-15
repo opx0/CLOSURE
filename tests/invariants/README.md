@@ -7,7 +7,7 @@ meeting it fires the stop condition in §8(c) — it is not a configuration chan
 This file exists so nobody has to take that on trust. Each row says where the check lives and, just
 as importantly, what the check does **not** cover.
 
-> Tests under `tests/**` sit outside the workspace packages and cannot resolve `@closer/*`. Anything
+> Tests under `tests/**` sit outside the workspace packages and cannot resolve `@levelhead/*`. Anything
 > an invariant needs from core therefore lives under `apps/cli/src/testing/`, which is why four of
 > the seven are enforced from there rather than from this directory.
 
@@ -31,6 +31,23 @@ card look complete — so it is checked the same way.
 | #   | Invariant                        | Enforced by                                                                                                                                                                                                                                                                                                                                                  | What it does not cover                                                                                                                                    |
 | --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 8   | **Delivery is never competence** | `tests/invariants/delivery-is-not-competence.test.ts` — the finding contract may not mention a delivery signal, and no delivery signal may be read in `evaluation/`, `gaps/` or `policy/`; `DeliveryReport` carries its own boundary as a value; `apps/server/src/routes/delivery.test.ts` asserts that recording delivery changes neither findings nor gaps | Name-based, like invariant 3. A delivery signal spelled to evade the pattern would pass, and nothing stops a _human_ reading a pace number as a judgment. |
+
+## Two more, added September 22, 2026 with the performance lane
+
+The performance lane turns the recruiter-side instrument stack inward: it measures how an answer was
+delivered, far more thoroughly than the three original delivery numbers. That is exactly the moment
+two promises get cheap to break, so each becomes a check.
+
+| #   | Invariant                               | Enforced by                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | What it does not cover                                                                                                                                                    |
+| --- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 9   | **No affect inference**                 | `tests/invariants/no-affect-inference.test.ts` — a comment-stripped grep over every `.ts`/`.tsx` under `apps/` and `packages/`, and over `voice/*.py`, bans emotion, mood, stress, arousal, engagement, deception, personality, blink rate and micro-expression. It also pins the signal registry: `gaze_on_camera_ratio` and `interruption_recovery_time` are present, `blink_rate`, `stress_level` and `confidence_level` are absent, so a new measured signal cannot be slipped in without this file noticing. | Name-based, like invariants 3 and 8. A signal spelled to evade the pattern would pass, and nothing stops a human reading a pitch number as a mood.                        |
+| 10  | **No raw biometric leaves the browser** | `apps/cli/src/testing/invariant-no-raw-biometrics.test.ts` — walks `KinematicsReportSchema` and asserts every leaf is a number, so a per-frame landmark series cannot be added to make a chart nicer; asserts `ProsodyReportSchema` carries timings but no audio; and greps `packages/contracts/src` and `apps/server/src` for `landmark`, `faceMesh`, `videoFrame`, `imageBytes` and the like.                                                                                                                   | The kinematics summariser runs in the browser, which no Node test exercises; the schema walk proves the _shape_ that crosses the wire, not the capture code's discipline. |
+
+The performance-lane half of invariant 8 (delivery is never competence) is enforced by the extended
+`tests/invariants/delivery-is-not-competence.test.ts`: the finding contract names no performance
+type, no performance type is read in `evaluation/`, `gaps/` or `policy/`, the debrief's two lanes are
+computed by two modules that name no type in common, and the screen mirror never reaches a judgment
+path.
 
 ## Still only a claim
 

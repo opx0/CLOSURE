@@ -1,5 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox'
 import { OwnerIdSchema } from './owner.ts'
+import { NudgeSchema } from './nudge.ts'
 
 export const JobKindSchema = Type.Union([
   Type.Literal('ingest_repository'),
@@ -7,6 +8,7 @@ export const JobKindSchema = Type.Union([
   Type.Literal('sweep_retention'),
   Type.Literal('plan_retrieval'),
   Type.Literal('run_benchmark'),
+  Type.Literal('send_nudge'),
 ])
 export type JobKind = Static<typeof JobKindSchema>
 
@@ -50,12 +52,21 @@ export const RunBenchmarkPayloadSchema = Type.Object({
   labelsFile: Type.Optional(Type.String({ minLength: 1 })),
 })
 
+// Sending is durable work with an outside effect, so it is a job like every other: leased,
+// idempotent by key, and buried with its error rather than retried forever.
+export const SendNudgePayloadSchema = Type.Object({
+  kind: Type.Literal('send_nudge'),
+  nudge: NudgeSchema,
+  dryRun: Type.Boolean(),
+})
+
 export const JobPayloadSchema = Type.Union([
   IngestRepositoryPayloadSchema,
   BuildExportPayloadSchema,
   SweepRetentionPayloadSchema,
   PlanRetrievalPayloadSchema,
   RunBenchmarkPayloadSchema,
+  SendNudgePayloadSchema,
 ])
 export type JobPayload = Static<typeof JobPayloadSchema>
 export type JobPayloadOf<K extends JobKind> = Extract<JobPayload, { kind: K }>

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { silentLogger } from '@closer/core'
+import { silentLogger } from '@levelhead/core'
 import { buildApp } from '../app.ts'
 import type { Config } from '../config.ts'
 import type { ServerDeps } from '../deps.ts'
@@ -16,18 +16,18 @@ const CONFIG: Config = {
   NODE_ENV: 'test',
   PORT: 0,
   LOG_LEVEL: 'fatal',
-  CLOSER_EVENT_DIR: '.closer/events',
-  CLOSER_EXPORT_DIR: '.closer/exports',
-  CLOSER_STORE: 'jsonl',
+  LEVELHEAD_EVENT_DIR: '.levelhead/events',
+  LEVELHEAD_EXPORT_DIR: '.levelhead/exports',
+  LEVELHEAD_STORE: 'jsonl',
   SESSION_TOKEN_CEILING: 120_000,
   SESSION_COST_CEILING_USD: 2,
   MODEL_CALLS_PER_TURN_CEILING: 3,
-  CLOSER_API_TOKENS: 'alice:alice-token,bob:bob-token',
-  CLOSER_CORS_ORIGIN: '',
-  CLOSER_RATE_LIMIT_PER_MINUTE: 10_000,
-  CLOSER_MAX_BODY_BYTES: 262_144,
-  CLOSER_DEMO_MODE: false,
-  CLOSER_WEB_DIST: 'apps/web/dist-does-not-exist',
+  LEVELHEAD_API_TOKENS: 'alice:alice-token,bob:bob-token',
+  LEVELHEAD_CORS_ORIGIN: '',
+  LEVELHEAD_RATE_LIMIT_PER_MINUTE: 10_000,
+  LEVELHEAD_MAX_BODY_BYTES: 262_144,
+  LEVELHEAD_DEMO_MODE: false,
+  LEVELHEAD_WEB_DIST: 'apps/web/dist-does-not-exist',
   SNAPSHOT_RETENTION_DAYS: 90,
   OTEL_ENABLED: false,
 }
@@ -95,7 +95,7 @@ test('one owner never sees another owner’s claims, sessions or ledger', async 
     method: 'POST',
     url: '/sessions',
     headers: bearer('alice-token'),
-    payload: { mode: 'coach', turnsPerRound: 1, drill: false },
+    payload: { rounds: ['project_deep_dive'], mode: 'coach', turnsPerRound: 1, drill: false },
   })
   expect(started.statusCode).toBe(201)
   const sessionId = (started.json() as { sessionId: string }).sessionId
@@ -105,7 +105,7 @@ test('one owner never sees another owner’s claims, sessions or ledger', async 
     method: 'POST',
     url: '/sessions',
     headers: bearer('bob-token'),
-    payload: {},
+    payload: { rounds: ['project_deep_dive'] },
   })
   expect(bobStarts.statusCode).toBe(409)
 

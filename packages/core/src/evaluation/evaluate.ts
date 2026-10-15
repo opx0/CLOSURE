@@ -18,8 +18,9 @@ import {
   type RubricSet,
   type Span,
   type Competency,
-} from '@closer/contracts'
-import { answerEvaluationPrompt, type AnswerEvaluationVars } from '@closer/prompts'
+  type Topic,
+} from '@levelhead/contracts'
+import { answerEvaluationPrompt, type AnswerEvaluationVars } from '@levelhead/prompts'
 import type { ArtifactContext } from '../ports/conductor.ts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 import type { EvaluatorPort, StructuredFailure } from '../ports/evaluator.ts'
@@ -47,42 +48,53 @@ const JudgedCompetencySchema = Type.Union([
 // an unasked-for verdict by contract, not by accident of only reading named fields.
 const closed = { additionalProperties: false } as const
 
-export const EvaluationOutputSchema = Type.Object(
+const claimJudgments = [
+  Type.Object({ ...judgment, kind: Type.Literal('claim'), verdict: ClaimVerdictSchema }, closed),
+  Type.Object(
+    {
+      ...judgment,
+      kind: Type.Literal('claim_abstained'),
+      abstention: ClaimAbstentionSchema,
+    },
+    closed,
+  ),
+  Type.Object(
+    {
+      ...judgment,
+      kind: Type.Literal('composure'),
+      signals: Type.Array(ComposureSignalSchema, { minItems: 1 }),
+    },
+    closed,
+  ),
+  Type.Object(
+    {
+      ...judgment,
+      kind: Type.Literal('competency'),
+      competency: JudgedCompetencySchema,
+      levelMet: Type.Union([LevelSchema, Type.Null()]),
+    },
+    closed,
+  ),
+] as const
+
+const competencyAbstained = Type.Object(
   {
-    findings: Type.Array(
-      Type.Union([
-        Type.Object(
-          { ...judgment, kind: Type.Literal('claim'), verdict: ClaimVerdictSchema },
-          closed,
-        ),
-        Type.Object(
-          {
-            ...judgment,
-            kind: Type.Literal('claim_abstained'),
-            abstention: ClaimAbstentionSchema,
-          },
-          closed,
-        ),
-        Type.Object(
-          {
-            ...judgment,
-            kind: Type.Literal('composure'),
-            signals: Type.Array(ComposureSignalSchema, { minItems: 1 }),
-          },
-          closed,
-        ),
-        Type.Object(
-          {
-            ...judgment,
-            kind: Type.Literal('competency'),
-            competency: JudgedCompetencySchema,
-            levelMet: Type.Union([LevelSchema, Type.Null()]),
-          },
-          closed,
-        ),
-      ]),
-    ),
+    ...judgment,
+    kind: Type.Literal('competency_abstained'),
+    competency: JudgedCompetencySchema,
+    abstention: ClaimAbstentionSchema,
   },
+  closed,
+)
+
+// With a claim on the table an abstention is a claim abstention, so the competency form is not offered.
+export const ClaimEvaluationOutputSchema = Type.Object(
+  { findings: Type.Array(Type.Union([...claimJudgments])) },
+  closed,
+)
+
+export const EvaluationOutputSchema = Type.Object(
+  { findings: Type.Array(Type.Union([...claimJudgments, competencyAbstained])) },
   closed,
 )
 export type EvaluationOutput = Static<typeof EvaluationOutputSchema>
@@ -101,6 +113,7 @@ export interface EvaluateAnswerInput {
   round: RoundKind
   // Present only on a walkthrough (§4.8); where an answer contradicts the code shown, the code wins.
   artifact?: ArtifactContext
+  topic?: Topic
   level: Level
   answerText: string
   answerSourceId: string
@@ -108,7 +121,8 @@ export interface EvaluateAnswerInput {
   transcript: AnswerEvaluationVars['transcript']
   rubricSet: RubricSet
   // A role pack adds what that role expects to the anchor's required concepts. It is data handed to
-  // the same prompt, never a second prompt — the template and its hash are untouched by it.
+  // the same prompt, never a second prompt — the template and its hash are untouched by it. Only a
+  // claim takes them: a role's queue concepts appended to a normalisation question are noise.
   role?: RoleId
   evaluator: EvaluatorPort
   ids: IdSource
@@ -145,14 +159,18 @@ function anchorsForTurn(input: EvaluateAnswerInput): AnswerEvaluationVars['ancho
     if (anchor === undefined) return []
 
     const roleConcepts =
-      input.role === undefined ? [] : expectedConceptsFor(input.role, ref.id as Competency)
+      input.role === undefined || input.claim === null
+        ? []
+        : expectedConceptsFor(input.role, ref.id as Competency)
+    const expected: Partial<Record<string, readonly string[]>> = input.topic?.expected ?? {}
+    const topicConcepts = expected[ref.id] ?? []
 
     return [
       {
         rubricId: ref.id,
         rubricVersion: ref.version,
         expectation: anchor.expectation,
-        requiredConcepts: [...anchor.requiredConcepts, ...roleConcepts],
+        requiredConcepts: [...anchor.requiredConcepts, ...roleConcepts, ...topicConcepts],
       },
     ]
   })
@@ -166,6 +184,7 @@ function rubricIdFor(judged: Judgment): string {
     case 'composure':
       return 'composure'
     case 'competency':
+    case 'competency_abstained':
       return judged.competency
   }
 }
@@ -177,6 +196,9 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
     action: input.action,
     round: input.round,
     claim: claim === null ? null : { type: claim.type, assertion: claim.assertion },
+    ...(input.topic === undefined
+      ? {}
+      : { topic: { area: input.topic.area, title: input.topic.title, ask: input.topic.ask } }),
     anchors: anchorsForTurn(input),
     // Conductor and Evaluator are handed the same lines, or a walkthrough is judged against code
     // the candidate was never shown.
@@ -201,7 +223,7 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
     promptHash: answerEvaluationPrompt.hash,
     system: rendered.system,
     user: rendered.user,
-    schema: EvaluationOutputSchema,
+    schema: claim === null ? EvaluationOutputSchema : ClaimEvaluationOutputSchema,
     schemaName: 'answer_evaluation',
     maxOutputTokens: MAX_OUTPUT_TOKENS,
   })
@@ -258,6 +280,10 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
     }
     if ((judged.kind === 'claim' || judged.kind === 'claim_abstained') && claim === null) {
       drop('claim_finding_without_claim')
+      continue
+    }
+    if (judged.kind === 'competency_abstained' && claim !== null) {
+      drop('competency_abstention_with_claim')
       continue
     }
 
@@ -361,6 +387,14 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
           kind: 'competency',
           competency: judged.competency,
           levelMet: judged.levelMet,
+        })
+        break
+      case 'competency_abstained':
+        findings.push({
+          ...base,
+          kind: 'competency_abstained',
+          competency: judged.competency,
+          abstention: judged.abstention,
         })
         break
     }

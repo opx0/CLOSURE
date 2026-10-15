@@ -9,8 +9,8 @@ import {
   nextPressure,
   selectAction,
   type PressureState,
-} from '@closer/core'
-import type { Competency, GapEntry, PolicyAction, RoundKind, Span } from '@closer/contracts'
+} from '@levelhead/core'
+import type { Competency, GapEntry, PolicyAction, RoundKind, Span } from '@levelhead/contracts'
 import type {
   ArmId,
   ExtractionOutcome,
@@ -48,10 +48,10 @@ export const typedPolicy: ArmPolicy = {
   description: 'packages/core selectAction: the typed policy, choosing each action from the state',
   next(turn) {
     return selectAction({
-      confirmedClaimIds: [turn.claimId],
-      currentClaimId: turn.claimId,
+      subjectIds: [turn.claimId],
+      currentSubjectId: turn.claimId,
       askedCounts: turn.askedCounts,
-      coveredForCurrentClaim: turn.covered,
+      coveredForCurrentSubject: turn.covered,
       recentActions: turn.recentActions,
       turnCount: turn.turnCount,
       personaId: turn.ctx.personaId,
@@ -78,7 +78,7 @@ export const fixedOrderPolicy: ArmPolicy = {
 }
 
 // Content the action needs that the renderer may not invent — chosen by code here, as the CLI does,
-// so anything untrue CLOSER says is in the log as data.
+// so anything untrue Levelhead says is in the log as data.
 function seedFor(action: PolicyAction, technology: string): string | undefined {
   if (!ACTIONS[action].needsSeed) return undefined
   switch (action) {
@@ -99,9 +99,9 @@ function seedFor(action: PolicyAction, technology: string): string | undefined {
   }
 }
 
-// Both CLOSER arms are this function with only `policy` differing — what makes ticket 05 §8(a) a
+// Both Levelhead arms are this function with only `policy` differing — what makes ticket 05 §8(a) a
 // real ablation rather than two implementations that happen to disagree elsewhere.
-export function closerArm(id: ArmId, description: string, policy: ArmPolicy): Arm {
+export function levelheadArm(id: ArmId, description: string, policy: ArmPolicy): Arm {
   return {
     id,
     description,

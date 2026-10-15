@@ -1,14 +1,18 @@
 import {
+  AREA_ROUND,
   DEFAULT_ROLE_ID,
   dueForRetrieval,
   interviewFormat,
+  openPinned,
   planFromFormat,
   renderLedger,
   replay,
+  resolveInterview,
+  roleLevel,
   rolePack,
-  roleRounds,
   validationNotice,
-} from '@closer/core'
+} from '@levelhead/core'
+import { LEVEL_ORDER, ROUND_ORDER } from '@levelhead/contracts'
 import type {
   Claim,
   Finding,
@@ -18,8 +22,8 @@ import type {
   PersonaId,
   RoleId,
   RoundKind,
-} from '@closer/contracts'
-import type { PressureLevel } from '@closer/core'
+} from '@levelhead/contracts'
+import type { ArtifactContext, PressureLevel } from '@levelhead/core'
 import { GitRepository } from '../repo/git-repository.ts'
 import { REPO_SESSION } from './repo.ts'
 import { ask } from '../terminal.ts'
@@ -27,13 +31,23 @@ import { openStore } from '../store.ts'
 import { fromEnv } from '../adapters/index.ts'
 import { loadCliConfig } from '../config.ts'
 import { RandomIds, SystemClock } from '../runtime.ts'
-import { runSession, type SessionIo } from '@closer/core'
+import { runSession, type SessionIo } from '@levelhead/core'
 import { CLAIM_SET_SESSION } from './claims.ts'
+import { ROUND_LABEL, topicLabel } from './catalog.ts'
+import { titled } from './ledger.ts'
 import { askParagraph, dim, heading, line, quote } from '../terminal.ts'
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const at = argv.indexOf(`--${name}`)
   return at === -1 ? undefined : argv[at + 1]
+}
+
+function isRound(value: string): value is RoundKind {
+  return ROUND_ORDER.some((round) => round === value)
+}
+
+function isLevel(value: string): value is Level {
+  return LEVEL_ORDER.some((level) => level === value)
 }
 
 // §4.4's own wording: a confidence is stated, not hidden, and never rounded into a verdict.
@@ -49,9 +63,11 @@ function printFinding(finding: Finding, quotes: ReadonlyMap<string, string>): vo
       ? `Finding — claim ${finding.verdict.replace(/_/g, ' ')}.`
       : finding.kind === 'claim_abstained'
         ? `Finding — abstained: ${finding.abstention.replace(/_/g, ' ')}.`
-        : finding.kind === 'composure'
-          ? `Composure — ${finding.signals.join(', ').replace(/_/g, ' ')}.`
-          : `Finding — ${finding.competency.replace(/_/g, ' ')}, met ${finding.levelMet ?? 'no level anchor'}.`
+        : finding.kind === 'competency_abstained'
+          ? `Finding — ${finding.competency.replace(/_/g, ' ')}, abstained: ${finding.abstention.replace(/_/g, ' ')}.`
+          : finding.kind === 'composure'
+            ? `Composure — ${finding.signals.join(', ').replace(/_/g, ' ')}.`
+            : `Finding — ${finding.competency.replace(/_/g, ' ')}, met ${finding.levelMet ?? 'no level anchor'}.`
 
   line('')
   line(headline)
@@ -65,17 +81,25 @@ function printFinding(finding: Finding, quotes: ReadonlyMap<string, string>): vo
   )
 }
 
-// Shared with `closer transfer`, so a transfer session looks and reads like the interrogation it retests.
-const ROUND_LABEL: Record<RoundKind, string> = {
-  project_deep_dive: 'project deep-dive',
-  design_extension: 'design extension',
-  behavioral: 'behavioural, with evidence',
-  code_walkthrough: 'code walkthrough',
+export function excerpt(artifact: ArtifactContext): { where: string; lines: string[] } {
+  const rows = artifact.code.replace(/\n$/, '').split('\n')
+  const first = artifact.startLine ?? 1
+  const last = artifact.endLine ?? first + rows.length - 1
+  const width = String(last).length
+  const where = [artifact.path, artifact.symbol, `lines ${first}–${last}`].filter(
+    (part) => part !== undefined,
+  )
+  return {
+    where: where.join(' · '),
+    lines: rows.map((row, index) => `${String(first + index).padStart(width)} │ ${row}`),
+  }
 }
 
 export function terminalIo(): SessionIo {
+  let thread: string | undefined
   return {
     round(kind, index, total, brief) {
+      thread = undefined
       heading(`round ${index + 1} of ${total} — ${ROUND_LABEL[kind]}`)
       if (brief !== undefined) line(brief)
     },
@@ -84,6 +108,16 @@ export function terminalIo(): SessionIo {
       return answer === 'y' || answer === 'yes'
     },
     question(text, meta) {
+      const subject = meta.topic?.id ?? meta.artifact?.artifactId
+      if (subject !== thread) {
+        thread = subject
+        if (meta.topic !== undefined) heading(topicLabel(meta.topic))
+        if (meta.artifact !== undefined) {
+          const opened = excerpt(meta.artifact)
+          heading(opened.where)
+          for (const row of opened.lines) line(row)
+        }
+      }
       heading(
         `turn ${meta.turn + 1} · ${meta.action.toLowerCase().replace(/_/g, ' ')} · pressure ${meta.pressureLevel}`,
       )
@@ -105,31 +139,11 @@ export function terminalIo(): SessionIo {
 export async function session(argv: readonly string[]): Promise<number> {
   const config = loadCliConfig()
   const { store } = openStore(config)
-  const claimSet = replay(await store.read(CLAIM_SET_SESSION))
-
-  const confirmed = [...claimSet.claims.values()].filter((claim) =>
-    claimSet.confirmedClaimIds.has(claim.id),
-  )
-  if (confirmed.length === 0) {
-    line('no confirmed claims yet — run: closer claims <resume.md>')
-    return 1
-  }
-
-  const wanted = flag(argv, 'claim')
-  let claims: Claim[] = confirmed
-  if (wanted !== undefined) {
-    const one = confirmed.find((candidate) => candidate.id === wanted)
-    if (one === undefined) {
-      line(`no confirmed claim with id ${wanted}`)
-      for (const candidate of confirmed) dim(`  ${candidate.id}  ${candidate.assertion}`)
-      return 1
-    }
-    claims = [one]
-  }
 
   const roleId = (flag(argv, 'role') ?? DEFAULT_ROLE_ID) as RoleId
-  if (rolePack(roleId) === undefined) {
-    line(`no role pack named ${roleId} — run: closer roles`)
+  const pack = rolePack(roleId)
+  if (pack === undefined) {
+    line(`no role pack named ${roleId} — run: levelhead roles`)
     return 1
   }
 
@@ -138,40 +152,91 @@ export async function session(argv: readonly string[]): Promise<number> {
   const formatId = flag(argv, 'format')
   const format = formatId === undefined ? undefined : interviewFormat(formatId)
   if (formatId !== undefined && format === undefined) {
-    line(`no format named ${formatId} — run: closer formats`)
+    line(`no format named ${formatId} — run: levelhead formats`)
     return 1
   }
   const preset = format === undefined ? undefined : planFromFormat(format)
 
-  const rounds = (flag(argv, 'rounds')?.split(',') ??
-    preset?.rounds ??
-    (flag(argv, 'role') === undefined
-      ? ['project_deep_dive']
-      : [...roleRounds(roleId)])) as RoundKind[]
+  const requested = flag(argv, 'rounds')?.split(',') ?? preset?.rounds
+  const unknownRound = requested?.find((round) => !isRound(round))
+  if (unknownRound !== undefined) {
+    line(`no round named ${unknownRound} — one of: ${ROUND_ORDER.join(', ')}`)
+    return 1
+  }
+  const level = flag(argv, 'level') ?? preset?.level ?? roleLevel(roleId)
+  if (!isLevel(level)) {
+    line(`no level named ${level} — one of: ${LEVEL_ORDER.join(', ')}`)
+    return 1
+  }
+
+  const resolved = resolveInterview({
+    roleId,
+    rounds: requested?.filter(isRound),
+    topicIds: flag(argv, 'topics')?.split(','),
+  })
+  if (!resolved.ok) {
+    if (resolved.problem === 'unknown_topics') {
+      line(`no topic with id ${resolved.topicIds.join(', ')} — run: levelhead topics`)
+    } else {
+      for (const stray of resolved.topics) {
+        line(`${stray.id} is asked in the ${AREA_ROUND[stray.area]} round — add it to --rounds`)
+      }
+    }
+    return 1
+  }
+  const { rounds, topics } = resolved
+
+  const claimSet = replay(await store.read(CLAIM_SET_SESSION))
+  const confirmed = [...claimSet.claims.values()].filter((claim) =>
+    claimSet.confirmedClaimIds.has(claim.id),
+  )
+  if (resolved.needsClaims && confirmed.length === 0) {
+    line(
+      'cross-questioning your résumé needs a confirmed claim — run: levelhead claims <resume.md>',
+    )
+    dim('  or start an interview with no résumé at all: levelhead session')
+    return 1
+  }
+
+  const wanted = flag(argv, 'claim')
+  let selected: Claim[] = confirmed
+  if (wanted !== undefined) {
+    const one = confirmed.find((candidate) => candidate.id === wanted)
+    if (one === undefined) {
+      line(`no confirmed claim with id ${wanted}`)
+      for (const candidate of confirmed) dim(`  ${candidate.id}  ${candidate.assertion}`)
+      return 1
+    }
+    selected = [one]
+  }
+  const claims = resolved.readsClaims ? selected : []
 
   // Refused rather than degraded — without a pin, a walkthrough is a generic question wearing a citation.
   let pinned
-  if (rounds.includes('code_walkthrough')) {
-    const repoView = replay(await store.read(REPO_SESSION))
-    if (repoView.snapshot === null) {
-      line('a code walkthrough needs a pinned repository — run: closer repo <path>')
+  if (resolved.needsSnapshot) {
+    const entry = openPinned(await store.read(REPO_SESSION))
+    if (entry === undefined) {
+      line('a code walkthrough needs a pinned repository — run: levelhead repo <path>')
       return 1
     }
     const repository = new GitRepository({ ids: new RandomIds() })
     // Re-registers the earlier process's pin, so the walkthrough reads that commit, not today's tree.
-    repository.register(repoView.snapshot)
+    repository.register(entry.snapshot)
     pinned = {
-      snapshot: repoView.snapshot,
-      artifacts: [...repoView.artifacts.values()],
-      evidence: [...repoView.evidence.values()],
+      snapshot: entry.snapshot,
+      artifacts: entry.artifacts,
+      evidence: entry.evidence,
       repository,
     }
   }
 
   // Gathered across every log, because a gap outlives the session that closed it.
   const settled: GapEntry[] = []
+  const topicHistory: string[] = []
   for (const sessionId of await store.listSessions()) {
-    for (const gap of replay(await store.read(sessionId)).gaps.values()) {
+    const view = replay(await store.read(sessionId))
+    topicHistory.push(...(view.session?.topicIds ?? []))
+    for (const gap of view.gaps.values()) {
       const known = settled.findIndex((other) => other.id === gap.id)
       if (known === -1) settled.push(gap)
       else if (gap.lastTouchedAt >= (settled[known]?.lastTouchedAt ?? '')) settled[known] = gap
@@ -184,8 +249,12 @@ export async function session(argv: readonly string[]): Promise<number> {
   }
 
   const { conductor, evaluator } = fromEnv(process.env)
-  heading(`${claims.length} claim${claims.length === 1 ? '' : 's'} in play`)
-  for (const candidate of claims) dim(`  ${candidate.assertion}`)
+  heading(`${pack.label} · ${level}`)
+  dim(`  ${rounds.map((round) => ROUND_LABEL[round]).join(' → ')}`)
+  if (claims.length > 0) {
+    dim(`  ${claims.length} résumé claim${claims.length === 1 ? '' : 's'} in play`)
+    for (const candidate of claims) dim(`    ${candidate.assertion}`)
+  }
   dim(`  ${validationNotice(roleId)}`)
   if (format !== undefined) {
     dim(`  format: ${format.label}`)
@@ -194,11 +263,13 @@ export async function session(argv: readonly string[]): Promise<number> {
 
   const result = await runSession({
     claims,
+    ...(topics === undefined ? {} : { topics }),
+    topicHistory,
     rounds,
     retrievals,
     ...(pinned === undefined ? {} : { pinned }),
     mode: (flag(argv, 'mode') ?? 'simulation') as Mode,
-    level: (flag(argv, 'level') ?? preset?.level ?? 'mid') as Level,
+    level,
     role: roleId,
     // Warm and gentle by default — skeptic/high pressure is a deliberate choice the candidate
     // opts into with a flag, not something a first run throws them into unannounced.
@@ -232,13 +303,13 @@ export async function session(argv: readonly string[]): Promise<number> {
       if (span !== undefined) quotes.set(link.id, span.quoted)
     }
     heading('gap ledger')
-    for (const row of renderLedger(gaps, quotes)) line(row)
+    for (const row of renderLedger(gaps.map(titled), quotes)) line(row)
   }
 
   line('')
   dim(
     `session ${result.sessionId} · stopped by ${result.stoppedBy} · ${result.view.invocations.length} model calls · $${result.view.totals.costUsd.toFixed(4)}`,
   )
-  dim(`replay it with: closer replay ${result.sessionId}`)
+  dim(`replay it with: levelhead replay ${result.sessionId}`)
   return 0
 }

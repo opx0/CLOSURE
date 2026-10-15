@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = 'closer.token'
+const TOKEN_KEY = 'levelhead.token'
 
 export function apiToken(): string | null {
   try {
@@ -66,8 +66,39 @@ type Json<P extends keyof paths, M extends 'get' | 'post' | 'delete'> = paths[P]
         : unknown
   : unknown
 
+// The request body a POST expects, read off the same generated schema, so a caller cannot post a
+// shape the server would reject at its boundary.
+type Body<P extends keyof paths, M extends 'post'> = paths[P][M] extends {
+  requestBody: { content: { 'application/json': infer B } }
+}
+  ? B
+  : never
+
+// One status's body, for a route that answers with more than one success shape.
+type Reply<P extends keyof paths, M extends 'post', S extends 201 | 202> = paths[P][M] extends {
+  responses: Record<S, { content: { 'application/json': infer B } }>
+}
+  ? B
+  : never
+
+export type StartSessionBody = Body<'/sessions', 'post'>
+// 201 when the server parsed the repository itself; 202 and a job to poll when a worker will.
+export type PinResult = Reply<'/snapshots', 'post', 201> | Reply<'/snapshots', 'post', 202>
+export type ProsodyReportBody = Body<'/sessions/{id}/prosody', 'post'>
+export type KinematicsReportBody = Body<'/sessions/{id}/kinematics', 'post'>
+export type MirrorBody = Body<'/mirror', 'post'>
+
+// Response shapes for the performance-lane surfaces, derived from the generated schema so the pages
+// never restate a type the server owns.
+export type Debrief = Json<'/sessions/{id}/debrief', 'get'>
+export type SessionPerformance = Json<'/sessions/{id}/performance', 'get'>
+export type Analytics = Json<'/analytics', 'get'>
+export type ScreenSimulation = Json<'/mirror', 'post'>
+
 export const api = {
   health: () => request<Json<'/health', 'get'>>('/health'),
+
+  claimSet: () => request<Json<'/claims', 'get'>>('/claims'),
 
   extractClaims: (resumeText: string) =>
     request<Json<'/claims', 'post'>>('/claims', {
@@ -84,7 +115,9 @@ export const api = {
       }),
     }),
 
-  startSession: (body: Record<string, unknown>) =>
+  resumeFeedback: () => request<Json<'/resume/feedback', 'get'>>('/resume/feedback'),
+
+  startSession: (body: StartSessionBody) =>
     request<Json<'/sessions', 'post'>>('/sessions', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -95,6 +128,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+
+  sessions: () => request<Json<'/sessions', 'get'>>('/sessions'),
 
   session: (sessionId: string) => request<Json<'/sessions/{id}', 'get'>>(`/sessions/${sessionId}`),
 
@@ -123,7 +158,36 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // The performance lane over HTTP. Prosody and kinematics are recorded beside the interview and
+  // never travel with an answer; the server keeps them structurally out of every finding.
+  recordProsody: (sessionId: string, report: ProsodyReportBody) =>
+    request<Json<'/sessions/{id}/prosody', 'post'>>(`/sessions/${sessionId}/prosody`, {
+      method: 'POST',
+      body: JSON.stringify(report),
+    }),
+
+  recordKinematics: (sessionId: string, report: KinematicsReportBody) =>
+    request<Json<'/sessions/{id}/kinematics', 'post'>>(`/sessions/${sessionId}/kinematics`, {
+      method: 'POST',
+      body: JSON.stringify(report),
+    }),
+
+  performance: (sessionId: string) =>
+    request<Json<'/sessions/{id}/performance', 'get'>>(`/sessions/${sessionId}/performance`),
+
+  debrief: (sessionId: string) =>
+    request<Json<'/sessions/{id}/debrief', 'get'>>(`/sessions/${sessionId}/debrief`),
+
+  analytics: () => request<Json<'/analytics', 'get'>>('/analytics'),
+
+  mirror: (body: MirrorBody) =>
+    request<Json<'/mirror', 'post'>>('/mirror', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   roles: () => request<Json<'/roles', 'get'>>('/roles'),
+  topics: () => request<Json<'/topics', 'get'>>('/topics'),
   formats: () => request<Json<'/formats', 'get'>>('/formats'),
   rubrics: () => request<Json<'/rubrics', 'get'>>('/rubrics'),
   personas: () => request<Json<'/personas', 'get'>>('/personas'),
@@ -134,7 +198,19 @@ export const api = {
   deleteSnapshot: (snapshotId: string) =>
     request<Json<'/snapshots/{id}', 'delete'>>(`/snapshots/${snapshotId}`, { method: 'DELETE' }),
 
+  snapshots: () => request<Json<'/snapshots', 'get'>>('/snapshots'),
+  artifact: (snapshotId: string, artifactId: string) =>
+    request<Json<'/snapshots/{id}/artifacts/{artifactId}', 'get'>>(
+      `/snapshots/${snapshotId}/artifacts/${artifactId}`,
+    ),
+  pinSnapshot: (repoPath: string, ref?: string) =>
+    request<PinResult>('/snapshots', {
+      method: 'POST',
+      body: JSON.stringify({ repoPath, ...(ref === undefined ? {} : { ref }) }),
+    }),
+
   jobs: () => request<Json<'/jobs', 'get'>>('/jobs'),
+  job: (jobId: string) => request<Json<'/jobs/{id}', 'get'>>(`/jobs/${jobId}`),
   benchmarkRuns: () => request<Json<'/benchmark/runs', 'get'>>('/benchmark/runs'),
 }
 

@@ -7,7 +7,7 @@ const PAGE = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>CLOSER — voice</title>
+<title>Levelhead — voice</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: ui-monospace, monospace; max-width: 860px; margin: 2rem auto; padding: 0 1rem;
@@ -33,7 +33,7 @@ const PAGE = `<!doctype html>
 </style>
 </head>
 <body>
-  <h1>CLOSER — voice</h1>
+  <h1>Levelhead — voice</h1>
   <p class="dim">Local only: transcription and speech run on your machine (voice/serve.py). Nothing recorded here leaves it.</p>
 
   <section id="setup">
@@ -98,7 +98,7 @@ const PAGE = `<!doctype html>
   </section>
 
 <script>
-const VOICE = localStorage.getItem('closer.voiceUrl') || 'http://localhost:8091';
+const VOICE = localStorage.getItem('levelhead.voiceUrl') || 'http://localhost:8091';
 const state = { claims: [], confirmed: new Set(), sessionId: null, recorder: null, chunks: [] };
 
 const el = (id) => document.getElementById(id);
@@ -234,10 +234,15 @@ async function speak(text) {
 }
 
 function verdictLine(finding) {
-  if (finding.kind === 'claim') return \`claim \${finding.verdict.replace(/_/g, ' ')}\`;
-  if (finding.kind === 'claim_abstained') return \`abstained: \${finding.abstention.replace(/_/g, ' ')}\`;
-  if (finding.kind === 'composure') return \`composure — \${finding.signals.join(', ').replace(/_/g, ' ')}\`;
-  return \`\${finding.competency.replace(/_/g, ' ')} — met \${finding.levelMet ?? 'no level'}\`;
+  const words = (text) => text.replace(/_/g, ' ');
+  switch (finding.kind) {
+    case 'claim': return \`claim \${words(finding.verdict)}\`;
+    case 'claim_abstained': return \`abstained: \${words(finding.abstention)}\`;
+    case 'competency_abstained': return \`\${words(finding.competency)} — abstained: \${words(finding.abstention)}\`;
+    case 'composure': return \`composure — \${words(finding.signals.join(', '))}\`;
+    case 'competency': return \`\${words(finding.competency)} — met \${finding.levelMet ?? 'no level'}\`;
+    default: return words(finding.kind);
+  }
 }
 
 async function handleTurn(data) {
@@ -305,7 +310,7 @@ async function stopRecording() {
     // The voice service runs silence/noise through a voice-activity filter rather than guess at
     // what wasn't said, so quiet or empty audio comes back as an empty string here, not garbage.
     el('answerText').value = text;
-    el('answerText').placeholder = text.trim() ? '' : 'No speech detected — try recording again, closer to the mic.';
+    el('answerText').placeholder = text.trim() ? '' : 'No speech detected — try recording again, LEVELHEADKEEP_MIC.';
     el('answerBox').hidden = false;
   } catch (err) {
     showError(\`Transcription failed: \${err.message}. Is \\\`bun run voice:up\\\` running?\`);
@@ -337,7 +342,12 @@ el('submit').onclick = async () => {
 </html>`
 
 export const uiRoutes: FastifyPluginAsyncTypebox = async (app) => {
+  // The front door is the built React app. The dependency-free voice page stays reachable at
+  // /voice for a fresh checkout that has not built the client yet.
   app.get('/', { schema: { hide: true } }, async (_request, reply) => {
+    reply.redirect('/app/')
+  })
+  app.get('/voice', { schema: { hide: true } }, async (_request, reply) => {
     reply.type('text/html').send(PAGE)
   })
 }

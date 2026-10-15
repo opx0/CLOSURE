@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { ROUND_ORDER, type Claim, type RoundKind } from '@closer/contracts'
+import { ROUND_ORDER, type Claim, type RoundKind } from '@levelhead/contracts'
 import { roundBriefPrompt, type RoundBriefVars } from './round-brief.ts'
 
 const claim: Claim = {
@@ -37,14 +37,31 @@ test('the brief is one spoken line that opens a round and judges nothing', () =>
 })
 
 test('each round opens with its own line', () => {
+  const openingMarkers: Record<RoundKind, string> = {
+    cs_fundamentals: 'moves to computer-science fundamentals',
+    problem_solving: 'spoken rather than coded',
+    role_knowledge: 'the working knowledge of the role they are interviewing for',
+    system_design: 'The round ahead is system design',
+    behavioral: 'times from their own experience, which part was theirs, and what it cost',
+    project_deep_dive: 'goes into what they built and stays there',
+    design_extension: 'take what you built and scale it a hundred times',
+    code_walkthrough: 'opens their repository and has them walk you through the code in it',
+  }
   const openings = ROUND_ORDER.map((round) => roundBriefPrompt.render(varsFor(round)).user)
   expect(new Set(openings).size).toBe(ROUND_ORDER.length)
 
-  const [deepDive, design, behavioral, walkthrough] = openings as [string, string, string, string]
-  expect(deepDive).toContain('goes into what they built and stays there')
-  expect(design).toContain('take what you built and scale it a hundred times')
-  expect(behavioral).toContain('onto the people and the decisions')
-  expect(walkthrough).toContain('walk through code they linked')
+  ROUND_ORDER.forEach((round, index) => expect(openings[index]).toContain(openingMarkers[round]))
+})
+
+test('what they built is only brought up when there is a claim', () => {
+  const withClaim = roundBriefPrompt.render(varsFor('project_deep_dive')).user
+  expect(withClaim).toContain('What they said they built:')
+  expect(withClaim).toContain('<<<UNTRUSTED_CLAIM>>>')
+
+  const withoutClaim = roundBriefPrompt.render(varsFor('cs_fundamentals', { claim: null })).user
+  expect(withoutClaim).not.toContain('What they said they built')
+  expect(withoutClaim).not.toContain('<<<UNTRUSTED_CLAIM>>>')
+  expect(withoutClaim).not.toContain('claim')
 })
 
 test('the session reads as a loop: the first round opens it, a later one continues it', () => {
@@ -76,5 +93,5 @@ test('the rendered brief moves with the round; the prompt it is attributed by do
   })
   expect(new Set(digests).size).toBe(ROUND_ORDER.length)
   expect(roundBriefPrompt.id).toBe('round-brief')
-  expect(roundBriefPrompt.version).toBe(1)
+  expect(roundBriefPrompt.version).toBe(2)
 })

@@ -11,16 +11,26 @@ import {
   PersonaIdSchema,
   PolicyActionSchema,
   PressureLevelSchema,
+  RoleIdSchema,
   RoundKindSchema,
   SessionSchema,
   SessionStateSchema,
   SpanSchema,
   InvocationRecordSchema,
-} from '@closer/contracts'
-import type { Level, Mode, PersonaId, RoundKind } from '@closer/contracts'
-import { replay } from '@closer/core'
-import type { PressureLevel } from '@closer/core'
+  TopicAreaSchema,
+} from '@levelhead/contracts'
+import {
+  AREA_ROUND,
+  DEFAULT_ROLE_ID,
+  openPinned,
+  replay,
+  resolveInterview,
+  rolePack,
+} from '@levelhead/core'
+import type { EventStore, PinnedContext, PressureLevel } from '@levelhead/core'
 import { CLAIM_SET_SESSION } from '../../../cli/src/commands/claims.ts'
+import { REPO_SESSION } from '../../../cli/src/commands/repo.ts'
+import { GitRepository } from '../../../cli/src/repo/git-repository.ts'
 import type { ServerDeps } from '../deps.ts'
 import type { SessionHost } from '../session-host.ts'
 import {
@@ -30,6 +40,7 @@ import {
   quotesFrom,
   wireFindings,
 } from './shared.ts'
+import { ShownArtifactSchema } from './snapshots.ts'
 
 // No score and no quality summary here — findings and their citations are the whole output, as in
 // the terminal.
@@ -46,12 +57,27 @@ const TurnUpdateSchema = Type.Object({
   ),
   question: Type.Optional(
     Type.Object({
+      attemptId: Type.String({ minLength: 1 }),
       text: Type.String({ minLength: 1 }),
       turn: Type.Integer({ minimum: 0 }),
       // Chosen by code, never the model — the candidate is owed why a question was asked this way.
       action: PolicyActionSchema,
       pressureLevel: PressureLevelSchema,
       round: RoundKindSchema,
+      topic: Type.Optional(
+        Type.Object({
+          id: Type.String({ minLength: 1 }),
+          area: TopicAreaSchema,
+          title: Type.String({ minLength: 1 }),
+        }),
+      ),
+      claim: Type.Optional(
+        Type.Object({
+          id: Type.String({ minLength: 1 }),
+          assertion: Type.String({ minLength: 1 }),
+        }),
+      ),
+      artifact: Type.Optional(ShownArtifactSchema),
     }),
   ),
   findings: Type.Array(FindingSchema),
@@ -63,6 +89,7 @@ const TurnUpdateSchema = Type.Object({
       Type.Literal('end_topic'),
       Type.Literal('ceiling'),
       Type.Literal('evaluator_failure'),
+      Type.Literal('practice_outcome_rejected'),
     ]),
   ),
 })
@@ -92,17 +119,106 @@ const SessionViewSchema = Type.Object({
   closed: Type.Union([Type.Object({ reason: Type.String() }), Type.Null()]),
 })
 
+const NO_CLAIMS = {
+  error: 'no confirmed claims',
+  detail:
+    'this round cross-questions your résumé: add it under Résumé & projects (POST /claims, then ' +
+    'POST /claims/:id/confirm). An interview round needs no résumé at all.',
+}
+
+async function askedTopics(store: EventStore): Promise<string[]> {
+  const asked: string[] = []
+  for (const sessionId of await store.listSessions()) {
+    const view = replay(await store.read(sessionId))
+    asked.push(...(view.session?.topicIds ?? []))
+  }
+  return asked
+}
+
+async function openSnapshot(
+  store: EventStore,
+  deps: ServerDeps,
+  snapshotId: string | undefined,
+): Promise<PinnedContext | undefined> {
+  const entry = openPinned(await store.read(REPO_SESSION), snapshotId)
+  if (entry === undefined) return undefined
+  const repository = new GitRepository({ ids: deps.ids, clock: deps.clock })
+  repository.register(entry.snapshot)
+  return {
+    snapshot: entry.snapshot,
+    artifacts: entry.artifacts,
+    evidence: entry.evidence,
+    repository,
+  }
+}
+
 export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPluginAsyncTypebox {
   return async (app) => {
+    app.get(
+      '/sessions',
+      {
+        schema: {
+          summary: 'The current owner’s interviews, newest first, with their availability',
+          tags: ['sessions'],
+          response: {
+            200: Type.Object({
+              sessions: Type.Array(
+                Type.Object({
+                  session: SessionSchema,
+                  answerCount: Type.Integer({ minimum: 0 }),
+                  availability: Type.Union([
+                    Type.Literal('awaiting_answer'),
+                    Type.Literal('processing'),
+                    Type.Literal('closed'),
+                    Type.Literal('interrupted'),
+                  ]),
+                }),
+              ),
+            }),
+          },
+        },
+      },
+      async (request) => {
+        const store = deps.storeFor(request.principal)
+        const sessions = []
+        for (const sessionId of await store.listSessions()) {
+          const view = replay(await store.read(sessionId))
+          if (view.session === null) continue
+          const live = host.get(sessionId, request.principal.ownerId)
+          const availability =
+            view.closed !== null
+              ? ('closed' as const)
+              : live === undefined
+                ? ('interrupted' as const)
+                : live.awaitingAnswer
+                  ? ('awaiting_answer' as const)
+                  : ('processing' as const)
+          sessions.push({
+            session: view.session,
+            answerCount: view.transcript.filter((entry) => entry.role === 'candidate').length,
+            availability,
+          })
+        }
+        sessions.sort(
+          (left, right) =>
+            right.session.startedAt.localeCompare(left.session.startedAt) ||
+            right.session.id.localeCompare(left.session.id),
+        )
+        return { sessions }
+      },
+    )
+
     app.post(
       '/sessions',
       {
         schema: {
-          summary: 'Start an interview over the confirmed claim set and return the first question',
+          summary: 'Start an interview and return the first question',
           tags: ['sessions'],
           body: Type.Object({
-            // Every default matches `closer session`'s, so both callers start the same interview.
+            roleId: Type.Optional(RoleIdSchema),
+            topicIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             claimIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
+            snapshotId: Type.Optional(Type.String({ minLength: 1 })),
             mode: Type.Optional(ModeSchema),
             level: Type.Optional(LevelSchema),
             personaId: Type.Optional(PersonaIdSchema),
@@ -115,49 +231,75 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
         },
       },
       async (request, reply) => {
+        const body = request.body
+        const roleId = body.roleId ?? DEFAULT_ROLE_ID
+        const pack = rolePack(roleId)
+        if (pack === undefined) {
+          return reply.code(400).send({ error: 'no such role', detail: roleId })
+        }
+
+        const resolved = resolveInterview({ roleId, rounds: body.rounds, topicIds: body.topicIds })
+        if (!resolved.ok) {
+          return reply.code(400).send(
+            resolved.problem === 'unknown_topics'
+              ? { error: 'no such topic', detail: resolved.topicIds.join(', ') }
+              : {
+                  error: 'a topic belongs to a round that was not requested',
+                  detail: resolved.topics
+                    .map((topic) => `${topic.id} is asked in ${AREA_ROUND[topic.area]}`)
+                    .join(', '),
+                },
+          )
+        }
+        const { rounds, topics } = resolved
+
         const store = deps.storeFor(request.principal)
         const claimSet = replay(await store.read(CLAIM_SET_SESSION))
         const confirmed = [...claimSet.claims.values()].filter((claim) =>
           claimSet.confirmedClaimIds.has(claim.id),
         )
-        if (confirmed.length === 0) {
-          return reply.code(409).send({
-            error: 'no confirmed claims',
-            detail: 'POST /claims, then POST /claims/:id/confirm — §4.1: nothing starts confirmed',
-          })
-        }
+        if (resolved.needsClaims && confirmed.length === 0) return reply.code(409).send(NO_CLAIMS)
 
-        const wanted = request.body.claimIds
-        const claims =
+        const wanted = body.claimIds
+        const selected =
           wanted === undefined ? confirmed : confirmed.filter((claim) => wanted.includes(claim.id))
-        if (wanted !== undefined && claims.length !== wanted.length) {
-          const missing = wanted.filter((id) => !claims.some((claim) => claim.id === id))
+        if (wanted !== undefined && selected.length !== wanted.length) {
+          const missing = wanted.filter((id) => !selected.some((claim) => claim.id === id))
           return reply.code(400).send({
             error: 'claim is not confirmed, or does not exist',
             detail: missing.join(', '),
           })
         }
 
-        const rounds = (request.body.rounds ?? ['project_deep_dive']) as RoundKind[]
-        // Walkthrough needs a pinned snapshot, which this API can't create — refused rather than
-        // degraded into a generic question wearing a citation.
-        if (rounds.includes('code_walkthrough')) {
-          return reply.code(400).send({
-            error: 'a code walkthrough needs a pinned repository',
-            detail: 'pin one with `closer repo <path>`; this API does not pin snapshots',
-          })
+        let pinned: PinnedContext | undefined
+        if (resolved.needsSnapshot) {
+          pinned = await openSnapshot(store, deps, body.snapshotId)
+          if (pinned === undefined) {
+            return reply.code(400).send({
+              error: 'pin a repository first',
+              detail:
+                body.snapshotId === undefined
+                  ? 'a code walkthrough opens files from a pinned repository: POST /snapshots'
+                  : `${body.snapshotId} is not a pinned snapshot, or it was deleted`,
+            })
+          }
         }
 
         const update = await host.start({
           principal: request.principal,
-          claims,
+          claims: resolved.readsClaims ? selected : [],
           rounds,
-          mode: (request.body.mode ?? 'simulation') as Mode,
-          level: (request.body.level ?? 'mid') as Level,
-          personaId: (request.body.personaId ?? 'skeptic') as PersonaId,
-          pressureCeiling: (request.body.pressureCeiling ?? 3) as PressureLevel,
-          turnsPerRound: request.body.turnsPerRound ?? 6,
-          drill: request.body.drill ?? true,
+          role: roleId,
+          ...(topics === undefined ? {} : { topics }),
+          topicHistory: await askedTopics(store),
+          ...(pinned === undefined ? {} : { pinned }),
+          mode: body.mode ?? 'simulation',
+          level: body.level ?? pack.defaultLevel,
+          // Gentle by default, as in `levelhead session`: a skeptic at full pressure is opted into.
+          personaId: body.personaId ?? 'collaborator',
+          pressureCeiling: (body.pressureCeiling ?? 1) as PressureLevel,
+          turnsPerRound: body.turnsPerRound ?? 6,
+          drill: body.drill ?? true,
         })
         return reply.code(201).send({ ...update, findings: wireFindings(update.findings) })
       },

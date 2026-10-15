@@ -85,7 +85,7 @@ test('two files claiming one version are refused', () => {
 })
 
 test('a file that does not announce its order is refused', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-migrations-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-migrations-'))
   try {
     await writeFile(join(dir, 'add-index.sql'), '-- unnumbered', 'utf8')
     await expect(loadMigrations(dir)).rejects.toThrow(/is not a migration/)
@@ -95,7 +95,8 @@ test('a file that does not announce its order is refused', async () => {
 })
 
 const url = process.env['DATABASE_URL']
-const database = url === undefined ? undefined : await openTestDatabase(url, 'closer_test_migrate')
+const database =
+  url === undefined ? undefined : await openTestDatabase(url, 'levelhead_test_migrate')
 if (database === undefined) {
   console.log(
     '[skipped] packages/db migration integration tests: DATABASE_URL is unset or unreachable',

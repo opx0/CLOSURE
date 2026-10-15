@@ -5,8 +5,8 @@ import {
   indexGaps,
   rubricSetV1,
   spanViolations,
-} from '@closer/core'
-import type { Finding, GapEntry } from '@closer/contracts'
+} from '@levelhead/core'
+import type { Finding, GapEntry } from '@levelhead/contracts'
 import { FixedClock, ScriptedConductor, ScriptedEvaluator, SeqIds } from './fakes.ts'
 import { runHarnessSession } from './harness.ts'
 import {
@@ -174,7 +174,8 @@ test('an abstention is not a pass: it does not close a gap under transfer', asyn
   // §4.5: a gap closes only when it *held* under changed constraints. Silence is not holding.
   expect(after?.status).not.toBe('closed_under_transfer')
 
-  // `transferAttemptIds` only grows on a closing `gap_status` event, so an empty list here is the
-  // log itself — stronger than reading the status back — saying no close was ever licensed.
-  expect(after?.transferAttemptIds).toEqual([])
+  expect(after?.transferAttemptIds).toHaveLength(1)
+  expect(after?.practiceReceipts?.map(({ kind, held }) => ({ kind, held }))).toEqual([
+    { kind: 'transfer', held: false },
+  ])
 })

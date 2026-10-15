@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test'
 import type { Static, TSchema } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
-import type { Claim, InvocationRecord, PolicyAction } from '@closer/contracts'
+import type { Claim, InvocationRecord, PolicyAction, RoleId, Topic } from '@levelhead/contracts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 import type { EvaluatorPort, StructuredRequest, StructuredResult } from '../ports/evaluator.ts'
 import {
@@ -68,14 +68,37 @@ function idSource(): IdSource {
 
 const clock: Clock = { now: () => '2026-09-09T10:00:00.000Z' }
 
+const TOPIC: Topic = {
+  id: 'os.deadlock',
+  area: 'os',
+  title: 'Deadlock',
+  ask: 'Ask them what a deadlock is and how a system prevents or recovers from it.',
+  minLevel: 'junior',
+  expected: {
+    mechanism: ['the four Coffman conditions'],
+    trade_offs: ['prevention costs concurrency; detection costs a recovery path'],
+    failure_modes: ['a lock ordering broken by one new code path'],
+  },
+  falsePremise: 'A deadlock always resolves itself once the scheduler preempts one thread.',
+  twist: 'the locks are now held across two machines',
+}
+
 function inputFor(
   evaluator: EvaluatorPort,
-  over: { action?: PolicyAction; claim?: Claim | null; claimSpanId?: string } = {},
+  over: {
+    action?: PolicyAction
+    claim?: Claim | null
+    claimSpanId?: string
+    topic?: Topic
+    role?: RoleId
+  } = {},
 ): EvaluateAnswerInput {
   return {
     attemptId: 'attempt-1',
     claim: over.claim === undefined ? CLAIM : over.claim,
     ...(over.claimSpanId === undefined ? {} : { claimSpanId: over.claimSpanId }),
+    ...(over.topic === undefined ? {} : { topic: over.topic }),
+    ...(over.role === undefined ? {} : { role: over.role }),
     action: over.action ?? 'PROBE_MECHANISM',
     round: 'project_deep_dive',
     level: 'senior',
@@ -299,7 +322,7 @@ test('the request carries the versioned prompt and the level anchors the turn ca
 
   const request = requests[0]
   expect(request?.promptId).toBe('answer-evaluation')
-  expect(request?.promptVersion).toBe(1)
+  expect(request?.promptVersion).toBe(2)
   expect(request?.promptHash).toHaveLength(16)
   expect(request?.user).toContain('failure_modes (v1)')
   expect(request?.user).toContain('claim_status (v1)')
@@ -322,4 +345,104 @@ test('the fixtures the fake port returns satisfy the schema the model is held to
   }
   expect(Value.Check(EvaluationOutputSchema, output)).toBe(true)
   expect(Value.Check(EvaluationOutputSchema, { findings: [{ kind: 'claim' }] })).toBe(false)
+})
+
+function anchorLines(user: string | undefined): string[] {
+  return (user ?? '').split('\n').filter((line) => line.includes('Required at this level:'))
+}
+
+test('a topic turn judges against the topic’s own concepts, and not the role’s', async () => {
+  const { port, requests } = fakeEvaluator({
+    ok: true,
+    value: { findings: [] },
+    invocation: INVOCATION,
+  })
+
+  await evaluateAnswer(
+    inputFor(port, {
+      claim: null,
+      topic: TOPIC,
+      role: 'backend_services',
+      action: 'FALSE_PREMISE',
+    }),
+  )
+
+  const user = requests[0]?.user
+  const anchors = anchorLines(user)
+  expect(anchors.find((line) => line.includes('the four Coffman conditions'))).toBeDefined()
+  expect(anchors.find((line) => line.includes('a lock ordering broken by one'))).toBeDefined()
+  expect(anchors.find((line) => line.includes('prevention costs concurrency'))).toBeDefined()
+  expect(user).not.toContain('what happens on retry')
+  expect(user).not.toContain('claim_status (v1)')
+  expect(user).toContain('The topic the interviewer chose for this turn: Deadlock (os).')
+})
+
+test('a claim turn still carries the role’s concepts', async () => {
+  const { port, requests } = fakeEvaluator({
+    ok: true,
+    value: { findings: [] },
+    invocation: INVOCATION,
+  })
+
+  await evaluateAnswer(inputFor(port, { role: 'backend_services' }))
+
+  expect(requests[0]?.user).toContain('what happens on retry')
+})
+
+test('with no claim on the table, declining to judge a competency is a cited finding', async () => {
+  const output: EvaluationOutput = {
+    findings: [
+      {
+        kind: 'competency_abstained',
+        competency: 'failure_modes',
+        abstention: 'insufficient_evidence',
+        rationale: 'Recovery is referred to but no failure is described.',
+        confidence: 0.6,
+        quotes: ["I don't think we handled that."],
+      },
+    ],
+  }
+  const { port } = fakeEvaluator({ ok: true, value: output, invocation: INVOCATION })
+
+  const result = ok(await evaluateAnswer(inputFor(port, { claim: null, topic: TOPIC })))
+
+  expect(result.findings).toHaveLength(1)
+  const finding = result.findings[0]
+  expect(finding?.kind).toBe('competency_abstained')
+  expect(finding?.rubric.id).toBe('failure_modes')
+  expect(finding?.kind === 'competency_abstained' ? finding.abstention : null).toBe(
+    'insufficient_evidence',
+  )
+  expect(result.evidence.map((link) => link.subject)).toEqual([
+    { kind: 'attempt', attemptId: 'attempt-1' },
+  ])
+  everyCitationResolves(result)
+})
+
+test('a competency abstention is offered only when there is no claim to abstain on', async () => {
+  const abstained: EvaluationOutput = {
+    findings: [
+      {
+        kind: 'competency_abstained',
+        competency: 'mechanism',
+        abstention: 'not_verifiable',
+        rationale: 'Nothing checkable was said.',
+        confidence: 0.5,
+        quotes: ['renews it while it works'],
+      },
+    ],
+  }
+  const withClaim = fakeEvaluator({ ok: true, value: abstained, invocation: INVOCATION })
+  const withoutClaim = fakeEvaluator({ ok: true, value: { findings: [] }, invocation: INVOCATION })
+
+  const claimed = ok(await evaluateAnswer(inputFor(withClaim.port)))
+  await evaluateAnswer(inputFor(withoutClaim.port, { claim: null, topic: TOPIC }))
+
+  const [claimTurn] = withClaim.requests
+  const [topicTurn] = withoutClaim.requests
+  if (claimTurn === undefined || topicTurn === undefined) throw new Error('no request was made')
+  expect(Value.Check(claimTurn.schema, abstained)).toBe(false)
+  expect(Value.Check(topicTurn.schema, abstained)).toBe(true)
+  expect(claimed.findings).toHaveLength(0)
+  expect(claimed.dropped[0]?.reason).toBe('competency_abstention_with_claim')
 })

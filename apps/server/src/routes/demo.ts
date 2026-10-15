@@ -30,9 +30,10 @@ export function demoRoutes(enabled: boolean): FastifyPluginAsyncTypebox {
       },
       async (_request, reply) => {
         if (!enabled) {
-          return reply
-            .code(404)
-            .send({ error: 'this instance is not a showcase', detail: 'CLOSER_DEMO_MODE is off' })
+          return reply.code(404).send({
+            error: 'this instance is not a showcase',
+            detail: 'LEVELHEAD_DEMO_MODE is off',
+          })
         }
 
         const ownerId = `demo${randomUUID().replace(/-/g, '').slice(0, 12)}`

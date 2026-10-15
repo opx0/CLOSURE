@@ -1,7 +1,13 @@
 import { test, expect } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { ROUND_ORDER, type RoundKind } from '@closer/contracts'
+import { ROUND_ORDER, type RoundKind } from '@levelhead/contracts'
 import { answerEvaluationPrompt, type AnswerEvaluationVars } from './answer-evaluation.ts'
+
+const topic = {
+  area: 'dsa',
+  title: 'Finding a duplicate',
+  ask: 'How would you find the one duplicate in an array of a billion integers?',
+} as const
 
 const artifact = {
   path: 'src/queue.ts',
@@ -9,6 +15,12 @@ const artifact = {
   startLine: 42,
   endLine: 61,
   code: 'export async function claimJob(db: Db) {\n  // lease for 30 seconds\n}',
+}
+
+function fencedSpans(text: string): string[] {
+  return [...text.matchAll(/(<<<UNTRUSTED_[A-Z]+>>>)\n([\s\S]*?)\n\1/g)].map(
+    (match) => match[2] ?? '',
+  )
 }
 
 function varsFor(round: RoundKind, overrides: Partial<AnswerEvaluationVars> = {}) {
@@ -32,19 +44,29 @@ function varsFor(round: RoundKind, overrides: Partial<AnswerEvaluationVars> = {}
 }
 
 test('each round tells the Evaluator what that round put on trial', () => {
+  const focusMarkers: Record<RoundKind, string> = {
+    cs_fundamentals: 'A term named without its mechanism is a term, not an explanation',
+    problem_solving: 'Never judge code syntax, naming or language details',
+    role_knowledge: 'Naming a tool is not knowing it',
+    system_design: 'actually reasoned, each choice given a reason and a cost, rather than listed',
+    behavioral: 'Ownership and cost are what is judged',
+    project_deep_dive: 'the layer below the résumé sentence',
+    design_extension: 'whether the design actually changed under the new constraint',
+    code_walkthrough: 'Where the answer contradicts the code',
+  }
   const briefs = ROUND_ORDER.map((round) => answerEvaluationPrompt.render(varsFor(round)).user)
   expect(new Set(briefs).size).toBe(ROUND_ORDER.length)
 
-  const [deepDive, design, behavioral, walkthrough] = briefs as [string, string, string, string]
-  expect(deepDive).toContain('the layer below the résumé sentence')
-  expect(design).toContain('whether the design actually changed under the new constraint')
-  expect(design).toContain('restated with the new number appended')
-  expect(behavioral).toContain('Ownership and cost are what is judged')
-  expect(behavioral).toContain('not queue mechanics and not system design')
-  expect(walkthrough).toContain('Where the answer contradicts the code')
+  ROUND_ORDER.forEach((round, index) => expect(briefs[index]).toContain(focusMarkers[round]))
 })
 
-test('the honesty contract is the same six clauses in every round, with or without code', () => {
+test('problem solving is judged on the reasoning about approach, complexity and edge cases', () => {
+  const { user } = answerEvaluationPrompt.render(varsFor('problem_solving', { claim: null, topic }))
+  expect(user).toContain('whether its time and space complexity is stated and right')
+  expect(user).toContain('which edge cases and breaking inputs they name')
+})
+
+test('the honesty contract is the same six clauses in every round, with or without code, claim or topic', () => {
   const clauses = [
     '1. CITE.',
     '2. ABSTAIN RATHER THAN GUESS.',
@@ -59,7 +81,50 @@ test('the honesty contract is the same six clauses in every round, with or witho
   for (const round of ROUND_ORDER) {
     expect(answerEvaluationPrompt.render(varsFor(round)).system).toBe(baseline)
     expect(answerEvaluationPrompt.render(varsFor(round, { artifact })).system).toBe(baseline)
+    expect(answerEvaluationPrompt.render(varsFor(round, { claim: null, topic })).system).toBe(
+      baseline,
+    )
   }
+})
+
+test('abstention names the finding kind that fits whether or not a claim is on the table', () => {
+  const { system } = answerEvaluationPrompt.render(varsFor('cs_fundamentals'))
+  expect(system).toContain(
+    'When a claim is supplied below, the abstention is a claim_abstained finding carrying that abstention.',
+  )
+  expect(system).toContain(
+    'When no claim is supplied, it is a competency_abstained finding carrying that abstention and the competency you cannot judge: mechanism, trade_offs or failure_modes.',
+  )
+
+  const withClaim = answerEvaluationPrompt.render(varsFor('project_deep_dive')).user
+  expect(fencedSpans(withClaim)).toContain('Built a durable job queue on PostgreSQL.')
+  expect(withClaim).not.toContain('competency_abstained')
+
+  const withoutClaim = answerEvaluationPrompt.render(
+    varsFor('cs_fundamentals', { claim: null, topic }),
+  ).user
+  expect(withoutClaim).toContain('return no claim or claim_abstained finding')
+  expect(withoutClaim).toContain(
+    'Where the answer does not let you judge a competency, return competency_abstained for it.',
+  )
+  expect(withoutClaim).not.toContain('<<<UNTRUSTED_CLAIM>>>')
+})
+
+test('the topic names what was asked, in the clear rather than fenced as candidate data', () => {
+  const { user } = answerEvaluationPrompt.render(varsFor('problem_solving', { claim: null, topic }))
+  expect(user).toContain(
+    'The topic the interviewer chose for this turn: Finding a duplicate (dsa).',
+  )
+  expect(user).toContain(
+    'The question it opened on: How would you find the one duplicate in an array of a billion integers?',
+  )
+  for (const fenced of fencedSpans(user)) {
+    expect(fenced).not.toContain('Finding a duplicate')
+    expect(fenced).not.toContain('How would you find the one duplicate')
+  }
+
+  const untopical = answerEvaluationPrompt.render(varsFor('project_deep_dive')).user
+  expect(untopical).not.toContain('The topic the interviewer chose')
 })
 
 test('composure stays tied to the pressure move, not to the round', () => {
@@ -97,5 +162,5 @@ test('the rendered prompt moves with the round; the prompt it is attributed by d
   })
   expect(new Set(digests).size).toBe(ROUND_ORDER.length)
   expect(answerEvaluationPrompt.id).toBe('answer-evaluation')
-  expect(answerEvaluationPrompt.version).toBe(1)
+  expect(answerEvaluationPrompt.version).toBe(2)
 })

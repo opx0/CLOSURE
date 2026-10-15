@@ -7,18 +7,22 @@ import type {
   Finding,
   GapEntry,
   InvocationRecord,
+  KinematicsReport,
   PolicyAction,
+  ProsodyReport,
   RoundKind,
   Session,
   Snapshot,
   SessionState,
   SnapshotTombstone,
   Span,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
+import { applyPracticeOutcome, PracticeOutcomeError } from '../gaps/outcome.ts'
 
 export interface AttemptRecord {
   readonly id: string
   readonly claimId?: string
+  readonly topicId?: string
   readonly action: PolicyAction
   readonly pressureLevel: number
   // Null between action-selected and question-rendered; `Attempt` in contracts requires the id once complete.
@@ -45,9 +49,13 @@ export interface SessionView {
   readonly snapshot: Snapshot | null
   readonly tombstones: readonly SnapshotTombstone[]
   readonly delivery: readonly DeliveryReport[]
+  readonly prosody: readonly ProsodyReport[]
+  readonly kinematics: readonly KinematicsReport[]
   readonly confirmedClaimIds: ReadonlySet<string>
   readonly transcript: readonly TranscriptEntry[]
   readonly attempts: ReadonlyMap<string, AttemptRecord>
+  // The subjects END_TOPIC moved the session on to, in order.
+  readonly handoffs: readonly string[]
   readonly findings: readonly Finding[]
   readonly gaps: ReadonlyMap<string, GapEntry>
   readonly pressureLevel: number
@@ -72,9 +80,12 @@ export function replay(events: readonly AnyEvent[]): SessionView {
   let snapshot: Snapshot | null = null
   const tombstones: SnapshotTombstone[] = []
   const delivery: DeliveryReport[] = []
+  const prosody: ProsodyReport[] = []
+  const kinematics: KinematicsReport[] = []
   const confirmedClaimIds = new Set<string>()
   const transcript: TranscriptEntry[] = []
   const attempts = new Map<string, AttemptRecord>()
+  const handoffs: string[] = []
   const findings: Finding[] = []
   const gaps = new Map<string, GapEntry>()
   const invocations: InvocationRecord[] = []
@@ -97,19 +108,24 @@ export function replay(events: readonly AnyEvent[]): SessionView {
     }
 
     switch (event.kind) {
-      case 'plan':
-        // Changes nothing — the chosen action arrives as its own policy_action event, so a
-        // considered-but-rejected action never leaks into state.
+      case 'plan': {
+        // The chosen action arrives as its own policy_action event, so a considered-but-rejected
+        // action never leaks into state; only the hand-off is read here. Logs written before topics
+        // existed name it `nextClaimId`.
+        const next = event.payload.nextSubjectId ?? event.payload.nextClaimId
+        if (next !== undefined) handoffs.push(next)
         break
+      }
 
       case 'policy_action': {
-        const { attemptId, action, pressureLevel: level, claimId } = event.payload
+        const { attemptId, action, pressureLevel: level, claimId, topicId } = event.payload
         attempts.set(attemptId, {
           id: attemptId,
           action,
           pressureLevel: level,
           questionEventId: null,
           ...(claimId === undefined ? {} : { claimId }),
+          ...(topicId === undefined ? {} : { topicId }),
         })
         break
       }
@@ -199,6 +215,19 @@ export function replay(events: readonly AnyEvent[]): SessionView {
             gaps.set(change.gap.id, change.gap)
             break
 
+          case 'practice_outcome': {
+            const gap = gaps.get(change.gapId)
+            if (gap === undefined)
+              throw new Error(`practice outcome refers to missing gap ${change.gapId}`)
+            const result = applyPracticeOutcome({
+              gap,
+              outcome: { ...change, occurredAt: event.occurredAt },
+            })
+            if (result.kind === 'rejected') throw new PracticeOutcomeError(result.failure)
+            gaps.set(gap.id, result.gap)
+            break
+          }
+
           case 'gap_status': {
             const gap = gaps.get(change.gapId)
             if (gap !== undefined) {
@@ -221,6 +250,7 @@ export function replay(events: readonly AnyEvent[]): SessionView {
 
           case 'round_started':
             round = change.kind
+            if (change.briefInvocation !== undefined) invocations.push(change.briefInvocation)
             break
 
           case 'snapshot_pinned':
@@ -235,6 +265,14 @@ export function replay(events: readonly AnyEvent[]): SessionView {
 
           case 'delivery_recorded':
             delivery.push(change.report)
+            break
+
+          case 'prosody_recorded':
+            prosody.push(change.report)
+            break
+
+          case 'kinematics_recorded':
+            kinematics.push(change.report)
             break
 
           case 'ceiling_breach':
@@ -278,9 +316,12 @@ export function replay(events: readonly AnyEvent[]): SessionView {
     snapshot,
     tombstones,
     delivery,
+    prosody,
+    kinematics,
     confirmedClaimIds,
     transcript,
     attempts,
+    handoffs,
     findings,
     gaps,
     pressureLevel,

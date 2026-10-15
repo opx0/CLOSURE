@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { ExportBundleSchema, SnapshotTombstoneSchema } from '@closer/contracts'
-import { SessionLog, buildExportBundle, replay, tombstoneFor } from '@closer/core'
+import { ExportBundleSchema, SnapshotTombstoneSchema } from '@levelhead/contracts'
+import { SessionLog, buildExportBundle, pinnedSnapshots, tombstoneFor } from '@levelhead/core'
 import { REPO_SESSION } from '../../../cli/src/commands/repo.ts'
 import type { ServerDeps } from '../deps.ts'
 import { ErrorSchema } from './shared.ts'
@@ -14,7 +14,7 @@ export function privacyRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
       '/export',
       {
         schema: {
-          summary: 'Everything CLOSER holds about you, as events plus the view they fold into',
+          summary: 'Everything Levelhead holds about you, as events plus the view they fold into',
           tags: ['privacy'],
           response: { 200: ExportBundleSchema },
         },
@@ -48,19 +48,21 @@ export function privacyRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
       },
       async (request, reply) => {
         const store = deps.storeFor(request.principal)
-        const view = replay(await store.read(REPO_SESSION))
-        const snapshot = view.snapshot
-        if (snapshot === null || snapshot.id !== request.params.id) {
+        const pinned = pinnedSnapshots(await store.read(REPO_SESSION)).find(
+          (entry) => entry.snapshot.id === request.params.id,
+        )
+        if (pinned === undefined) {
           return reply.code(404).send({ error: 'no such snapshot', detail: request.params.id })
         }
-        if (view.tombstones.some((stone) => stone.snapshotId === snapshot.id)) {
+        const { snapshot } = pinned
+        if (pinned.deleted) {
           return reply.code(404).send({ error: 'snapshot already deleted', detail: snapshot.id })
         }
 
         const tombstone = tombstoneFor({
           snapshot,
           contentHash: snapshot.commit,
-          artifactCount: view.artifacts.size,
+          artifactCount: pinned.artifacts.length,
           reason: 'candidate_requested',
           deletedAt: deps.clock.now(),
         })
@@ -94,7 +96,7 @@ export function privacyRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
       async () => ({
         spans:
           'A span is a citation into text you supplied. It is kept for as long as the session it ' +
-          'is cited by, because a finding without its evidence is the thing CLOSER exists to refuse.',
+          'is cited by, because a finding without its evidence is the thing Levelhead exists to refuse.',
         snapshots:
           'A pinned repository snapshot is deletable, by you at any time and automatically once it ' +
           'expires. Repository code is parsed, never executed, and never copied into the event log.',
@@ -111,7 +113,7 @@ export function privacyRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           'for a citation that never resolved.',
         export:
           'GET /export returns every event, transcript, finding and gap held for you, in the same ' +
-          'append-only form CLOSER reads.',
+          'append-only form Levelhead reads.',
       }),
     )
   }

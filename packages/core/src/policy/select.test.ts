@@ -1,14 +1,14 @@
 import { test, expect } from 'bun:test'
-import type { PolicyAction } from '@closer/contracts'
+import type { PolicyAction } from '@levelhead/contracts'
 import { ACTIONS } from './actions.ts'
 import { selectAction, type PolicyInput } from './select.ts'
 
 function input(overrides: Partial<PolicyInput> = {}): PolicyInput {
   return {
-    confirmedClaimIds: ['claim-1', 'claim-2'],
-    currentClaimId: 'claim-1',
+    subjectIds: ['claim-1', 'claim-2'],
+    currentSubjectId: 'claim-1',
     askedCounts: {},
-    coveredForCurrentClaim: [],
+    coveredForCurrentSubject: [],
     recentActions: [],
     turnCount: 0,
     personaId: 'collaborator',
@@ -36,7 +36,7 @@ test('a fresh claim follows the arc: what, then what breaks, then what you would
   expect(
     selectAction(
       input({
-        coveredForCurrentClaim: ['mechanism'],
+        coveredForCurrentSubject: ['mechanism'],
         askedCounts: { 'claim-1': 1 },
         recentActions: ['PROBE_MECHANISM'],
         turnCount: 1,
@@ -47,7 +47,7 @@ test('a fresh claim follows the arc: what, then what breaks, then what you would
   expect(
     selectAction(
       input({
-        coveredForCurrentClaim: ['mechanism', 'failure_modes'],
+        coveredForCurrentSubject: ['mechanism', 'failure_modes'],
         askedCounts: { 'claim-1': 2 },
         recentActions: ['TEST_FAILURE_MODE', 'PROBE_MECHANISM'],
         turnCount: 2,
@@ -58,7 +58,7 @@ test('a fresh claim follows the arc: what, then what breaks, then what you would
   expect(
     selectAction(
       input({
-        coveredForCurrentClaim: ['mechanism', 'failure_modes', 'trade_offs'],
+        coveredForCurrentSubject: ['mechanism', 'failure_modes', 'trade_offs'],
         askedCounts: { 'claim-1': 3 },
         recentActions: ['PROBE_TRADE_OFF'],
         turnCount: 3,
@@ -83,7 +83,7 @@ test('evidence follows the first description of the mechanism', () => {
 
 test('the same input twice yields an identical plan', () => {
   const shared = input({
-    coveredForCurrentClaim: ['mechanism'],
+    coveredForCurrentSubject: ['mechanism'],
     askedCounts: { 'claim-1': 2 },
     recentActions: ['REQUEST_EVIDENCE', 'PROBE_MECHANISM'],
     turnCount: 2,
@@ -125,7 +125,7 @@ test('a pressure move never fires twice in a row', () => {
     personaId: 'rusher',
     turnCount: 5,
     askedCounts: { 'claim-1': 2 },
-    coveredForCurrentClaim: ['mechanism'],
+    coveredForCurrentSubject: ['mechanism'],
     pressure: { level: 3, heldStreak: 0 },
   } as const
 
@@ -203,11 +203,11 @@ test('pressure eventually interleaves the arc rather than never firing', () => {
   // having applied none (§4.3, §10).
   const chosen = selectAction(
     input({
-      currentClaimId: 'claim-1',
+      currentSubjectId: 'claim-1',
       askedCounts: { 'claim-1': 3 },
       turnCount: 3,
       recentActions: ['PROBE_TRADE_OFF', 'TEST_FAILURE_MODE', 'PROBE_MECHANISM'],
-      coveredForCurrentClaim: ['mechanism', 'failure_modes'],
+      coveredForCurrentSubject: ['mechanism', 'failure_modes'],
       personaId: 'skeptic',
     }),
   )

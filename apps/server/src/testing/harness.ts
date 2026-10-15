@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { silentLogger } from '@closer/core'
+import { silentLogger, type JobQueuePort } from '@levelhead/core'
 import { buildApp } from '../app.ts'
 import type { Config } from '../config.ts'
 import type { ServerDeps } from '../deps.ts'
@@ -17,18 +17,18 @@ const TEST_CONFIG: Config = {
   NODE_ENV: 'test',
   PORT: 0,
   LOG_LEVEL: 'fatal',
-  CLOSER_EVENT_DIR: '.closer/events',
-  CLOSER_EXPORT_DIR: '.closer/exports',
-  CLOSER_STORE: 'jsonl',
+  LEVELHEAD_EVENT_DIR: '.levelhead/events',
+  LEVELHEAD_EXPORT_DIR: '.levelhead/exports',
+  LEVELHEAD_STORE: 'jsonl',
   SESSION_TOKEN_CEILING: 120_000,
   SESSION_COST_CEILING_USD: 2,
   MODEL_CALLS_PER_TURN_CEILING: 3,
-  CLOSER_API_TOKENS: '',
-  CLOSER_CORS_ORIGIN: '',
-  CLOSER_RATE_LIMIT_PER_MINUTE: 10_000,
-  CLOSER_MAX_BODY_BYTES: 256 * 1024,
-  CLOSER_DEMO_MODE: false,
-  CLOSER_WEB_DIST: 'apps/web/dist',
+  LEVELHEAD_API_TOKENS: '',
+  LEVELHEAD_CORS_ORIGIN: '',
+  LEVELHEAD_RATE_LIMIT_PER_MINUTE: 10_000,
+  LEVELHEAD_MAX_BODY_BYTES: 256 * 1024,
+  LEVELHEAD_DEMO_MODE: false,
+  LEVELHEAD_WEB_DIST: 'apps/web/dist',
   SNAPSHOT_RETENTION_DAYS: 90,
   OTEL_ENABLED: false,
 }
@@ -74,7 +74,12 @@ export interface TestApi {
 // One evaluator queue serves extraction and evaluation, in call order — as one Evaluator port does
 // in production too.
 export async function testApi(
-  input: { questions?: readonly string[]; scripted?: readonly unknown[] } = {},
+  input: {
+    questions?: readonly string[]
+    scripted?: readonly unknown[]
+    config?: Partial<Config>
+    queue?: JobQueuePort
+  } = {},
 ): Promise<TestApi> {
   const store = new MemoryEventStore()
   const deps: ServerDeps = {
@@ -85,10 +90,10 @@ export async function testApi(
     evaluator: new ScriptedEvaluator(input.scripted ?? []),
     ceilings: { sessionCostUsd: 2, sessionTokens: 120_000, modelCallsPerTurn: 3 },
     logger: silentLogger,
-    queue: null,
+    queue: input.queue ?? null,
     retrieval: null,
   }
-  const app = await buildApp(TEST_CONFIG, deps)
+  const app = await buildApp({ ...TEST_CONFIG, ...input.config }, deps)
   await app.ready()
   return { app, store }
 }
@@ -114,8 +119,8 @@ export async function confirmedClaim(app: FastifyInstance): Promise<string> {
 export interface TurnBody {
   sessionId: string
   status: string
-  question?: { text: string }
-  findings: { id: string; evidenceIds: string[] }[]
+  question?: { attemptId: string; text: string }
+  findings: { id: string; attemptId: string; evidenceIds: string[] }[]
   quotes: { evidenceId: string; quoted: string }[]
   notices: string[]
   stoppedBy?: string
@@ -128,7 +133,7 @@ export async function interviewed(
   const started = await app.inject({
     method: 'POST',
     url: '/sessions',
-    payload: { mode: 'coach', turnsPerRound: 1, drill: false },
+    payload: { rounds: ['project_deep_dive'], mode: 'coach', turnsPerRound: 1, drill: false },
   })
   const start = started.json() as TurnBody
   const answered = await app.inject({

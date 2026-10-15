@@ -71,14 +71,72 @@ export interface paths {
                                     label: string;
                                     validation: "measured" | "unvalidated";
                                     competencies: ("mechanism" | "trade_offs" | "failure_modes" | "composure")[];
-                                    defaultRounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                                    defaultRounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     defaultLevel: "junior" | "mid" | "senior" | "staff";
+                                    areas: ("os" | "dbms" | "networks" | "oop" | "dsa" | "system_design" | "web" | "backend" | "ml" | "data" | "devops" | "behavioral")[];
                                     vocabulary: string[];
                                     expectedConceptsByCompetency: {
                                         [key: string]: string[];
                                     };
                                 };
                                 notice: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Roles and the authored topics an interview draws its questions from */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rounds: {
+                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
+                                subject: "topic" | "claim" | "artifact";
+                            }[];
+                            levels: ("junior" | "mid" | "senior" | "staff")[];
+                            roles: {
+                                id: string;
+                                label: string;
+                                areas: ("os" | "dbms" | "networks" | "oop" | "dsa" | "system_design" | "web" | "backend" | "ml" | "data" | "devops" | "behavioral")[];
+                                defaultRounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                defaultLevel: "junior" | "mid" | "senior" | "staff";
+                                topicIds: string[];
+                            }[];
+                            topics: {
+                                id: string;
+                                area: "os" | "dbms" | "networks" | "oop" | "dsa" | "system_design" | "web" | "backend" | "ml" | "data" | "devops" | "behavioral";
+                                title: string;
+                                minLevel: "junior" | "mid" | "senior" | "staff";
+                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                             }[];
                         };
                     };
@@ -129,7 +187,7 @@ export interface paths {
                                 disclaimer: string;
                                 defaultLevel: "junior" | "mid" | "senior" | "staff";
                                 rounds: {
-                                    kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                    kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                     personaId: "collaborator" | "skeptic" | "bar_raiser" | "rusher";
                                     turns: number;
                                     pressureCeiling: number;
@@ -347,7 +405,47 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The claim set so far, each claim carrying whether the candidate confirmed it */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            resumeText: string | null;
+                            claims: {
+                                id: string;
+                                spanId: string;
+                                type: "built" | "designed" | "optimized" | "led" | "measured";
+                                assertion: string;
+                                technologies: string[];
+                                metrics: string[];
+                                implied: boolean;
+                                confirmedByCandidate: boolean;
+                                extractorVersion: string;
+                            }[];
+                            spans: {
+                                id: string;
+                                sourceId: string;
+                                startByte: number;
+                                endByte: number;
+                                quoted: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
         put?: never;
         /** Extract the claim set from a résumé, sourced to byte-exact spans */
         post: {
@@ -487,6 +585,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/resume/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per résumé line: what held, what was contradicted, what is vague, what no linked code backs, each with the evidence behind it */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            lines: {
+                                spanId: string;
+                                text: string;
+                                claimIds: string[];
+                                tags: {
+                                    kind: "implied_unconfirmed" | "no_metric" | "linked_code" | "no_code_evidence" | "code_not_checked" | "held" | "partially_supported" | "contradicted" | "open_gap";
+                                    claimId: string;
+                                    advice: string;
+                                    quotes: string[];
+                                    findingIds: string[];
+                                    gapIds: string[];
+                                    artifactPaths: string[];
+                                }[];
+                            }[];
+                            snapshotIds: string[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions": {
         parameters: {
             query?: never;
@@ -494,9 +644,53 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The current owner’s interviews, newest first, with their availability */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sessions: {
+                                session: {
+                                    id: string;
+                                    mode: "simulation" | "coach" | "drill" | "transfer" | "review";
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    personaId: "collaborator" | "skeptic" | "bar_raiser" | "rusher";
+                                    pressureLevel: number;
+                                    pressureCeiling: number;
+                                    rubricSet: {
+                                        id: string;
+                                        version: number;
+                                    }[];
+                                    claimIds: string[];
+                                    roleId?: string;
+                                    topicIds?: string[];
+                                    rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                    snapshotId?: string;
+                                    /** Format: date-time */
+                                    startedAt: string;
+                                };
+                                answerCount: number;
+                                availability: "awaiting_answer" | "processing" | "closed" | "interrupted";
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
         put?: never;
-        /** Start an interview over the confirmed claim set and return the first question */
+        /** Start an interview and return the first question */
         post: {
             parameters: {
                 query?: never;
@@ -507,12 +701,15 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        roleId?: string;
+                        topicIds?: string[];
                         claimIds?: string[];
+                        snapshotId?: string;
                         mode?: "simulation" | "coach" | "drill" | "transfer" | "review";
                         level?: "junior" | "mid" | "senior" | "staff";
                         personaId?: "collaborator" | "skeptic" | "bar_raiser" | "rusher";
                         pressureCeiling?: number;
-                        rounds?: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                        rounds?: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                         turnsPerRound?: number;
                         drill?: boolean;
                     };
@@ -529,17 +726,34 @@ export interface paths {
                             sessionId: string;
                             status: "awaiting_answer" | "closed";
                             round?: {
-                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                 index: number;
                                 total: number;
                                 brief?: string;
                             };
                             question?: {
+                                attemptId: string;
                                 text: string;
                                 turn: number;
                                 action: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
                                 pressureLevel: number;
-                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
+                                topic?: {
+                                    id: string;
+                                    area: "os" | "dbms" | "networks" | "oop" | "dsa" | "system_design" | "web" | "backend" | "ml" | "data" | "devops" | "behavioral";
+                                    title: string;
+                                };
+                                claim?: {
+                                    id: string;
+                                    assertion: string;
+                                };
+                                artifact?: {
+                                    path: string;
+                                    symbol?: string;
+                                    startLine?: number;
+                                    endLine?: number;
+                                    code: string;
+                                };
                             };
                             findings: ({
                                 id: string;
@@ -613,13 +827,31 @@ export interface paths {
                                 kind: "competency";
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency_abstained";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                abstention: "insufficient_evidence" | "not_verifiable";
                             })[];
                             quotes: {
                                 evidenceId: string;
                                 quoted: string;
                             }[];
                             notices: string[];
-                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure";
+                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "practice_outcome_rejected";
                         };
                     };
                 };
@@ -692,17 +924,34 @@ export interface paths {
                             sessionId: string;
                             status: "awaiting_answer" | "closed";
                             round?: {
-                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                 index: number;
                                 total: number;
                                 brief?: string;
                             };
                             question?: {
+                                attemptId: string;
                                 text: string;
                                 turn: number;
                                 action: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
                                 pressureLevel: number;
-                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
+                                topic?: {
+                                    id: string;
+                                    area: "os" | "dbms" | "networks" | "oop" | "dsa" | "system_design" | "web" | "backend" | "ml" | "data" | "devops" | "behavioral";
+                                    title: string;
+                                };
+                                claim?: {
+                                    id: string;
+                                    assertion: string;
+                                };
+                                artifact?: {
+                                    path: string;
+                                    symbol?: string;
+                                    startLine?: number;
+                                    endLine?: number;
+                                    code: string;
+                                };
                             };
                             findings: ({
                                 id: string;
@@ -776,13 +1025,31 @@ export interface paths {
                                 kind: "competency";
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency_abstained";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                abstention: "insufficient_evidence" | "not_verifiable";
                             })[];
                             quotes: {
                                 evidenceId: string;
                                 quoted: string;
                             }[];
                             notices: string[];
-                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure";
+                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "practice_outcome_rejected";
                         };
                     };
                 };
@@ -857,13 +1124,15 @@ export interface paths {
                                     version: number;
                                 }[];
                                 claimIds: string[];
-                                rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                                roleId?: string;
+                                topicIds?: string[];
+                                rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                 snapshotId?: string;
                                 /** Format: date-time */
                                 startedAt: string;
                             } | null;
                             state: "selecting" | "asking" | "awaiting_answer" | "observing" | "evaluating" | "drilling" | "closed";
-                            round: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough") | null;
+                            round: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design") | null;
                             pressureLevel: number;
                             transcript: {
                                 role: "interviewer" | "candidate";
@@ -942,6 +1211,24 @@ export interface paths {
                                 kind: "competency";
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency_abstained";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                abstention: "insufficient_evidence" | "not_verifiable";
                             })[];
                             quotes: {
                                 evidenceId: string;
@@ -951,6 +1238,7 @@ export interface paths {
                                 id: string;
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 claimId?: string;
+                                topicId?: string;
                                 summary: string;
                                 status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                 findingIds: string[];
@@ -960,6 +1248,11 @@ export interface paths {
                                 /** Format: date-time */
                                 lastTouchedAt: string;
                                 transferAttemptIds: string[];
+                                practiceReceipts?: {
+                                    attemptId: string;
+                                    kind: "drill" | "transfer" | "retrieval";
+                                    held: boolean;
+                                }[];
                                 retrievals?: {
                                     attemptId: string;
                                     /** Format: date-time */
@@ -1098,6 +1391,7 @@ export interface paths {
                                 }[];
                                 chosen: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
                                 pressureLevel: number;
+                                nextSubjectId?: string;
                                 nextClaimId?: string;
                             };
                         } | {
@@ -1115,7 +1409,8 @@ export interface paths {
                                 action: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
                                 pressureLevel: number;
                                 claimId?: string;
-                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                topicId?: string;
+                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                 artifactId?: string;
                             };
                         } | {
@@ -1261,6 +1556,24 @@ export interface paths {
                                     kind: "competency";
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "competency_abstained";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    abstention: "insufficient_evidence" | "not_verifiable";
                                 })[];
                                 spans: {
                                     id: string;
@@ -1332,7 +1645,9 @@ export interface paths {
                                         version: number;
                                     }[];
                                     claimIds: string[];
-                                    rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                                    roleId?: string;
+                                    topicIds?: string[];
+                                    rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
                                     /** Format: date-time */
                                     startedAt: string;
@@ -1400,9 +1715,24 @@ export interface paths {
                             } | {
                                 /** @enum {string} */
                                 change: "round_started";
-                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                 index: number;
                                 brief?: string;
+                                briefInvocation?: {
+                                    id: string;
+                                    port: "conductor" | "evaluator";
+                                    modelAlias: string;
+                                    promptId: string;
+                                    promptVersion: number;
+                                    promptHash: string;
+                                    inputTokens: number;
+                                    outputTokens: number;
+                                    costUsd: number;
+                                    stopReason: "end_turn" | "max_tokens" | "refusal" | "stop_sequence" | "other";
+                                    latencyMs: number;
+                                    /** Format: date-time */
+                                    occurredAt: string;
+                                };
                             } | {
                                 /** @enum {string} */
                                 change: "snapshot_pinned";
@@ -1452,6 +1782,7 @@ export interface paths {
                                     id: string;
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
+                                    topicId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];
@@ -1461,6 +1792,11 @@ export interface paths {
                                     /** Format: date-time */
                                     lastTouchedAt: string;
                                     transferAttemptIds: string[];
+                                    practiceReceipts?: {
+                                        attemptId: string;
+                                        kind: "drill" | "transfer" | "retrieval";
+                                        held: boolean;
+                                    }[];
                                     retrievals?: {
                                         attemptId: string;
                                         /** Format: date-time */
@@ -1468,6 +1804,13 @@ export interface paths {
                                         passed: boolean;
                                     }[];
                                 };
+                            } | {
+                                /** @enum {string} */
+                                change: "practice_outcome";
+                                gapId: string;
+                                attemptId: string;
+                                kind: "drill" | "transfer" | "retrieval";
+                                held: boolean;
                             } | {
                                 /** @enum {string} */
                                 change: "gap_status";
@@ -1509,6 +1852,83 @@ export interface paths {
                                     fillerRatePerHundredWords: number;
                                     /** @enum {string} */
                                     boundary: "delivery_only_never_competence";
+                                };
+                            } | {
+                                /** @enum {string} */
+                                change: "prosody_recorded";
+                                report: {
+                                    attemptId: string;
+                                    audioMs: number;
+                                    words: {
+                                        text: string;
+                                        startMs: number;
+                                        endMs: number;
+                                    }[];
+                                    pauses: {
+                                        atMs: number;
+                                        durationMs: number;
+                                        kind: "filled" | "unfilled";
+                                        position: "mid_clause" | "clause_boundary";
+                                    }[];
+                                    hesitationClusters: {
+                                        atMs: number;
+                                        durationMs: number;
+                                        events: number;
+                                    }[];
+                                    disfluencies: {
+                                        repairs: number;
+                                        restarts: number;
+                                        prolongations: number;
+                                        discourseMarkers: number;
+                                    };
+                                    pitch: {
+                                        medianHz: number;
+                                        p10Hz: number;
+                                        p90Hz: number;
+                                        rangeSemitones: number;
+                                        coefficientOfVariation: number;
+                                        declarativesCounted: number;
+                                        declarativesEndingRising: number;
+                                    };
+                                    intensity: {
+                                        medianDb: number;
+                                        endOfTurnDropDb: number;
+                                    };
+                                    responseLatencyMs: number | null;
+                                    timeToFirstContentWordMs: number | null;
+                                    sentenceLengthsWords: number[];
+                                    /** @enum {string} */
+                                    boundary: "observation_only_never_competence";
+                                };
+                            } | {
+                                /** @enum {string} */
+                                change: "kinematics_recorded";
+                                report: {
+                                    attemptId: string;
+                                    observedMs: number;
+                                    framesObserved: number;
+                                    framesWithFace: number;
+                                    faceVisibleRatio: number;
+                                    gazeOnCameraRatio: number;
+                                    headPose: {
+                                        yawDegreesSquared: number;
+                                        pitchDegreesSquared: number;
+                                        rollDegreesSquared: number;
+                                    };
+                                    postureShiftsPerMinute: number;
+                                    gesture: {
+                                        ratePerMinute: number;
+                                        medianAmplitude: number;
+                                        handsOutOfFrameRatio: number;
+                                    };
+                                    framing: {
+                                        headroom: number;
+                                        centerOffset: number;
+                                        exposureMedian: number;
+                                        exposureClippedRatio: number;
+                                    };
+                                    /** @enum {string} */
+                                    boundary: "observation_only_never_competence";
                                 };
                             } | {
                                 /** @enum {string} */
@@ -1609,6 +2029,7 @@ export interface paths {
                                 id: string;
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 claimId?: string;
+                                topicId?: string;
                                 summary: string;
                                 status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                 findingIds: string[];
@@ -1618,6 +2039,11 @@ export interface paths {
                                 /** Format: date-time */
                                 lastTouchedAt: string;
                                 transferAttemptIds: string[];
+                                practiceReceipts?: {
+                                    attemptId: string;
+                                    kind: "drill" | "transfer" | "retrieval";
+                                    held: boolean;
+                                }[];
                                 retrievals?: {
                                     attemptId: string;
                                     /** Format: date-time */
@@ -1749,6 +2175,24 @@ export interface paths {
                                 kind: "competency";
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency_abstained";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                abstention: "insufficient_evidence" | "not_verifiable";
                             })[];
                             quotes: {
                                 evidenceId: string;
@@ -1820,12 +2264,13 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            suggestedRounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                            suggestedRounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                             work: {
                                 gap: {
                                     id: string;
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
+                                    topicId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];
@@ -1835,6 +2280,11 @@ export interface paths {
                                     /** Format: date-time */
                                     lastTouchedAt: string;
                                     transferAttemptIds: string[];
+                                    practiceReceipts?: {
+                                        attemptId: string;
+                                        kind: "drill" | "transfer" | "retrieval";
+                                        held: boolean;
+                                    }[];
                                     retrievals?: {
                                         attemptId: string;
                                         /** Format: date-time */
@@ -1850,6 +2300,7 @@ export interface paths {
                                 id: string;
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 claimId?: string;
+                                topicId?: string;
                                 summary: string;
                                 status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                 findingIds: string[];
@@ -1859,6 +2310,11 @@ export interface paths {
                                 /** Format: date-time */
                                 lastTouchedAt: string;
                                 transferAttemptIds: string[];
+                                practiceReceipts?: {
+                                    attemptId: string;
+                                    kind: "drill" | "transfer" | "retrieval";
+                                    held: boolean;
+                                }[];
                                 retrievals?: {
                                     attemptId: string;
                                     /** Format: date-time */
@@ -1889,7 +2345,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every judgment about one claim or competency, oldest first, with its quotes */
+        /** Every judgment about one topic, file or résumé claim, oldest first, with its quotes */
         get: {
             parameters: {
                 query?: {
@@ -1910,6 +2366,7 @@ export interface paths {
                         "application/json": {
                             subjects: {
                                 subject: string;
+                                label: string;
                                 attempts: {
                                     at: string;
                                     sessionId: string;
@@ -1985,6 +2442,24 @@ export interface paths {
                                         kind: "competency";
                                         competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                         levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                    } | {
+                                        id: string;
+                                        attemptId: string;
+                                        rubric: {
+                                            id: string;
+                                            version: number;
+                                        };
+                                        level: "junior" | "mid" | "senior" | "staff";
+                                        rationale: string;
+                                        confidence: number;
+                                        modelVersion: string;
+                                        promptVersion: string;
+                                        transcriptSpanIds: string[];
+                                        evidenceIds: string[];
+                                        /** @enum {string} */
+                                        kind: "competency_abstained";
+                                        competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                        abstention: "insufficient_evidence" | "not_verifiable";
                                     };
                                     quoted?: string;
                                 }[];
@@ -2139,6 +2614,763 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{id}/prosody": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record prosody for one spoken answer — an observation, never a judgment */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        attemptId: string;
+                        audioMs: number;
+                        words: {
+                            text: string;
+                            startMs: number;
+                            endMs: number;
+                        }[];
+                        pauses: {
+                            atMs: number;
+                            durationMs: number;
+                            kind: "filled" | "unfilled";
+                            position: "mid_clause" | "clause_boundary";
+                        }[];
+                        hesitationClusters: {
+                            atMs: number;
+                            durationMs: number;
+                            events: number;
+                        }[];
+                        disfluencies: {
+                            repairs: number;
+                            restarts: number;
+                            prolongations: number;
+                            discourseMarkers: number;
+                        };
+                        pitch: {
+                            medianHz: number;
+                            p10Hz: number;
+                            p90Hz: number;
+                            rangeSemitones: number;
+                            coefficientOfVariation: number;
+                            declarativesCounted: number;
+                            declarativesEndingRising: number;
+                        };
+                        intensity: {
+                            medianDb: number;
+                            endOfTurnDropDb: number;
+                        };
+                        responseLatencyMs: number | null;
+                        timeToFirstContentWordMs: number | null;
+                        sentenceLengthsWords: number[];
+                        /** @enum {string} */
+                        boundary: "observation_only_never_competence";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            report: {
+                                attemptId: string;
+                                audioMs: number;
+                                words: {
+                                    text: string;
+                                    startMs: number;
+                                    endMs: number;
+                                }[];
+                                pauses: {
+                                    atMs: number;
+                                    durationMs: number;
+                                    kind: "filled" | "unfilled";
+                                    position: "mid_clause" | "clause_boundary";
+                                }[];
+                                hesitationClusters: {
+                                    atMs: number;
+                                    durationMs: number;
+                                    events: number;
+                                }[];
+                                disfluencies: {
+                                    repairs: number;
+                                    restarts: number;
+                                    prolongations: number;
+                                    discourseMarkers: number;
+                                };
+                                pitch: {
+                                    medianHz: number;
+                                    p10Hz: number;
+                                    p90Hz: number;
+                                    rangeSemitones: number;
+                                    coefficientOfVariation: number;
+                                    declarativesCounted: number;
+                                    declarativesEndingRising: number;
+                                };
+                                intensity: {
+                                    medianDb: number;
+                                    endOfTurnDropDb: number;
+                                };
+                                responseLatencyMs: number | null;
+                                timeToFirstContentWordMs: number | null;
+                                sentenceLengthsWords: number[];
+                                /** @enum {string} */
+                                boundary: "observation_only_never_competence";
+                            };
+                            boundary: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/kinematics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record kinematics for one spoken answer — an observation, never a judgment */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        attemptId: string;
+                        observedMs: number;
+                        framesObserved: number;
+                        framesWithFace: number;
+                        faceVisibleRatio: number;
+                        gazeOnCameraRatio: number;
+                        headPose: {
+                            yawDegreesSquared: number;
+                            pitchDegreesSquared: number;
+                            rollDegreesSquared: number;
+                        };
+                        postureShiftsPerMinute: number;
+                        gesture: {
+                            ratePerMinute: number;
+                            medianAmplitude: number;
+                            handsOutOfFrameRatio: number;
+                        };
+                        framing: {
+                            headroom: number;
+                            centerOffset: number;
+                            exposureMedian: number;
+                            exposureClippedRatio: number;
+                        };
+                        /** @enum {string} */
+                        boundary: "observation_only_never_competence";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            report: {
+                                attemptId: string;
+                                observedMs: number;
+                                framesObserved: number;
+                                framesWithFace: number;
+                                faceVisibleRatio: number;
+                                gazeOnCameraRatio: number;
+                                headPose: {
+                                    yawDegreesSquared: number;
+                                    pitchDegreesSquared: number;
+                                    rollDegreesSquared: number;
+                                };
+                                postureShiftsPerMinute: number;
+                                gesture: {
+                                    ratePerMinute: number;
+                                    medianAmplitude: number;
+                                    handsOutOfFrameRatio: number;
+                                };
+                                framing: {
+                                    headroom: number;
+                                    centerOffset: number;
+                                    exposureMedian: number;
+                                    exposureClippedRatio: number;
+                                };
+                                /** @enum {string} */
+                                boundary: "observation_only_never_competence";
+                            };
+                            boundary: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Raw prosody and kinematics recorded for this session */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            prosody: {
+                                attemptId: string;
+                                audioMs: number;
+                                words: {
+                                    text: string;
+                                    startMs: number;
+                                    endMs: number;
+                                }[];
+                                pauses: {
+                                    atMs: number;
+                                    durationMs: number;
+                                    kind: "filled" | "unfilled";
+                                    position: "mid_clause" | "clause_boundary";
+                                }[];
+                                hesitationClusters: {
+                                    atMs: number;
+                                    durationMs: number;
+                                    events: number;
+                                }[];
+                                disfluencies: {
+                                    repairs: number;
+                                    restarts: number;
+                                    prolongations: number;
+                                    discourseMarkers: number;
+                                };
+                                pitch: {
+                                    medianHz: number;
+                                    p10Hz: number;
+                                    p90Hz: number;
+                                    rangeSemitones: number;
+                                    coefficientOfVariation: number;
+                                    declarativesCounted: number;
+                                    declarativesEndingRising: number;
+                                };
+                                intensity: {
+                                    medianDb: number;
+                                    endOfTurnDropDb: number;
+                                };
+                                responseLatencyMs: number | null;
+                                timeToFirstContentWordMs: number | null;
+                                sentenceLengthsWords: number[];
+                                /** @enum {string} */
+                                boundary: "observation_only_never_competence";
+                            }[];
+                            kinematics: {
+                                attemptId: string;
+                                observedMs: number;
+                                framesObserved: number;
+                                framesWithFace: number;
+                                faceVisibleRatio: number;
+                                gazeOnCameraRatio: number;
+                                headPose: {
+                                    yawDegreesSquared: number;
+                                    pitchDegreesSquared: number;
+                                    rollDegreesSquared: number;
+                                };
+                                postureShiftsPerMinute: number;
+                                gesture: {
+                                    ratePerMinute: number;
+                                    medianAmplitude: number;
+                                    handsOutOfFrameRatio: number;
+                                };
+                                framing: {
+                                    headroom: number;
+                                    centerOffset: number;
+                                    exposureMedian: number;
+                                    exposureClippedRatio: number;
+                                };
+                                /** @enum {string} */
+                                boundary: "observation_only_never_competence";
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/debrief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** End-of-session report: the competence lane and the performance lane, never merged */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sessionId: string;
+                            /** Format: date-time */
+                            generatedAt: string;
+                            competence: {
+                                findings: ({
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "claim";
+                                    claimId: string;
+                                    verdict: "supported" | "partially_supported" | "unsupported_by_available_evidence" | "contradicted";
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "claim_abstained";
+                                    claimId: string;
+                                    abstention: "insufficient_evidence" | "not_verifiable";
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "composure";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    signals: ("folding" | "fabricating" | "holding_ground" | "honest_yielding" | "coherence_after_interruption" | "escalation")[];
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "competency";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "competency_abstained";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    abstention: "insufficient_evidence" | "not_verifiable";
+                                })[];
+                                gaps: {
+                                    id: string;
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    claimId?: string;
+                                    topicId?: string;
+                                    summary: string;
+                                    status: "open" | "drilled" | "unverified" | "closed_under_transfer";
+                                    findingIds: string[];
+                                    evidenceIds: string[];
+                                    /** Format: date-time */
+                                    openedAt: string;
+                                    /** Format: date-time */
+                                    lastTouchedAt: string;
+                                    transferAttemptIds: string[];
+                                    practiceReceipts?: {
+                                        attemptId: string;
+                                        kind: "drill" | "transfer" | "retrieval";
+                                        held: boolean;
+                                    }[];
+                                    retrievals?: {
+                                        attemptId: string;
+                                        /** Format: date-time */
+                                        at: string;
+                                        passed: boolean;
+                                    }[];
+                                }[];
+                                abstentions: number;
+                                pressureReached: number;
+                            };
+                            performance: {
+                                observations: {
+                                    attemptId: string;
+                                    signal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                    value: number;
+                                    unit: "words_per_minute" | "milliseconds" | "ratio" | "per_minute" | "per_hundred_words" | "semitones" | "decibels" | "degrees_squared";
+                                    source: "prosody" | "kinematics";
+                                    /** @enum {string} */
+                                    boundary: "observation_only_never_competence";
+                                }[];
+                                notes: {
+                                    id: string;
+                                    signal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                    family: "speech" | "rhythm" | "kinematics";
+                                    summary: string;
+                                    trigger: {
+                                        /** @enum {string} */
+                                        kind: "baseline_drift";
+                                        baseline: {
+                                            signal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                            n: number;
+                                            median: number;
+                                            p25: number;
+                                            p75: number;
+                                            /** Format: date-time */
+                                            earliestAt: string;
+                                            /** Format: date-time */
+                                            latestAt: string;
+                                        };
+                                        observed: number;
+                                        direction: "above" | "below";
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "within_session_contrast";
+                                        contrast: "early_vs_late_in_answer" | "low_vs_high_pressure" | "before_vs_after_interruption";
+                                        earlier: number;
+                                        later: number;
+                                        ratio: number;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "reference_breach";
+                                        low: number;
+                                        high: number;
+                                        source: string;
+                                        observed: number;
+                                    };
+                                    observationAttemptIds: string[];
+                                    /** @enum {string} */
+                                    boundary: "observation_only_never_competence";
+                                }[];
+                                drills: {
+                                    noteId: string;
+                                    signal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                    instruction: string;
+                                    retestSignal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                    /** @enum {string} */
+                                    boundary: "observation_only_never_competence";
+                                }[];
+                                baselines: {
+                                    signal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                    n: number;
+                                    median: number;
+                                    p25: number;
+                                    p75: number;
+                                    /** Format: date-time */
+                                    earliestAt: string;
+                                    /** Format: date-time */
+                                    latestAt: string;
+                                }[];
+                                signalsWithoutBaseline: number;
+                            };
+                            /** @enum {string} */
+                            wall: "two_lanes_never_merged";
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mirror": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simulate an external résumé screen against one job description — never a verdict */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        jobDescription: string;
+                        resumeText: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            jobDescriptionHash: string;
+                            coverage: {
+                                term: string;
+                                present: boolean;
+                                spanIds: string[];
+                            }[];
+                            flags: ({
+                                /** @enum {string} */
+                                kind: "claim_states_no_outcome";
+                                claimId: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "claim_verb_is_vague";
+                                claimId: string;
+                                verb: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "claim_unsupported_by_snapshot";
+                                claimId: string;
+                                snapshotId: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "required_term_absent";
+                                term: string;
+                            })[];
+                            /** @enum {string} */
+                            boundary: "simulation_of_an_external_screen_never_a_finding";
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Longitudinal trends and gap-ledger snapshots across every session — no aggregate */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            performance: {
+                                signal: "articulation_rate" | "speaking_rate" | "unfilled_pause_rate" | "filled_pause_rate" | "mid_clause_pause_ratio" | "hesitation_cluster_rate" | "repair_rate" | "restart_rate" | "prolongation_rate" | "discourse_marker_rate" | "pitch_range" | "pitch_variation" | "terminal_rise_ratio" | "end_of_turn_loudness_drop" | "response_latency" | "time_to_first_content_word" | "answer_duration" | "rate_drift_within_answer" | "cadence_stability" | "sentence_length_variation" | "interruption_recovery_time" | "pre_answer_silence" | "rate_change_under_pressure" | "face_visible_ratio" | "gaze_on_camera_ratio" | "head_pose_instability" | "posture_shift_rate" | "gesture_rate" | "gesture_amplitude" | "hands_out_of_frame_ratio" | "framing_headroom" | "framing_center_offset" | "exposure_median" | "exposure_clipped_ratio";
+                                points: {
+                                    /** Format: date-time */
+                                    at: string;
+                                    sessionId: string;
+                                    value: number;
+                                }[];
+                                /** @enum {string} */
+                                boundary: "observation_only_never_competence";
+                            }[];
+                            ledger: {
+                                /** Format: date-time */
+                                at: string;
+                                sessionId: string;
+                                gapsOpen: number;
+                                gapsDrilled: number;
+                                gapsUnverified: number;
+                                gapsClosedUnderTransfer: number;
+                                abstentions: number;
+                                pressureReached: number;
+                            }[];
+                            composure: {
+                                level: number;
+                                held: number;
+                                folded: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/export": {
         parameters: {
             query?: never;
@@ -2146,7 +3378,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Everything CLOSER holds about you, as events plus the view they fold into */
+        /** Everything Levelhead holds about you, as events plus the view they fold into */
         get: {
             parameters: {
                 query?: never;
@@ -2181,7 +3413,9 @@ export interface paths {
                                         version: number;
                                     }[];
                                     claimIds: string[];
-                                    rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                                    roleId?: string;
+                                    topicIds?: string[];
+                                    rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
                                     /** Format: date-time */
                                     startedAt: string;
@@ -2205,6 +3439,7 @@ export interface paths {
                                         }[];
                                         chosen: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
                                         pressureLevel: number;
+                                        nextSubjectId?: string;
                                         nextClaimId?: string;
                                     };
                                 } | {
@@ -2222,7 +3457,8 @@ export interface paths {
                                         action: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
                                         pressureLevel: number;
                                         claimId?: string;
-                                        round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                        topicId?: string;
+                                        round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                         artifactId?: string;
                                     };
                                 } | {
@@ -2368,6 +3604,24 @@ export interface paths {
                                             kind: "competency";
                                             competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                             levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                        } | {
+                                            id: string;
+                                            attemptId: string;
+                                            rubric: {
+                                                id: string;
+                                                version: number;
+                                            };
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            rationale: string;
+                                            confidence: number;
+                                            modelVersion: string;
+                                            promptVersion: string;
+                                            transcriptSpanIds: string[];
+                                            evidenceIds: string[];
+                                            /** @enum {string} */
+                                            kind: "competency_abstained";
+                                            competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                            abstention: "insufficient_evidence" | "not_verifiable";
                                         })[];
                                         spans: {
                                             id: string;
@@ -2439,7 +3693,9 @@ export interface paths {
                                                 version: number;
                                             }[];
                                             claimIds: string[];
-                                            rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough")[];
+                                            roleId?: string;
+                                            topicIds?: string[];
+                                            rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                             snapshotId?: string;
                                             /** Format: date-time */
                                             startedAt: string;
@@ -2507,9 +3763,24 @@ export interface paths {
                                     } | {
                                         /** @enum {string} */
                                         change: "round_started";
-                                        kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough";
+                                        kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
                                         index: number;
                                         brief?: string;
+                                        briefInvocation?: {
+                                            id: string;
+                                            port: "conductor" | "evaluator";
+                                            modelAlias: string;
+                                            promptId: string;
+                                            promptVersion: number;
+                                            promptHash: string;
+                                            inputTokens: number;
+                                            outputTokens: number;
+                                            costUsd: number;
+                                            stopReason: "end_turn" | "max_tokens" | "refusal" | "stop_sequence" | "other";
+                                            latencyMs: number;
+                                            /** Format: date-time */
+                                            occurredAt: string;
+                                        };
                                     } | {
                                         /** @enum {string} */
                                         change: "snapshot_pinned";
@@ -2559,6 +3830,7 @@ export interface paths {
                                             id: string;
                                             competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                             claimId?: string;
+                                            topicId?: string;
                                             summary: string;
                                             status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                             findingIds: string[];
@@ -2568,6 +3840,11 @@ export interface paths {
                                             /** Format: date-time */
                                             lastTouchedAt: string;
                                             transferAttemptIds: string[];
+                                            practiceReceipts?: {
+                                                attemptId: string;
+                                                kind: "drill" | "transfer" | "retrieval";
+                                                held: boolean;
+                                            }[];
                                             retrievals?: {
                                                 attemptId: string;
                                                 /** Format: date-time */
@@ -2575,6 +3852,13 @@ export interface paths {
                                                 passed: boolean;
                                             }[];
                                         };
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "practice_outcome";
+                                        gapId: string;
+                                        attemptId: string;
+                                        kind: "drill" | "transfer" | "retrieval";
+                                        held: boolean;
                                     } | {
                                         /** @enum {string} */
                                         change: "gap_status";
@@ -2616,6 +3900,83 @@ export interface paths {
                                             fillerRatePerHundredWords: number;
                                             /** @enum {string} */
                                             boundary: "delivery_only_never_competence";
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "prosody_recorded";
+                                        report: {
+                                            attemptId: string;
+                                            audioMs: number;
+                                            words: {
+                                                text: string;
+                                                startMs: number;
+                                                endMs: number;
+                                            }[];
+                                            pauses: {
+                                                atMs: number;
+                                                durationMs: number;
+                                                kind: "filled" | "unfilled";
+                                                position: "mid_clause" | "clause_boundary";
+                                            }[];
+                                            hesitationClusters: {
+                                                atMs: number;
+                                                durationMs: number;
+                                                events: number;
+                                            }[];
+                                            disfluencies: {
+                                                repairs: number;
+                                                restarts: number;
+                                                prolongations: number;
+                                                discourseMarkers: number;
+                                            };
+                                            pitch: {
+                                                medianHz: number;
+                                                p10Hz: number;
+                                                p90Hz: number;
+                                                rangeSemitones: number;
+                                                coefficientOfVariation: number;
+                                                declarativesCounted: number;
+                                                declarativesEndingRising: number;
+                                            };
+                                            intensity: {
+                                                medianDb: number;
+                                                endOfTurnDropDb: number;
+                                            };
+                                            responseLatencyMs: number | null;
+                                            timeToFirstContentWordMs: number | null;
+                                            sentenceLengthsWords: number[];
+                                            /** @enum {string} */
+                                            boundary: "observation_only_never_competence";
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "kinematics_recorded";
+                                        report: {
+                                            attemptId: string;
+                                            observedMs: number;
+                                            framesObserved: number;
+                                            framesWithFace: number;
+                                            faceVisibleRatio: number;
+                                            gazeOnCameraRatio: number;
+                                            headPose: {
+                                                yawDegreesSquared: number;
+                                                pitchDegreesSquared: number;
+                                                rollDegreesSquared: number;
+                                            };
+                                            postureShiftsPerMinute: number;
+                                            gesture: {
+                                                ratePerMinute: number;
+                                                medianAmplitude: number;
+                                                handsOutOfFrameRatio: number;
+                                            };
+                                            framing: {
+                                                headroom: number;
+                                                centerOffset: number;
+                                                exposureMedian: number;
+                                                exposureClippedRatio: number;
+                                            };
+                                            /** @enum {string} */
+                                            boundary: "observation_only_never_competence";
                                         };
                                     } | {
                                         /** @enum {string} */
@@ -2749,11 +4110,30 @@ export interface paths {
                                     kind: "competency";
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "competency_abstained";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    abstention: "insufficient_evidence" | "not_verifiable";
                                 })[];
                                 gaps: {
                                     id: string;
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
+                                    topicId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];
@@ -2763,6 +4143,11 @@ export interface paths {
                                     /** Format: date-time */
                                     lastTouchedAt: string;
                                     transferAttemptIds: string[];
+                                    practiceReceipts?: {
+                                        attemptId: string;
+                                        kind: "drill" | "transfer" | "retrieval";
+                                        held: boolean;
+                                    }[];
                                     retrievals?: {
                                         attemptId: string;
                                         /** Format: date-time */
@@ -2949,7 +4334,7 @@ export interface paths {
                             jobs: {
                                 id: string;
                                 ownerId: string;
-                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark";
+                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark" | "send_nudge";
                                 idempotencyKey: string;
                                 payload: {
                                     /** @enum {string} */
@@ -2977,6 +4362,20 @@ export interface paths {
                                     portsModule: string;
                                     bar: "self_use" | "flagship";
                                     labelsFile?: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "send_nudge";
+                                    nudge: {
+                                        id: string;
+                                        channel: "email" | "sms" | "whatsapp";
+                                        to: string;
+                                        subject: string | null;
+                                        body: string;
+                                        /** Format: date-time */
+                                        dueAt: string;
+                                        gapIds: string[];
+                                    };
+                                    dryRun: boolean;
                                 };
                                 state: "queued" | "leased" | "succeeded" | "failed" | "dead";
                                 attempts: number;
@@ -3045,7 +4444,7 @@ export interface paths {
                             job: {
                                 id: string;
                                 ownerId: string;
-                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark";
+                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark" | "send_nudge";
                                 idempotencyKey: string;
                                 payload: {
                                     /** @enum {string} */
@@ -3073,6 +4472,20 @@ export interface paths {
                                     portsModule: string;
                                     bar: "self_use" | "flagship";
                                     labelsFile?: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "send_nudge";
+                                    nudge: {
+                                        id: string;
+                                        channel: "email" | "sms" | "whatsapp";
+                                        to: string;
+                                        subject: string | null;
+                                        body: string;
+                                        /** Format: date-time */
+                                        dueAt: string;
+                                        gapIds: string[];
+                                    };
+                                    dryRun: boolean;
                                 };
                                 state: "queued" | "leased" | "succeeded" | "failed" | "dead";
                                 attempts: number;
@@ -3124,108 +4537,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/snapshots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Queue a repository ingestion; parsing runs isolated, never in this process */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        repoPath: string;
-                        ref?: string;
-                        sessionId?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Default Response */
-                202: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            job: {
-                                id: string;
-                                ownerId: string;
-                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark";
-                                idempotencyKey: string;
-                                payload: {
-                                    /** @enum {string} */
-                                    kind: "ingest_repository";
-                                    repoPath: string;
-                                    ref: string;
-                                    sessionId: string;
-                                } | {
-                                    /** @enum {string} */
-                                    kind: "build_export";
-                                    destination: string;
-                                } | {
-                                    /** @enum {string} */
-                                    kind: "sweep_retention";
-                                    snapshotMaxAgeDays: number;
-                                } | {
-                                    /** @enum {string} */
-                                    kind: "plan_retrieval";
-                                    horizonDays: number;
-                                } | {
-                                    /** @enum {string} */
-                                    kind: "run_benchmark";
-                                    fixturesDir: string;
-                                    outDir: string;
-                                    portsModule: string;
-                                    bar: "self_use" | "flagship";
-                                    labelsFile?: string;
-                                };
-                                state: "queued" | "leased" | "succeeded" | "failed" | "dead";
-                                attempts: number;
-                                maxAttempts: number;
-                                /** Format: date-time */
-                                runAfter: string;
-                                leaseOwner: string | null;
-                                leaseExpiresAt: string | null;
-                                lastError: string | null;
-                                /** Format: date-time */
-                                createdAt: string;
-                                /** Format: date-time */
-                                updatedAt: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Default Response */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            error: string;
-                            detail?: string;
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/jobs/export": {
         parameters: {
             query?: never;
@@ -3261,7 +4572,7 @@ export interface paths {
                             job: {
                                 id: string;
                                 ownerId: string;
-                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark";
+                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark" | "send_nudge";
                                 idempotencyKey: string;
                                 payload: {
                                     /** @enum {string} */
@@ -3289,6 +4600,20 @@ export interface paths {
                                     portsModule: string;
                                     bar: "self_use" | "flagship";
                                     labelsFile?: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "send_nudge";
+                                    nudge: {
+                                        id: string;
+                                        channel: "email" | "sms" | "whatsapp";
+                                        to: string;
+                                        subject: string | null;
+                                        body: string;
+                                        /** Format: date-time */
+                                        dueAt: string;
+                                        gapIds: string[];
+                                    };
+                                    dryRun: boolean;
                                 };
                                 state: "queued" | "leased" | "succeeded" | "failed" | "dead";
                                 attempts: number;
@@ -3361,7 +4686,7 @@ export interface paths {
                             job: {
                                 id: string;
                                 ownerId: string;
-                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark";
+                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark" | "send_nudge";
                                 idempotencyKey: string;
                                 payload: {
                                     /** @enum {string} */
@@ -3389,6 +4714,20 @@ export interface paths {
                                     portsModule: string;
                                     bar: "self_use" | "flagship";
                                     labelsFile?: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "send_nudge";
+                                    nudge: {
+                                        id: string;
+                                        channel: "email" | "sms" | "whatsapp";
+                                        to: string;
+                                        subject: string | null;
+                                        body: string;
+                                        /** Format: date-time */
+                                        dueAt: string;
+                                        gapIds: string[];
+                                    };
+                                    dryRun: boolean;
                                 };
                                 state: "queued" | "leased" | "succeeded" | "failed" | "dead";
                                 attempts: number;
@@ -3450,7 +4789,269 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            kinds: ("ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark")[];
+                            kinds: ("ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark" | "send_nudge")[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Repositories this owner has pinned, most recent first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            snapshots: {
+                                id: string;
+                                repoPath: string;
+                                commit: string;
+                                fileCount: number;
+                                artifactCount: number;
+                                /** Format: date-time */
+                                pinnedAt: string;
+                                deleted: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Pin a repository. Parsing runs in an isolated process, never in this one: queued when a durable queue exists, awaited here when none does */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        repoPath: string;
+                        ref?: string;
+                        sessionId?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            snapshot: {
+                                id: string;
+                                repoPath: string;
+                                commit: string;
+                                fileCount: number;
+                                artifactCount: number;
+                                /** Format: date-time */
+                                pinnedAt: string;
+                                deleted: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            job: {
+                                id: string;
+                                ownerId: string;
+                                kind: "ingest_repository" | "build_export" | "sweep_retention" | "plan_retrieval" | "run_benchmark" | "send_nudge";
+                                idempotencyKey: string;
+                                payload: {
+                                    /** @enum {string} */
+                                    kind: "ingest_repository";
+                                    repoPath: string;
+                                    ref: string;
+                                    sessionId: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "build_export";
+                                    destination: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "sweep_retention";
+                                    snapshotMaxAgeDays: number;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "plan_retrieval";
+                                    horizonDays: number;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "run_benchmark";
+                                    fixturesDir: string;
+                                    outDir: string;
+                                    portsModule: string;
+                                    bar: "self_use" | "flagship";
+                                    labelsFile?: string;
+                                } | {
+                                    /** @enum {string} */
+                                    kind: "send_nudge";
+                                    nudge: {
+                                        id: string;
+                                        channel: "email" | "sms" | "whatsapp";
+                                        to: string;
+                                        subject: string | null;
+                                        body: string;
+                                        /** Format: date-time */
+                                        dueAt: string;
+                                        gapIds: string[];
+                                    };
+                                    dryRun: boolean;
+                                };
+                                state: "queued" | "leased" | "succeeded" | "failed" | "dead";
+                                attempts: number;
+                                maxAttempts: number;
+                                /** Format: date-time */
+                                runAfter: string;
+                                leaseOwner: string | null;
+                                leaseExpiresAt: string | null;
+                                lastError: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snapshots/{id}/artifacts/{artifactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The code of one artifact, read at the commit its snapshot pinned */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    artifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            artifact: {
+                                path: string;
+                                symbol?: string;
+                                startLine?: number;
+                                endLine?: number;
+                                code: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
                         };
                     };
                 };

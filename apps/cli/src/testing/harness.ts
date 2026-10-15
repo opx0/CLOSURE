@@ -1,7 +1,21 @@
-import type { AnyEvent, Claim, Finding, PolicyAction, RoundKind } from '@closer/contracts'
-import type { Ceilings, ConductorPort, EvaluatorPort, SessionView } from '@closer/core'
-import { spanViolations } from '@closer/core'
-import { runSession, type SessionIo, type SessionResult } from '@closer/core'
+import type {
+  AnyEvent,
+  Claim,
+  Finding,
+  Level,
+  PolicyAction,
+  RoundKind,
+  Topic,
+} from '@levelhead/contracts'
+import type {
+  Ceilings,
+  ConductorPort,
+  EvaluatorPort,
+  PinnedContext,
+  SessionView,
+} from '@levelhead/core'
+import { spanViolations } from '@levelhead/core'
+import { runSession, type SessionIo, type SessionResult } from '@levelhead/core'
 import { FixedClock, MemoryEventStore, SeqIds } from './fakes.ts'
 
 export const HARNESS_CEILINGS: Ceilings = {
@@ -12,8 +26,11 @@ export const HARNESS_CEILINGS: Ceilings = {
 
 export const DEEP_DIVE: readonly RoundKind[] = ['project_deep_dive']
 
+export type QuestionMeta = Parameters<SessionIo['question']>[1]
+
 export interface RecordedIo extends SessionIo {
   readonly questions: readonly string[]
+  readonly asked: readonly { text: string; meta: QuestionMeta }[]
   readonly notices: readonly string[]
   readonly shown: readonly Finding[]
   readonly answered: readonly string[]
@@ -22,6 +39,7 @@ export interface RecordedIo extends SessionIo {
 // The last answer repeats when the script runs out, so extra turns finish deterministically.
 export function recordedIo(answers: readonly string[]): RecordedIo {
   const questions: string[] = []
+  const asked: { text: string; meta: QuestionMeta }[] = []
   const notices: string[] = []
   const shown: Finding[] = []
   const answered: string[] = []
@@ -29,12 +47,14 @@ export function recordedIo(answers: readonly string[]): RecordedIo {
 
   return {
     questions,
+    asked,
     notices,
     shown,
     answered,
     round() {},
-    question(text) {
+    question(text, meta) {
       questions.push(text)
+      asked.push({ text, meta })
     },
     async answer() {
       const next = answers[answered.length] ?? last
@@ -59,8 +79,11 @@ export interface HarnessSessionInput {
   conductor: ConductorPort
   evaluator: EvaluatorPort
   mode?: Parameters<typeof runSession>[0]['mode']
+  level?: Level
   turnsPerRound?: number
   rounds?: readonly RoundKind[]
+  topics?: readonly Topic[]
+  pinned?: PinnedContext
   drill?: boolean
   transferGap?: Parameters<typeof runSession>[0]['transferGap']
   store?: MemoryEventStore
@@ -83,10 +106,12 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     // Confirmation is a separate step tested elsewhere; these harnesses put the claim in play already confirmed.
     claims: input.claims.map((claim) => ({ ...claim, confirmedByCandidate: true })),
     mode: input.mode ?? 'coach',
-    level: 'mid',
+    level: input.level ?? 'mid',
     personaId: 'skeptic',
     pressureCeiling: 3,
     rounds: [...(input.rounds ?? DEEP_DIVE)],
+    ...(input.topics === undefined ? {} : { topics: input.topics }),
+    ...(input.pinned === undefined ? {} : { pinned: input.pinned }),
     turnsPerRound: input.turnsPerRound ?? 1,
     drill: input.drill ?? false,
     ...(input.transferGap === undefined ? {} : { transferGap: input.transferGap }),

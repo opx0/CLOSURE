@@ -1,5 +1,5 @@
-import type { Competency, PolicyAction } from '@closer/contracts'
-import { isPressureAction } from '@closer/contracts'
+import type { Competency, PolicyAction } from '@levelhead/contracts'
+import { isPressureAction } from '@levelhead/contracts'
 
 // Declaration order is the tie-break order in `selectAction`. Arc (§4.2) first, then pressure moves
 // by ascending intensity, then END_TOPIC — so a tie never ends a topic a real question could advance.
@@ -26,7 +26,7 @@ export interface ActionSpec {
   probes: Competency | null
   // Derived from `isPressureAction`, never re-listed — two copies of the six moves would drift.
   isPressure: boolean
-  // Content the code must choose and the renderer may not invent, so anything untrue CLOSER says is
+  // Content the code must choose and the renderer may not invent, so anything untrue Levelhead says is
   // logged as data rather than left to the model.
   needsSeed: boolean
   // What to ask, never how the answer will be judged — the bar isn't disclosed to the thing asking.
@@ -38,7 +38,7 @@ const catalogue: Record<PolicyAction, Omit<ActionSpec, 'isPressure'>> = {
     probes: 'mechanism',
     needsSeed: false,
     description:
-      'Ask how the thing named in the claim actually works, one level below the last answer.',
+      'Ask how the thing under discussion actually works, one level below the last answer.',
   },
   REQUEST_EVIDENCE: {
     // §4.2 puts evidence in the "how" step: what backs the mechanism the candidate just described.
@@ -108,7 +108,7 @@ const catalogue: Record<PolicyAction, Omit<ActionSpec, 'isPressure'>> = {
   END_TOPIC: {
     probes: null,
     needsSeed: false,
-    description: 'Close this claim out and say the topic is finished.',
+    description: 'Close this subject out and say it is finished.',
   },
 }
 

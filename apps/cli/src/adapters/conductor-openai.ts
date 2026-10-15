@@ -1,11 +1,11 @@
-import type { InvocationRecord } from '@closer/contracts'
+import type { InvocationRecord } from '@levelhead/contracts'
 import type {
   ConductorPort,
   RenderQuestionInput,
   RenderRoundBriefInput,
   RenderedQuestion,
-} from '@closer/core'
-import { questionRenderPrompt, roundBriefPrompt } from '@closer/prompts'
+} from '@levelhead/core'
+import { questionRenderPrompt, roundBriefPrompt } from '@levelhead/prompts'
 import {
   firstChoiceText,
   mapFinishReason,
@@ -43,6 +43,9 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       transcript: input.transcript,
       seed: input.seed,
       round: input.round,
+      ...(input.topic === undefined
+        ? {}
+        : { topic: { area: input.topic.area, title: input.topic.title, ask: input.topic.ask } }),
       ...(input.artifact === undefined
         ? {}
         : {
