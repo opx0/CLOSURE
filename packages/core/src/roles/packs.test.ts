@@ -1,5 +1,13 @@
 import { expect, test } from 'bun:test'
-import { ROLE_PACKS, expectedConceptsFor, rolePack, validationNotice } from './packs.ts'
+import {
+  DEFAULT_ROLE_ID,
+  ROLE_PACKS,
+  expectedConceptsFor,
+  roleAreas,
+  rolePack,
+  roleRounds,
+  validationNotice,
+} from './packs.ts'
 
 test('every pack covers every competency the rubric judges', () => {
   for (const pack of ROLE_PACKS) {
@@ -23,4 +31,37 @@ test('an unknown role is an absence, not a silent default', () => {
   expect(rolePack('does_not_exist')).toBeUndefined()
   expect(validationNotice('does_not_exist')).toContain('no role pack')
   expect(expectedConceptsFor('does_not_exist', 'mechanism')).toEqual([])
+})
+
+test('roles read the way a student would pick one, each with the areas its role round asks about', () => {
+  expect(ROLE_PACKS.map((pack) => [pack.id, pack.label, pack.areas])).toEqual([
+    ['sde_generalist', 'Software engineer (general SDE)', ['backend', 'web']],
+    ['backend_services', 'Backend engineer', ['backend']],
+    ['frontend', 'Frontend engineer', ['web']],
+    ['fullstack', 'Full-stack engineer', ['web', 'backend']],
+    ['applied_ai', 'ML / AI engineer', ['ml', 'data']],
+    ['data_engineering', 'Data engineer', ['data']],
+    ['platform_reliability', 'DevOps / cloud / SRE', ['devops', 'backend']],
+  ])
+})
+
+test('every role starts an interview without a résumé or a repository', () => {
+  const resumeRounds = ['project_deep_dive', 'design_extension', 'code_walkthrough']
+  const needsResume = ROLE_PACKS.filter((pack) =>
+    pack.defaultRounds.some((round) => resumeRounds.includes(round)),
+  )
+
+  expect(needsResume.map((pack) => pack.id)).toEqual([])
+  expect(roleRounds('frontend')).toEqual([
+    'cs_fundamentals',
+    'problem_solving',
+    'role_knowledge',
+    'behavioral',
+  ])
+})
+
+test('the general software engineer is the default role and the fallback for an unknown one', () => {
+  expect(DEFAULT_ROLE_ID).toBe('sde_generalist')
+  expect(roleAreas('does_not_exist')).toEqual(['backend', 'web'])
+  expect(roleRounds('does_not_exist')).toEqual(roleRounds('sde_generalist'))
 })

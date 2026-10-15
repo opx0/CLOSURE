@@ -1,16 +1,17 @@
 import { test, expect } from 'bun:test'
-import type { PolicyAction } from '@closer/contracts'
-import { ROUND_ORDER } from '@closer/contracts'
+import type { PolicyAction } from '@levelhead/contracts'
+import { ROUND_ORDER } from '@levelhead/contracts'
+import { TOPIC_ROUNDS } from '../topics/index.ts'
 import { ACTIONS } from './actions.ts'
 import { ROUND_ARCS, roundRole } from './rounds.ts'
 import { selectAction, type Plan, type PolicyInput } from './select.ts'
 
 function input(overrides: Partial<PolicyInput> = {}): PolicyInput {
   return {
-    confirmedClaimIds: ['claim-1', 'claim-2'],
-    currentClaimId: 'claim-1',
+    subjectIds: ['claim-1', 'claim-2'],
+    currentSubjectId: 'claim-1',
     askedCounts: {},
-    coveredForCurrentClaim: [],
+    coveredForCurrentSubject: [],
     recentActions: [],
     turnCount: 0,
     personaId: 'collaborator',
@@ -60,7 +61,7 @@ test('the design extension leads with the changed constraint, not with the mecha
   const underneath = selectAction(
     input({
       round: 'design_extension',
-      coveredForCurrentClaim: ['trade_offs'],
+      coveredForCurrentSubject: ['trade_offs'],
       askedCounts: { 'claim-1': 1 },
       recentActions: ['CHANGE_CONSTRAINT'],
       turnCount: 1,
@@ -71,7 +72,7 @@ test('the design extension leads with the changed constraint, not with the mecha
 
 test('a constraint shock is the design extension move once the ladder allows it', () => {
   const shared = {
-    coveredForCurrentClaim: ['trade_offs'],
+    coveredForCurrentSubject: ['trade_offs'],
     askedCounts: { 'claim-1': 2 },
     recentActions: ['CHANGE_CONSTRAINT'],
     turnCount: 3,
@@ -88,24 +89,137 @@ test('a constraint shock is the design extension move once the ladder allows it'
   )
 })
 
-test('the behavioral round asks what it cost, and never what breaks', () => {
+test('the behavioral round opens the story, then asks what it cost and what they would change', () => {
+  const story = {
+    subjectIds: ['behavioral.disagreement'],
+    currentSubjectId: 'behavioral.disagreement',
+  }
   for (const personaId of ['collaborator', 'skeptic'] as const) {
-    const opening = selectAction(input({ round: 'behavioral', personaId }))
-    // The claim is already in writing, so there is something to ask evidence for on turn one.
-    expect(opening.chosen).toBe('REQUEST_EVIDENCE')
-    expect(reasonFor(opening, 'TEST_FAILURE_MODE')).toContain('does not use this action')
+    const opening = selectAction(input({ ...story, round: 'behavioral', personaId }))
+    expect(opening.chosen).toBe('PROBE_MECHANISM')
   }
 
   const cost = selectAction(
     input({
+      ...story,
       round: 'behavioral',
-      coveredForCurrentClaim: ['mechanism'],
-      askedCounts: { 'claim-1': 1 },
-      recentActions: ['REQUEST_EVIDENCE'],
+      coveredForCurrentSubject: ['mechanism'],
+      askedCounts: { 'behavioral.disagreement': 1 },
+      recentActions: ['PROBE_MECHANISM'],
       turnCount: 1,
     }),
   )
   expect(cost.chosen).toBe('PROBE_TRADE_OFF')
+
+  const hindsight = selectAction(
+    input({
+      ...story,
+      round: 'behavioral',
+      coveredForCurrentSubject: ['mechanism', 'trade_offs'],
+      askedCounts: { 'behavioral.disagreement': 2 },
+      recentActions: ['PROBE_TRADE_OFF', 'PROBE_MECHANISM'],
+      turnCount: 2,
+    }),
+  )
+  expect(hindsight.chosen).toBe('TEST_FAILURE_MODE')
+})
+
+test('each round declares what its questions are about', () => {
+  const bySubject = (subject: string) =>
+    ROUND_ORDER.filter((round) => ROUND_ARCS[round].subject === subject)
+
+  expect(bySubject('topic')).toEqual([
+    'cs_fundamentals',
+    'problem_solving',
+    'role_knowledge',
+    'system_design',
+    'behavioral',
+  ])
+  expect(bySubject('topic')).toEqual([...TOPIC_ROUNDS])
+  expect(bySubject('claim')).toEqual(['project_deep_dive', 'design_extension'])
+  expect(bySubject('artifact')).toEqual(['code_walkthrough'])
+})
+
+test('a knowledge round asks questions and never asks the candidate to prove anything', () => {
+  for (const round of [
+    'cs_fundamentals',
+    'problem_solving',
+    'role_knowledge',
+    'system_design',
+  ] as const) {
+    const plan = selectAction(input({ round, personaId: 'skeptic' }))
+    expect(plan.chosen).toBe('PROBE_MECHANISM')
+    expect(reasonFor(plan, 'REQUEST_EVIDENCE')).toContain('does not use this action')
+  }
+})
+
+test('a topic round explains itself in terms of topics, never claims', () => {
+  const plan = selectAction(
+    input({
+      round: 'cs_fundamentals',
+      subjectIds: ['os.deadlock', 'os.paging'],
+      currentSubjectId: 'os.deadlock',
+      askedCounts: { 'os.deadlock': 5 },
+      turnCount: 5,
+      recentActions: ['PROBE_MECHANISM'],
+    }),
+  )
+
+  expect(plan.chosen).toBe('END_TOPIC')
+  expect(plan.nextSubjectId).toBe('os.paging')
+  expect(reasonFor(plan, 'END_TOPIC')).toContain(
+    'this topic has taken 5 turns and 1 planned topics are still unasked',
+  )
+  for (const candidate of plan.considered) expect(candidate.reason).not.toContain('claim')
+})
+
+test('the design round moves the constraint once the first sketch is on the table', () => {
+  const sketched = selectAction(
+    input({
+      round: 'system_design',
+      coveredForCurrentSubject: ['mechanism'],
+      askedCounts: { 'claim-1': 1 },
+      recentActions: ['PROBE_MECHANISM'],
+      turnCount: 1,
+    }),
+  )
+  expect(sketched.chosen).toBe('CHANGE_CONSTRAINT')
+})
+
+test('a fundamentals round leads with the false premise once the ladder reaches it', () => {
+  const shared = {
+    coveredForCurrentSubject: ['mechanism'],
+    askedCounts: { 'claim-1': 1 },
+    recentActions: ['PROBE_MECHANISM'],
+    turnCount: 3,
+    personaId: 'skeptic',
+    pressure: { level: 3, heldStreak: 0 },
+  } as const
+
+  const fundamentals = selectAction(input({ ...shared, round: 'cs_fundamentals' }))
+  const problems = selectAction(input({ ...shared, round: 'problem_solving' }))
+  expect(fundamentals.chosen).toBe('FALSE_PREMISE')
+  expect(scoreOf(fundamentals, 'FALSE_PREMISE')).toBeGreaterThan(scoreOf(problems, 'FALSE_PREMISE'))
+})
+
+test('a code walkthrough goes from what the code does to what breaks it to what it gave up', () => {
+  const walk = (covered: readonly ('mechanism' | 'failure_modes')[], recent: PolicyAction[]) =>
+    selectAction(
+      input({
+        round: 'code_walkthrough',
+        artifactAvailable: true,
+        coveredForCurrentSubject: covered,
+        askedCounts: { 'claim-1': covered.length },
+        recentActions: recent,
+        turnCount: covered.length,
+      }),
+    ).chosen
+
+  expect(walk([], [])).toBe('PROBE_MECHANISM')
+  expect(walk(['mechanism'], ['PROBE_MECHANISM'])).toBe('TEST_FAILURE_MODE')
+  expect(walk(['mechanism', 'failure_modes'], ['TEST_FAILURE_MODE', 'PROBE_MECHANISM'])).toBe(
+    'PROBE_TRADE_OFF',
+  )
 })
 
 test('a code walkthrough needs something to walk through', () => {
@@ -133,7 +247,7 @@ test('the same input twice yields an identical plan in every round', () => {
     const shared = input({
       round,
       artifactAvailable: true,
-      coveredForCurrentClaim: ['mechanism'],
+      coveredForCurrentSubject: ['mechanism'],
       askedCounts: { 'claim-1': 2 },
       recentActions: ['REQUEST_EVIDENCE', 'PROBE_MECHANISM'],
       turnCount: 2,
@@ -148,18 +262,18 @@ test('the same input twice yields an identical plan in every round', () => {
 test('a finished claim hands the session the least-asked claim to open next', () => {
   const finished = selectAction(
     input({
-      confirmedClaimIds: ['claim-1', 'claim-2', 'claim-3'],
+      subjectIds: ['claim-1', 'claim-2', 'claim-3'],
       askedCounts: { 'claim-1': 3, 'claim-2': 2, 'claim-3': 0 },
-      coveredForCurrentClaim: ['mechanism', 'failure_modes', 'trade_offs'],
+      coveredForCurrentSubject: ['mechanism', 'failure_modes', 'trade_offs'],
       turnCount: 3,
     }),
   )
   expect(finished.chosen).toBe('END_TOPIC')
-  expect(finished.nextClaimId).toBe('claim-3')
+  expect(finished.nextSubjectId).toBe('claim-3')
 
   const exhausted = selectAction(
     input({
-      confirmedClaimIds: ['claim-1', 'claim-2', 'claim-3'],
+      subjectIds: ['claim-1', 'claim-2', 'claim-3'],
       askedCounts: { 'claim-1': 5, 'claim-2': 1, 'claim-3': 1 },
       turnCount: 5,
       recentActions: ['PROBE_MECHANISM'],
@@ -167,34 +281,34 @@ test('a finished claim hands the session the least-asked claim to open next', ()
   )
   expect(exhausted.chosen).toBe('END_TOPIC')
   // Tie on turns taken: the order the claims were confirmed in breaks it, on every replay.
-  expect(exhausted.nextClaimId).toBe('claim-2')
+  expect(exhausted.nextSubjectId).toBe('claim-2')
 })
 
 test('a plan names a next claim only when there is one and the topic is closing', () => {
   const lastClaim = selectAction(
     input({
-      confirmedClaimIds: ['claim-1'],
-      coveredForCurrentClaim: ['mechanism', 'failure_modes', 'trade_offs'],
+      subjectIds: ['claim-1'],
+      coveredForCurrentSubject: ['mechanism', 'failure_modes', 'trade_offs'],
       askedCounts: { 'claim-1': 3 },
       turnCount: 3,
     }),
   )
   expect(lastClaim.chosen).toBe('END_TOPIC')
-  expect('nextClaimId' in lastClaim).toBe(false)
+  expect('nextSubjectId' in lastClaim).toBe(false)
 
   const stillAsking = selectAction(input())
   expect(stillAsking.chosen).not.toBe('END_TOPIC')
-  expect('nextClaimId' in stillAsking).toBe(false)
+  expect('nextSubjectId' in stillAsking).toBe(false)
 
   // Every other claim has had its share, so there is nowhere honest left to go.
   const allSpent = selectAction(
     input({
-      confirmedClaimIds: ['claim-1', 'claim-2', 'claim-3'],
+      subjectIds: ['claim-1', 'claim-2', 'claim-3'],
       askedCounts: { 'claim-1': 2, 'claim-2': 4, 'claim-3': 6 },
-      coveredForCurrentClaim: ['mechanism', 'failure_modes', 'trade_offs'],
+      coveredForCurrentSubject: ['mechanism', 'failure_modes', 'trade_offs'],
       turnCount: 12,
     }),
   )
   expect(allSpent.chosen).toBe('END_TOPIC')
-  expect('nextClaimId' in allSpent).toBe(false)
+  expect('nextSubjectId' in allSpent).toBe(false)
 })
