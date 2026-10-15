@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
-import { silentLogger, type EnqueueInput, type JobQueuePort } from '@closer/core'
-import type { JobKind, JobRecord } from '@closer/contracts'
+import { silentLogger, type EnqueueInput, type JobQueuePort } from '@levelhead/core'
+import type { JobKind, JobRecord } from '@levelhead/contracts'
 import { JobRunner } from './runner.ts'
 import type { HandlerContext } from './handlers/index.ts'
 import { HANDLERS } from './handlers/index.ts'
@@ -115,6 +115,7 @@ test('every job kind this build knows has a handler', () => {
     'sweep_retention',
     'plan_retrieval',
     'run_benchmark',
+    'send_nudge',
   ]
   for (const kind of kinds) expect(typeof HANDLERS[kind]).toBe('function')
 })

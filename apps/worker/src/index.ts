@@ -1,17 +1,18 @@
 import { createServer } from 'node:http'
 import { Pool } from 'pg'
-import { LOCAL_OWNER_ID, type OwnerId } from '@closer/contracts'
-import { PostgresEventStore, PostgresJobQueue, PostgresRetrieval } from '@closer/db'
-import { createLogger, metrics, startTracing } from '@closer/observability'
+import { LOCAL_OWNER_ID, type OwnerId } from '@levelhead/contracts'
+import { PostgresEventStore, PostgresJobQueue, PostgresRetrieval } from '@levelhead/db'
+import { createLogger, metrics, startTracing } from '@levelhead/observability'
 import { RandomIds, SystemClock } from '../../cli/src/runtime.ts'
+import { outreachFrom } from './adapters/index.ts'
 import { loadWorkerConfig } from './config.ts'
 import { JobRunner } from './runner.ts'
 import type { HandlerContext } from './handlers/index.ts'
 
 const config = loadWorkerConfig()
-const logger = createLogger({ level: config.LOG_LEVEL, service: 'closer-worker' })
+const logger = createLogger({ level: config.LOG_LEVEL, service: 'levelhead-worker' })
 const tracing = await startTracing({
-  serviceName: 'closer-worker',
+  serviceName: 'levelhead-worker',
   endpoint: config.OTEL_EXPORTER_OTLP_ENDPOINT,
   enabled: config.OTEL_ENABLED,
 })
@@ -27,6 +28,7 @@ const context: HandlerContext = {
   storeFor: (ownerId: OwnerId) => new PostgresEventStore(pool, ownerId),
   retrieval,
   queue,
+  outreach: outreachFrom(config, clock),
   logger,
   clock,
   ids,
@@ -75,5 +77,6 @@ logger.log('info', 'worker ready', {
   name: config.WORKER_NAME,
   ownerScope: LOCAL_OWNER_ID,
   pollMs: config.WORKER_POLL_MS,
+  nudgeDelivery: context.outreach.describe(),
 })
 await runner.loop()
