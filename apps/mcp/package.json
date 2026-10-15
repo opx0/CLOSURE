@@ -9,6 +9,6 @@
   "dependencies": {
     "@levelhead/contracts": "workspace:*",
     "@levelhead/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.30.0"
+    "@modelcontextprotocol/sdk": "1.31.0"
   }
 }
