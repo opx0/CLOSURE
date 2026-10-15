@@ -6,8 +6,8 @@ import {
   claimsExtractedPayload,
   claimConfirmedPayload,
   replay,
-} from '@closer/core'
-import type { Claim } from '@closer/contracts'
+} from '@levelhead/core'
+import type { Claim } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { fromEnv } from '../adapters/index.ts'
 import { loadCliConfig } from '../config.ts'
@@ -27,7 +27,7 @@ export async function claims(argv: readonly string[]): Promise<number> {
   // A deliberate choice made once, not the default the flow drifts into.
   const assumeYes = argv.includes('--yes')
   if (path === undefined) {
-    line('usage: closer claims <resume.md>')
+    line('usage: levelhead claims <resume.md>')
     return 1
   }
 
@@ -98,6 +98,8 @@ export async function claims(argv: readonly string[]): Promise<number> {
   }
 
   line('')
-  line(`${confirmed} claims in play. Interrogate one with: closer session`)
+  line(`${confirmed} claims in play.`)
+  dim('  cross-question them: levelhead session --rounds project_deep_dive,design_extension')
+  dim('  see what they need: levelhead resume')
   return 0
 }

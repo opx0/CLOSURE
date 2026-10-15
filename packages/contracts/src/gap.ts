@@ -10,10 +10,24 @@ export const GapStatusSchema = Type.Union([
 ])
 export type GapStatus = Static<typeof GapStatusSchema>
 
+export const PracticeReceiptSchema = Type.Object({
+  attemptId: Type.String({ minLength: 1 }),
+  kind: Type.Union([Type.Literal('drill'), Type.Literal('transfer'), Type.Literal('retrieval')]),
+  held: Type.Boolean(),
+})
+export type PracticeReceipt = Static<typeof PracticeReceiptSchema>
+
+export const PracticeOutcomeSchema = Type.Object({
+  gapId: Type.String({ minLength: 1 }),
+  ...PracticeReceiptSchema.properties,
+})
+export type PracticeOutcome = Static<typeof PracticeOutcomeSchema>
+
 export const GapEntrySchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   competency: CompetencySchema,
   claimId: Type.Optional(Type.String({ minLength: 1 })),
+  topicId: Type.Optional(Type.String({ minLength: 1 })),
   summary: Type.String({ minLength: 1 }),
   status: GapStatusSchema,
   // Carries the finding's citations forward — the ledger row must show the candidate's own words (§4.6's Evidence column).
@@ -21,8 +35,9 @@ export const GapEntrySchema = Type.Object({
   evidenceIds: Type.Array(Type.String({ minLength: 1 })),
   openedAt: Type.String({ format: 'date-time' }),
   lastTouchedAt: Type.String({ format: 'date-time' }),
-  // Non-empty is what licenses `closed_under_transfer`.
+  // Both failed and successful Transfer attempts. Only a held outcome licenses closure.
   transferAttemptIds: Type.Array(Type.String({ minLength: 1 })),
+  practiceReceipts: Type.Optional(Type.Array(PracticeReceiptSchema)),
   // Optional so it stays valid on gap_opened events already written; `passed` matters so a re-drilled lapse doesn't read as a second survived retrieval.
   retrievals: Type.Optional(
     Type.Array(

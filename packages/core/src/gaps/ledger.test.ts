@@ -1,14 +1,7 @@
 import { test, expect } from 'bun:test'
-import type { Finding, GapEntry } from '@closer/contracts'
+import type { Finding, GapEntry } from '@levelhead/contracts'
 import type { Clock, IdSource } from '../ports/clock.ts'
-import {
-  applyDrillResult,
-  applyTransferResult,
-  gapKey,
-  gapsFromFindings,
-  indexGaps,
-  renderLedger,
-} from './ledger.ts'
+import { gapHeld, gapKey, gapsFromFindings, indexGaps, renderLedger } from './ledger.ts'
 
 function idSource(): IdSource {
   let issued = 0
@@ -141,43 +134,18 @@ test('two findings about the same gap land on one row', () => {
   expect(opened[0]?.evidenceIds).toEqual(['evidence-1', 'evidence-2'])
 })
 
-test('passing the drill moves open to drilled and closes nothing', () => {
-  const { gap, transition } = applyDrillResult(gapOf(), true, { clock })
-
-  expect(gap.status).toBe('drilled')
-  expect(transition).toEqual({ gapId: 'gap-1', from: 'open', to: 'drilled' })
-  expect(gap.transferAttemptIds).toEqual([])
-
-  const again = applyDrillResult(gap, true, { clock })
-  expect(again.gap.status).toBe('drilled')
-  expect(again.transition).toBeNull()
-})
-
-test('a failed drill leaves the gap open', () => {
-  const { gap, transition } = applyDrillResult(gapOf(), false, { clock })
-
-  expect(gap.status).toBe('open')
-  expect(transition).toBeNull()
-})
-
-test('only a passed transfer reaches closed_under_transfer', () => {
-  const drilled = gapOf({ status: 'drilled' })
-
-  const failed = applyTransferResult(drilled, 'attempt-9', false, { clock })
-  expect(failed.gap.status).toBe('open')
-  expect(failed.gap.transferAttemptIds).toEqual(['attempt-9'])
-
-  const passed = applyTransferResult(failed.gap, 'attempt-12', true, { clock })
-  expect(passed.gap.status).toBe('closed_under_transfer')
-  expect(passed.gap.transferAttemptIds).toEqual(['attempt-9', 'attempt-12'])
-  expect(passed.transition).toEqual({ gapId: 'gap-1', from: 'open', to: 'closed_under_transfer' })
-})
-
-test('a closed gap carries the transfer attempt that closed it', () => {
-  const closed = applyTransferResult(gapOf(), 'attempt-12', true, { clock }).gap
-
-  expect(closed.status).toBe('closed_under_transfer')
-  expect(closed.transferAttemptIds.length).toBeGreaterThan(0)
+test('new gap ids cannot replace a carried gap when an injected id counter restarts', () => {
+  const carried = gapOf({
+    id: 'gap-1',
+    competency: 'failure_modes',
+    status: 'closed_under_transfer',
+  })
+  const { opened } = gapsFromFindings([unsupported], indexGaps([carried]), {
+    clock,
+    ids: idSource(),
+  })
+  expect(opened.map((gap) => gap.id)).toEqual(['gap-2'])
+  expect(carried.status).toBe('closed_under_transfer')
 })
 
 test('the ledger renders four columns and no aggregate of any kind', () => {
@@ -217,4 +185,113 @@ test('the ledger renders without a quote lookup', () => {
 test('gap identity is one row per competency per claim', () => {
   expect(gapKey('mechanism', 'claim-1')).not.toBe(gapKey('failure_modes', 'claim-1'))
   expect(gapKey('composure')).toBe(gapKey('composure', undefined))
+})
+
+const shortOnMechanism: Finding = {
+  ...findingBase,
+  id: 'finding-7',
+  rubric: { id: 'mechanism', version: 1 },
+  rationale: 'Named the four conditions without saying how a cycle forms.',
+  kind: 'competency',
+  competency: 'mechanism',
+  levelMet: null,
+}
+
+const declinedMechanism: Finding = {
+  ...findingBase,
+  id: 'finding-8',
+  rubric: { id: 'mechanism', version: 1 },
+  rationale: 'Deadlock is referred to but never described.',
+  kind: 'competency_abstained',
+  competency: 'mechanism',
+  abstention: 'insufficient_evidence',
+}
+
+test('a gap on a topic turn carries the topic, one row per competency per topic', () => {
+  const first = gapsFromFindings([shortOnMechanism], new Map(), deps, { topicId: 'os.deadlock' })
+  expect(first.opened.map((gap) => [gap.competency, gap.topicId, gap.claimId])).toEqual([
+    ['mechanism', 'os.deadlock', undefined],
+  ])
+
+  const other = gapsFromFindings([shortOnMechanism], indexGaps(first.opened), deps, {
+    topicId: 'dbms.indexes',
+  })
+  expect(other.opened.map((gap) => gap.topicId)).toEqual(['dbms.indexes'])
+})
+
+test('composure found on a topic turn belongs to the candidate, not the topic', () => {
+  const folded: Finding = {
+    ...findingBase,
+    id: 'finding-9',
+    rubric: { id: 'composure', version: 1 },
+    rationale: 'Accepted the false premise about the heap.',
+    kind: 'composure',
+    competency: 'composure',
+    signals: ['folding'],
+  }
+
+  const { opened } = gapsFromFindings([folded], new Map(), deps, { topicId: 'os.deadlock' })
+
+  expect(opened.map((gap) => 'topicId' in gap)).toEqual([false])
+})
+
+test('declining to judge a competency opens it as unverified, and never overwrites a judgment', () => {
+  const topic = { topicId: 'os.deadlock' }
+  const fresh = gapsFromFindings([declinedMechanism], new Map(), deps, topic)
+  expect(fresh.opened.map((gap) => [gap.status, gap.topicId])).toEqual([
+    ['unverified', 'os.deadlock'],
+  ])
+
+  const [row] = fresh.opened
+  if (row === undefined) throw new Error('no gap was opened')
+  for (const status of ['open', 'drilled', 'closed_under_transfer'] as const) {
+    const seen = gapsFromFindings([declinedMechanism], indexGaps([{ ...row, status }]), deps, topic)
+    expect(seen.opened).toHaveLength(0)
+    expect(seen.transitions).toEqual([])
+  }
+
+  // Judged short afterwards, the unverified row becomes an open one rather than a second row.
+  const judgedLater = gapsFromFindings([shortOnMechanism], indexGaps(fresh.opened), deps, topic)
+  expect(judgedLater.opened).toHaveLength(0)
+  expect(judgedLater.transitions.map((change) => [change.from, change.to])).toEqual([
+    ['unverified', 'open'],
+  ])
+})
+
+test('a gap holds only on a judged pass of its own competency, never on an abstention or a pass elsewhere', () => {
+  const onTopic: GapEntry = {
+    id: 'gap-9',
+    competency: 'mechanism',
+    topicId: 'os.deadlock',
+    summary: 'Could not say how the cycle forms.',
+    status: 'drilled',
+    findingIds: ['finding-7'],
+    evidenceIds: ['evidence-1'],
+    openedAt: '2026-09-03T10:00:00.000Z',
+    lastTouchedAt: '2026-09-03T10:00:00.000Z',
+    transferAttemptIds: [],
+  }
+  const met = (competency: 'mechanism' | 'trade_offs', levelMet: 'junior' | 'senior'): Finding => ({
+    ...findingBase,
+    id: `finding-${competency}-${levelMet}`,
+    rubric: { id: competency, version: 1 },
+    rationale: 'Said how the cycle forms and how ordering breaks it.',
+    kind: 'competency',
+    competency,
+    levelMet,
+  })
+
+  expect(gapHeld(onTopic, [met('mechanism', 'senior')])).toBe(true)
+  expect(gapHeld(onTopic, [declinedMechanism, met('trade_offs', 'senior')])).toBe(false)
+  expect(gapHeld(onTopic, [declinedMechanism, met('mechanism', 'senior')])).toBe(false)
+  expect(gapHeld(onTopic, [met('mechanism', 'junior')])).toBe(false)
+  expect(gapHeld(onTopic, [met('trade_offs', 'senior')])).toBe(false)
+  expect(gapHeld(onTopic, [])).toBe(false)
+
+  const onClaim = gapOf()
+  const supported: Finding = { ...unsupported, id: 'finding-10', verdict: 'supported' }
+  expect(gapHeld(onClaim, [supported])).toBe(true)
+  expect(gapHeld(onClaim, [abstained])).toBe(false)
+  expect(gapHeld(onClaim, [{ ...supported, claimId: 'claim-2' }])).toBe(false)
+  expect(gapHeld(onClaim, [met('mechanism', 'senior')])).toBe(false)
 })

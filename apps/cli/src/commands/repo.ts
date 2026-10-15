@@ -1,4 +1,4 @@
-import { SessionLog, linkArtifactsToClaim, replay } from '@closer/core'
+import { SessionLog, linkSnapshotToClaims, replay } from '@levelhead/core'
 import { openStore } from '../store.ts'
 import { CLAIM_SET_SESSION } from './claims.ts'
 import { GitRepository } from '../repo/git-repository.ts'
@@ -22,7 +22,7 @@ export async function repo(argv: readonly string[]): Promise<number> {
   if (path === undefined) {
     const view = replay(await store.read(REPO_SESSION))
     if (view.snapshot === null) {
-      line('no repository pinned — run: closer repo <path> [--ref <commit|branch|tag>]')
+      line('no repository pinned — run: levelhead repo <path> [--ref <commit|branch|tag>]')
       return 1
     }
     heading('pinned repository')
@@ -40,9 +40,10 @@ export async function repo(argv: readonly string[]): Promise<number> {
 
   // Repository evidence determines what deserves examination — it never proves authorship.
   const claimSet = replay(await store.read(CLAIM_SET_SESSION))
-  const evidence = [...claimSet.claims.values()]
-    .filter((claim) => claimSet.confirmedClaimIds.has(claim.id))
-    .flatMap((claim) => linkArtifactsToClaim(pinned.artifacts, claim, ids))
+  const confirmed = [...claimSet.claims.values()].filter((claim) =>
+    claimSet.confirmedClaimIds.has(claim.id),
+  )
+  const evidence = linkSnapshotToClaims(pinned.artifacts, confirmed, ids)
 
   const log = await SessionLog.open({ store, clock, ids }, REPO_SESSION)
   await log.append('state_change', {
@@ -58,6 +59,6 @@ export async function repo(argv: readonly string[]): Promise<number> {
     `  ${pinned.snapshot.fileCount} files · ${pinned.artifacts.length} artifacts · ${evidence.length} claim links`,
   )
   dim('  parsed, never executed. Evidence shows what deserves examination, not who wrote it.')
-  dim('  now try: closer session --rounds code_walkthrough')
+  dim('  now try: levelhead session --rounds code_walkthrough')
   return 0
 }

@@ -1,14 +1,16 @@
-import { replay } from '@closer/core'
-import type { Finding, GapEntry } from '@closer/contracts'
+import { replay, topicById } from '@levelhead/core'
+import type { Finding, GapEntry } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line, quote } from '../terminal.ts'
+import { topicLabel } from './catalog.ts'
 
 interface Attempted {
   at: string
   sessionId: string
   finding: Finding
   quoted: string | undefined
+  topic: string | undefined
 }
 
 // Deliberately computed, not narrated by a model — the candidate reads the change in their own words.
@@ -35,12 +37,15 @@ export async function review(argv: readonly string[]): Promise<number> {
           : finding.competency
       if (wanted !== undefined && key !== wanted) continue
       const spanId = finding.transcriptSpanIds[0]
+      const topicId = view.attempts.get(finding.attemptId)?.topicId
+      const topic = topicId === undefined ? undefined : topicById(topicId)
       const rows = history.get(key) ?? []
       rows.push({
         at: startedAt,
         sessionId,
         finding,
         quoted: view.spans.get(spanId)?.quoted,
+        topic: topic === undefined ? undefined : topicLabel(topic),
       })
       history.set(key, rows)
     }
@@ -58,12 +63,14 @@ export async function review(argv: readonly string[]): Promise<number> {
       const verdict =
         row.finding.kind === 'claim'
           ? row.finding.verdict.replace(/_/g, ' ')
-          : row.finding.kind === 'claim_abstained'
+          : row.finding.kind === 'claim_abstained' || row.finding.kind === 'competency_abstained'
             ? `abstained: ${row.finding.abstention.replace(/_/g, ' ')}`
             : row.finding.kind === 'composure'
               ? row.finding.signals.join(', ').replace(/_/g, ' ')
               : `met ${row.finding.levelMet ?? 'no level anchor'}`
-      line(`  ${row.at.slice(0, 10)}  ${verdict}`)
+      line(
+        `  ${row.at.slice(0, 10)}  ${verdict}${row.topic === undefined ? '' : ` · ${row.topic}`}`,
+      )
       if (row.quoted !== undefined) quote(row.quoted)
     }
     // First and last judgment side by side, deliberately no aggregate over them.

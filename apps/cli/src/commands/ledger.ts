@@ -1,8 +1,13 @@
-import { renderLedger, replay, spanViolations } from '@closer/core'
-import type { GapEntry } from '@closer/contracts'
+import { renderLedger, replay, spanViolations, topicById } from '@levelhead/core'
+import type { GapEntry } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line } from '../terminal.ts'
+
+export function titled(gap: GapEntry): GapEntry {
+  const topic = gap.topicId === undefined ? undefined : topicById(gap.topicId)
+  return topic === undefined ? gap : { ...gap, summary: `${topic.title}: ${gap.summary}` }
+}
 
 // A gap can open in one session and close under transfer in another, so the ledger is assembled by
 // replaying every log.
@@ -33,7 +38,7 @@ export async function ledger(): Promise<number> {
     dim('  no gaps yet — run a session.')
     return 0
   }
-  for (const row of renderLedger([...gaps.values()], quotes)) line(row)
+  for (const row of renderLedger([...gaps.values()].map(titled), quotes)) line(row)
   line('')
   // Deliberately the only number on this page — a count of broken citations, never a score.
   dim(violations === 0 ? '  every citation resolves.' : `  ${violations} citations do not resolve.`)

@@ -1,4 +1,4 @@
-import type { Artifact, Claim, Evidence } from '@closer/contracts'
+import type { Artifact, Claim, Evidence } from '@levelhead/contracts'
 import type { IdSource } from '../ports/clock.ts'
 
 export interface ArtifactMatch {
@@ -104,7 +104,7 @@ function scoreArtifact(artifact: Artifact, terms: readonly Term[]): ArtifactMatc
 // Deterministic: no clock, no randomness, ties broken by path then symbol — replay-reproducible,
 // like a policy action. An artifact that matches nothing is dropped rather than ranked last; padding
 // the list with the next file alphabetically would spend §4.8's force on a coincidence.
-export function rankArtifacts(
+export function matchArtifacts(
   artifacts: readonly Artifact[],
   claim: Claim,
   limit: number,
@@ -123,13 +123,148 @@ export function rankArtifacts(
     .slice(0, limit)
 }
 
-// What the session loop asks for: the artifacts themselves, in the order `rankArtifacts` put them.
-export function selectArtifacts(
-  artifacts: readonly Artifact[],
-  claim: Claim,
-  limit: number,
-): Artifact[] {
-  return rankArtifacts(artifacts, claim, limit).map((match) => match.artifact)
+export interface RankedArtifact {
+  artifact: Artifact
+  // The confirmed claim this code bears on, so the question can tie the file back to the résumé line.
+  claim: Claim | null
+}
+
+export interface ArtifactRankInput {
+  artifacts: readonly Artifact[]
+  evidence: readonly Evidence[]
+  // Confirmed claims, in confirmation order.
+  claims: readonly Claim[]
+}
+
+// Code the candidate did not write, or that nobody would ask them to explain.
+const SKIPPED_SEGMENTS = new Set([
+  'test',
+  'tests',
+  '__tests__',
+  'spec',
+  'specs',
+  '__mocks__',
+  'e2e',
+  'fixtures',
+  'testdata',
+  'testing',
+  'node_modules',
+  'vendor',
+  'third_party',
+  'third-party',
+  'bower_components',
+  '.venv',
+  'venv',
+  'site-packages',
+  'generated',
+  '__generated__',
+  'dist',
+  'build',
+  'out',
+  'target',
+  'coverage',
+  '.next',
+])
+
+const TEST_FILE = /[._-](test|spec)\.[^.]+$|^test_.*\.py$|^conftest\.py$/i
+const GENERATED_FILE = /\.(gen|generated|min)\.[^.]+$|\.d\.[cm]?ts$|\.pb\.go$|_pb2(_grpc)?\.py$/i
+const LOCKFILE = /[.-]lock\.(json|ya?ml)$|\.lockb?$|^go\.sum$/i
+const CONFIG_FILE =
+  /\.(json|ya?ml|toml|ini|cfg|conf|env|xml|properties)$|(^|[.-])config\.[cm]?[jt]sx?$|^\.[^.]+rc(\.[a-z]+)?$/i
+
+const SKIPPED_NAMES: readonly RegExp[] = [TEST_FILE, GENERATED_FILE, LOCKFILE, CONFIG_FILE]
+
+function skipped(artifact: Artifact): boolean {
+  if (artifact.kind !== 'file' && artifact.kind !== 'function') return true
+  const segments = artifact.path.split('/')
+  const name = segments[segments.length - 1] ?? ''
+  return (
+    segments.some((segment) => SKIPPED_SEGMENTS.has(segment)) ||
+    SKIPPED_NAMES.some((pattern) => pattern.test(name))
+  )
+}
+
+// Long enough to have a decision in it, short enough to be read aloud in one question.
+const MIN_SYMBOL_LINES = 8
+const MAX_SYMBOL_LINES = 120
+
+function sizeTier(artifact: Artifact): number {
+  if (artifact.symbol === undefined) return 2
+  const { startLine, endLine } = artifact
+  if (startLine === undefined || endLine === undefined) return 1
+  const lines = endLine - startLine + 1
+  return lines >= MIN_SYMBOL_LINES && lines <= MAX_SYMBOL_LINES ? 0 : 1
+}
+
+interface Candidate {
+  artifact: Artifact
+  claim: Claim | null
+  score: number
+  tier: number
+}
+
+// Linking alone is not enough: a pin may link every artifact to every confirmed claim, and tying a
+// file to a résumé line whose words it never mentions would put a claim in the question that the
+// code does not bear on.
+function linkedClaim(
+  artifact: Artifact,
+  claims: readonly Claim[],
+  linked: ReadonlySet<string>,
+): { claim: Claim | null; score: number } {
+  let best: { claim: Claim | null; score: number } = { claim: null, score: 0 }
+  for (const claim of claims) {
+    if (!linked.has(claim.id)) continue
+    const { score } = scoreArtifact(artifact, claimTerms(claim))
+    if (score > best.score) best = { claim, score }
+  }
+  return best
+}
+
+function spreadAcrossFiles(ranked: readonly Candidate[]): Candidate[] {
+  const seen = new Map<string, number>()
+  return ranked
+    .map((candidate, position) => {
+      const occurrence = seen.get(candidate.artifact.path) ?? 0
+      seen.set(candidate.artifact.path, occurrence + 1)
+      return { candidate, occurrence, position }
+    })
+    .sort((a, b) => a.occurrence - b.occurrence || a.position - b.position)
+    .map(({ candidate }) => candidate)
+}
+
+// What a walkthrough opens, in order: code a confirmed claim bears on first, then functions sized to
+// be explained in one answer, spread across files. Deterministic, so replay reopens the same code.
+export function rankArtifacts(input: ArtifactRankInput): RankedArtifact[] {
+  const confirmed = new Set(input.claims.map((claim) => claim.id))
+  const claimsByArtifact = new Map<string, Set<string>>()
+  for (const link of input.evidence) {
+    if (link.subject.kind !== 'claim' || link.target.kind !== 'artifact') continue
+    if (!confirmed.has(link.subject.claimId)) continue
+    const known = claimsByArtifact.get(link.target.artifactId) ?? new Set<string>()
+    claimsByArtifact.set(link.target.artifactId, known.add(link.subject.claimId))
+  }
+
+  const candidates = input.artifacts
+    .filter((artifact) => !skipped(artifact))
+    .map((artifact): Candidate => {
+      const linked = claimsByArtifact.get(artifact.id) ?? new Set<string>()
+      const { claim, score } = linkedClaim(artifact, input.claims, linked)
+      return { artifact, claim, score, tier: (claim === null ? 3 : 0) + sizeTier(artifact) }
+    })
+    .sort(
+      (a, b) =>
+        a.tier - b.tier ||
+        b.score - a.score ||
+        a.artifact.path.localeCompare(b.artifact.path) ||
+        (a.artifact.startLine ?? 0) - (b.artifact.startLine ?? 0),
+    )
+
+  const tiers = [...new Set(candidates.map((candidate) => candidate.tier))]
+  return tiers.flatMap((tier) =>
+    spreadAcrossFiles(candidates.filter((candidate) => candidate.tier === tier)).map(
+      ({ artifact, claim }) => ({ artifact, claim }),
+    ),
+  )
 }
 
 // `repository_observed` says only that the claim and artifact belong in the same question — never
@@ -146,4 +281,22 @@ export function linkArtifactsToClaim(
     target: { kind: 'artifact', artifactId: artifact.id },
     trust: 'repository_observed',
   }))
+}
+
+export const LINKS_PER_CLAIM = 10
+
+// Only code that shares terms with the claim is linked. Linking the whole snapshot would make every
+// résumé line read as backed by code.
+export function linkSnapshotToClaims(
+  artifacts: readonly Artifact[],
+  claims: readonly Claim[],
+  ids: IdSource,
+): Evidence[] {
+  return claims.flatMap((claim) =>
+    linkArtifactsToClaim(
+      matchArtifacts(artifacts, claim, LINKS_PER_CLAIM).map((match) => match.artifact),
+      claim,
+      ids,
+    ),
+  )
 }
