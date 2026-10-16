@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { LocalObjectStore } from './objects.ts'
 
 async function withStore(run: (store: LocalObjectStore, root: string) => Promise<void>) {
-  const root = await mkdtemp(join(tmpdir(), 'closer-objects-'))
+  const root = await mkdtemp(join(tmpdir(), 'levelhead-objects-'))
   try {
     await run(new LocalObjectStore(root), root)
   } finally {

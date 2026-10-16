@@ -7,7 +7,7 @@ import type {
   RenderedQuestion,
   StructuredRequest,
   StructuredResult,
-} from '@closer/core'
+} from '@levelhead/core'
 import { fakeInvocation } from './fakes.ts'
 
 // Quoted verbatim from `fixtures/resume-injection.md` so the fixture and this file can't drift apart.

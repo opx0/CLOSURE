@@ -65,11 +65,20 @@ export const CompetencyFindingSchema = Type.Object({
   levelMet: Type.Union([LevelSchema, Type.Null()]),
 })
 
+// A topic turn has no claim to abstain on, and the right to say "I cannot tell" cannot depend on there being one.
+export const CompetencyAbstentionFindingSchema = Type.Object({
+  ...findingBase,
+  kind: Type.Literal('competency_abstained'),
+  competency: CompetencySchema,
+  abstention: ClaimAbstentionSchema,
+})
+
 export const FindingSchema = Type.Union([
   ClaimFindingSchema,
   ClaimAbstentionFindingSchema,
   ComposureFindingSchema,
   CompetencyFindingSchema,
+  CompetencyAbstentionFindingSchema,
 ])
 
 type NonEmpty<T> = readonly [T, ...T[]]
@@ -87,6 +96,9 @@ export type ClaimFinding = WithCitations<Static<typeof ClaimFindingSchema>>
 export type ClaimAbstentionFinding = WithCitations<Static<typeof ClaimAbstentionFindingSchema>>
 export type ComposureFinding = WithCitations<Static<typeof ComposureFindingSchema>>
 export type CompetencyFinding = WithCitations<Static<typeof CompetencyFindingSchema>>
+export type CompetencyAbstentionFinding = WithCitations<
+  Static<typeof CompetencyAbstentionFindingSchema>
+>
 
 // The non-empty tuples above are a compile-time strengthening of the schema's `minItems: 1`, so
 // widening back to the schema type loses nothing. One helper, so no caller re-invents the cast.

@@ -1,10 +1,10 @@
-import { replay } from '@closer/core'
-import type { GapEntry } from '@closer/contracts'
+import { AREA_ROUND, replay, topicById } from '@levelhead/core'
+import type { GapEntry, Level } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line } from '../terminal.ts'
 import { CLAIM_SET_SESSION } from './claims.ts'
-import { runSession } from '@closer/core'
+import { runSession } from '@levelhead/core'
 import { fromEnv } from '../adapters/index.ts'
 import { RandomIds, SystemClock } from '../runtime.ts'
 import { terminalIo } from './session.ts'
@@ -16,11 +16,14 @@ export async function transfer(argv: readonly string[]): Promise<number> {
   const { store } = openStore(config)
 
   const drilled = new Map<string, GapEntry>()
+  const judgedAt = new Map<string, Level>()
   for (const sessionId of await store.listSessions()) {
-    for (const gap of replay(await store.read(sessionId)).gaps.values()) {
+    const view = replay(await store.read(sessionId))
+    for (const gap of view.gaps.values()) {
       const known = drilled.get(gap.id)
       if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) drilled.set(gap.id, gap)
     }
+    for (const finding of view.findings) judgedAt.set(finding.id, finding.level)
   }
 
   const at = argv.indexOf('--gap')
@@ -34,10 +37,11 @@ export async function transfer(argv: readonly string[]): Promise<number> {
     return 1
   }
 
+  const topic = target.topicId === undefined ? undefined : topicById(target.topicId)
   const claimSet = replay(await store.read(CLAIM_SET_SESSION))
   const claim = target.claimId === undefined ? undefined : claimSet.claims.get(target.claimId)
-  if (claim === undefined) {
-    line(`gap ${target.id} is not attached to a claim; transfer needs one.`)
+  if (topic === undefined && claim === undefined) {
+    line(`gap ${target.id} is not attached to a claim or a topic; transfer needs one.`)
     return 1
   }
 
@@ -47,10 +51,13 @@ export async function transfer(argv: readonly string[]): Promise<number> {
   dim('  the same idea, different constraints. Passing this is what closes the gap.')
 
   const result = await runSession({
-    claims: [claim],
-    rounds: ['project_deep_dive'],
+    claims: claim === undefined ? [] : [claim],
+    ...(topic === undefined ? {} : { topics: [topic] }),
+    rounds: [topic === undefined ? 'project_deep_dive' : AREA_ROUND[topic.area]],
     mode: 'transfer',
-    level: 'mid',
+    // Retested against the anchor it failed, not a different bar.
+    level:
+      target.findingIds.map((id) => judgedAt.get(id)).find((level) => level !== undefined) ?? 'mid',
     personaId: 'skeptic',
     pressureCeiling: 1,
     turnsPerRound: 1,
@@ -71,6 +78,6 @@ export async function transfer(argv: readonly string[]): Promise<number> {
     },
   })
 
-  dim(`session ${result.sessionId} · see it with: closer ledger`)
+  dim(`session ${result.sessionId} · see it with: levelhead ledger`)
   return 0
 }

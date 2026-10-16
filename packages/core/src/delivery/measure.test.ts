@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { DELIVERY_BOUNDARY } from '@closer/contracts'
+import { DELIVERY_BOUNDARY } from '@levelhead/contracts'
 import { LONG_PAUSE_MS, measureDelivery, renderDelivery } from './measure.ts'
 
 const turn = {

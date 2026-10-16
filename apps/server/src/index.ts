@@ -1,8 +1,8 @@
 import { Pool } from 'pg'
-import { LOCAL_OWNER_ID, type OwnerId, type Principal } from '@closer/contracts'
-import { PostgresEventStore, PostgresJobQueue, PostgresRetrieval } from '@closer/db'
-import { createLogger, startTracing } from '@closer/observability'
-import type { EventStore, JobQueuePort, RetrievalPort } from '@closer/core'
+import { LOCAL_OWNER_ID, type OwnerId, type Principal } from '@levelhead/contracts'
+import { PostgresEventStore, PostgresJobQueue, PostgresRetrieval } from '@levelhead/db'
+import { createLogger, startTracing } from '@levelhead/observability'
+import type { EventStore, JobQueuePort, RetrievalPort } from '@levelhead/core'
 import { loadConfig } from './config.ts'
 import { buildApp } from './app.ts'
 import { ownerOf } from './deps.ts'
@@ -14,9 +14,9 @@ import { RandomIds, SystemClock } from '../../cli/src/runtime.ts'
 
 const config = loadConfig()
 const { conductor, evaluator } = fromEnv(process.env)
-const logger = createLogger({ level: config.LOG_LEVEL, service: 'closer-server' })
+const logger = createLogger({ level: config.LOG_LEVEL, service: 'levelhead-server' })
 const tracing = await startTracing({
-  serviceName: 'closer-server',
+  serviceName: 'levelhead-server',
   endpoint: config.OTEL_EXPORTER_OTLP_ENDPOINT,
   enabled: config.OTEL_ENABLED,
 })
@@ -24,14 +24,14 @@ const tracing = await startTracing({
 const ids = new RandomIds()
 
 const pool =
-  config.CLOSER_STORE === 'postgres' && config.DATABASE_URL !== undefined
+  config.LEVELHEAD_STORE === 'postgres' && config.DATABASE_URL !== undefined
     ? new Pool({ connectionString: config.DATABASE_URL })
     : null
 
 const storeFor = (owner: OwnerId | Principal): EventStore => {
   const ownerId = ownerOf(owner)
   return pool === null
-    ? new JsonlEventStore(config.CLOSER_EVENT_DIR, ownerId)
+    ? new JsonlEventStore(config.LEVELHEAD_EVENT_DIR, ownerId)
     : new PostgresEventStore(pool, ownerId)
 }
 
@@ -71,9 +71,9 @@ try {
   await app.listen({ port: config.PORT, host: '0.0.0.0' })
   logger.log('info', 'server listening', {
     port: config.PORT,
-    store: config.CLOSER_STORE,
+    store: config.LEVELHEAD_STORE,
     ownerScope: LOCAL_OWNER_ID,
-    demoMode: config.CLOSER_DEMO_MODE,
+    demoMode: config.LEVELHEAD_DEMO_MODE,
   })
 } catch (error) {
   app.log.error(error)

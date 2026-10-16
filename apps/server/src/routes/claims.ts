@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto'
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { ClaimSchema, SpanSchema } from '@closer/contracts'
+import { ClaimSchema, SpanSchema } from '@levelhead/contracts'
 import {
   SessionLog,
   claimConfirmedPayload,
   claimsExtractedPayload,
   extractClaims,
   replay,
-} from '@closer/core'
+} from '@levelhead/core'
 // Imported rather than hardcoded: two callers spelling this string independently would drift.
 import { CLAIM_SET_SESSION } from '../../../cli/src/commands/claims.ts'
 import type { ServerDeps } from '../deps.ts'
@@ -19,10 +19,40 @@ const RejectedQuoteSchema = Type.Object({
   reason: Type.String(),
 })
 
-// Same two steps as `closer claims`, against the same log — a claim set extracted here is the one
-// `closer session` interrogates.
+// Same two steps as `levelhead claims`, against the same log — a claim set extracted here is the one
+// `levelhead session` interrogates.
 export function claimsRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
   return async (app) => {
+    app.get(
+      '/claims',
+      {
+        schema: {
+          summary: 'The claim set so far, each claim carrying whether the candidate confirmed it',
+          tags: ['claims'],
+          response: {
+            200: Type.Object({
+              resumeText: Type.Union([Type.String(), Type.Null()]),
+              claims: Type.Array(ClaimSchema),
+              spans: Type.Array(SpanSchema),
+            }),
+          },
+        },
+      },
+      async (request) => {
+        const events = await deps.storeFor(request.principal).read(CLAIM_SET_SESSION)
+        let resumeText: string | null = null
+        for (const event of events) {
+          if (event.kind !== 'state_change') continue
+          const change = event.payload
+          if (change.change === 'source_registered' && change.kind === 'resume') {
+            resumeText = change.text
+          }
+        }
+        const view = replay(events)
+        return { resumeText, claims: [...view.claims.values()], spans: [...view.spans.values()] }
+      },
+    )
+
     app.post(
       '/claims',
       {

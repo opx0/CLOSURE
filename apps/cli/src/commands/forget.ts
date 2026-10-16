@@ -5,8 +5,8 @@ import {
   snapshotExpiresAt,
   snapshotIsExpired,
   tombstoneFor,
-} from '@closer/core'
-import type { DeletionReason } from '@closer/contracts'
+} from '@levelhead/core'
+import type { DeletionReason } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { RandomIds, SystemClock } from '../runtime.ts'

@@ -1,5 +1,5 @@
-import { SessionLog, snapshotIsExpired, tombstoneFor } from '@closer/core'
-import type { JobRecord } from '@closer/contracts'
+import { SessionLog, snapshotIsExpired, tombstoneFor } from '@levelhead/core'
+import type { JobRecord } from '@levelhead/contracts'
 import { REPO_SESSION } from '../../../cli/src/commands/repo.ts'
 import type { HandlerContext } from './context.ts'
 

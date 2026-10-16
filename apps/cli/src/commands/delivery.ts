@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
-import { SessionLog, measureDelivery, renderDelivery, replay } from '@closer/core'
-import type { SpokenTurn } from '@closer/contracts'
+import { SessionLog, measureDelivery, renderDelivery, replay } from '@levelhead/core'
+import type { SpokenTurn } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { RandomIds, SystemClock } from '../runtime.ts'
@@ -16,7 +16,7 @@ function flag(argv: readonly string[], name: string): string | undefined {
 export async function delivery(argv: readonly string[]): Promise<number> {
   const sessionId = flag(argv, 'session')
   if (sessionId === undefined) {
-    line('closer delivery --session <id> [--from <spoken-turn.json>]')
+    line('levelhead delivery --session <id> [--from <spoken-turn.json>]')
     return 1
   }
 

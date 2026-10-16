@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { EVENT_SCHEMA_VERSION } from '@closer/contracts'
+import { EVENT_SCHEMA_VERSION } from '@levelhead/contracts'
 import { replay } from './replay.ts'
 import { UPCASTERS, UpcastGap, readEvent, upcastEvent, type Upcaster } from './upcast.ts'
 

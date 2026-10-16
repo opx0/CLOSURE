@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test'
 import type { Static, TSchema } from '@sinclair/typebox'
-import type { InvocationRecord } from '@closer/contracts'
+import type { InvocationRecord } from '@levelhead/contracts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 import type { EvaluatorPort, StructuredRequest, StructuredResult } from '../ports/evaluator.ts'
 import { extractClaims, type ExtractedClaims, type ExtractionResult } from './extract.ts'

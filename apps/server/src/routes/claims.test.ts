@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test'
 import { Buffer } from 'node:buffer'
-import { EXTRACTION, RESUME, RESUME_QUOTE, testApi } from '../testing/harness.ts'
+import { EXTRACTION, RESUME, RESUME_QUOTE, confirmedClaim, testApi } from '../testing/harness.ts'
 
 test('a résumé in, a claim set out, sourced to spans that resolve byte-for-byte', async () => {
   const { app } = await testApi({ scripted: [EXTRACTION] })
@@ -74,4 +74,34 @@ test('an extraction failure is a named failure, never an empty claim set', async
 
   expect(response.statusCode).toBe(502)
   expect((response.json() as { error: string }).error).toBe('claim extraction failed')
+})
+
+test('the claim set reads back as confirmed, with the résumé it was extracted from', async () => {
+  const { app } = await testApi({ scripted: [EXTRACTION] })
+
+  const empty = await app.inject({ method: 'GET', url: '/claims' })
+  expect(empty.statusCode).toBe(200)
+  expect(empty.json() as unknown).toEqual({ resumeText: null, claims: [], spans: [] })
+
+  const claimId = await confirmedClaim(app)
+  const body = (await app.inject({ method: 'GET', url: '/claims' })).json() as {
+    resumeText: string | null
+    claims: { id: string; assertion: string; confirmedByCandidate: boolean }[]
+    spans: { quoted: string }[]
+  }
+  expect(body.resumeText).toBe(RESUME)
+  expect(
+    body.claims.map(({ id, assertion, confirmedByCandidate }) => ({
+      id,
+      assertion,
+      confirmedByCandidate,
+    })),
+  ).toEqual([
+    {
+      id: claimId,
+      assertion: 'built a durable job queue on PostgreSQL',
+      confirmedByCandidate: true,
+    },
+  ])
+  expect(body.spans.map((span) => span.quoted)).toEqual([RESUME_QUOTE])
 })

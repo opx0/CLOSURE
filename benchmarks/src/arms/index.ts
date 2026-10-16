@@ -1,15 +1,15 @@
 export * from './arm.ts'
-export * from './closer.ts'
-export * from './closer-full.ts'
-export * from './closer-no-adaptation.ts'
+export * from './levelhead.ts'
+export * from './levelhead-full.ts'
+export * from './levelhead-no-adaptation.ts'
 export * from './fixed-sequence.ts'
 export * from './generic-llm.ts'
 export * from './repo-rag.ts'
 export * from './model-layer.ts'
 
-import { closerFullArm } from './closer-full.ts'
-import { closerHeadlessAgentArm, closerLocalModelArm } from './model-layer.ts'
-import { closerNoAdaptationArm } from './closer-no-adaptation.ts'
+import { levelheadFullArm } from './levelhead-full.ts'
+import { levelheadHeadlessAgentArm, levelheadLocalModelArm } from './model-layer.ts'
+import { levelheadNoAdaptationArm } from './levelhead-no-adaptation.ts'
 import { fixedSequenceArm } from './fixed-sequence.ts'
 import { genericLlmArm } from './generic-llm.ts'
 import { repoRagArm } from './repo-rag.ts'
@@ -21,8 +21,8 @@ export const ALL_ARMS: readonly Arm[] = [
   fixedSequenceArm,
   genericLlmArm,
   repoRagArm,
-  closerNoAdaptationArm,
-  closerFullArm,
-  closerLocalModelArm,
-  closerHeadlessAgentArm,
+  levelheadNoAdaptationArm,
+  levelheadFullArm,
+  levelheadLocalModelArm,
+  levelheadHeadlessAgentArm,
 ]

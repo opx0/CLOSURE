@@ -1,4 +1,6 @@
-import type { GapEntry, RoundKind } from '@closer/contracts'
+import { ROUND_ORDER, type GapEntry, type RoundKind } from '@levelhead/contracts'
+import { ROUND_ARCS } from '../policy/rounds.ts'
+import { AREA_ROUND, topicById } from '../topics/index.ts'
 import { dueForRetrieval, isDue, reviewDueAt } from './due.ts'
 
 export interface PlannedWork {
@@ -38,6 +40,26 @@ function dueAtFor(gap: GapEntry): string {
   return gap.status === 'closed_under_transfer' ? reviewDueAt(gap) : gap.lastTouchedAt
 }
 
+// A gap is practised where the thing it is about gets asked: a topic in its own round, composure
+// in the behavioral round, and anything from the résumé in the rounds that cross-question it on
+// that competency. A competency gap with neither a topic nor a claim was opened on the résumé side.
+function roundsFor(gap: GapEntry): RoundKind[] {
+  if (gap.topicId !== undefined) {
+    const topic = topicById(gap.topicId)
+    return topic === undefined ? [] : [AREA_ROUND[topic.area]]
+  }
+  if (gap.competency === 'composure') return ['behavioral']
+  return ROUND_ORDER.filter(
+    (round) =>
+      ROUND_ARCS[round].subject === 'claim' && ROUND_ARCS[round].arc.includes(gap.competency),
+  )
+}
+
+function suggestRounds(gaps: readonly GapEntry[]): RoundKind[] {
+  const suggested = new Set(gaps.flatMap(roundsFor))
+  return ROUND_ORDER.filter((round) => suggested.has(round))
+}
+
 export function planNextSession(input: {
   gaps: readonly GapEntry[]
   now: string
@@ -55,15 +77,8 @@ export function planNextSession(input: {
     .map((gap) => ({ gap, reason: reasonFor(gap), dueAt: dueAtFor(gap) }))
     .sort((left, right) => Date.parse(left.dueAt) - Date.parse(right.dueAt))
 
-  const competencies = new Set(work.map((entry) => entry.gap.competency))
-  const suggestedRounds: RoundKind[] = ['project_deep_dive']
-  if (competencies.has('trade_offs') || competencies.has('failure_modes')) {
-    suggestedRounds.push('design_extension')
-  }
-  if (competencies.has('composure')) suggestedRounds.push('behavioral')
-
   return {
-    suggestedRounds,
+    suggestedRounds: suggestRounds(work.map((entry) => entry.gap)),
     work,
     retrievals: dueForRetrieval(input.gaps, input.now, input.retrievalLimit),
     nothingDue: work.every(

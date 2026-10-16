@@ -9,7 +9,7 @@ import {
   type InvocationRecord,
   type Session,
   type Span,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 import { replay, type SessionView } from './replay.ts'
 import { assertValidEvent } from './validate.ts'
 
@@ -259,4 +259,52 @@ test('an empty log folds to an empty view rather than throwing', () => {
   expect(view.session).toBeNull()
   expect(view.state).toBe('selecting')
   expect(view.totals).toEqual({ costUsd: 0, tokens: 0 })
+})
+
+test('an attempt keeps its topic, and hand-offs read the old plan field and the new one alike', () => {
+  const interview: Session = {
+    ...session,
+    claimIds: [],
+    roleId: 'sde_generalist',
+    topicIds: ['os.deadlock', 'os.paging'],
+    rounds: ['cs_fundamentals'],
+  }
+  const considered = [{ action: 'END_TOPIC' as const, score: 10, reason: 'the arc is covered' }]
+  const log: AnyEvent[] = [
+    at(0, 'state_change', { change: 'session_started', session: interview }),
+    at(1, 'plan', {
+      attemptId: 'att_0',
+      considered,
+      chosen: 'END_TOPIC',
+      pressureLevel: 1,
+      nextClaimId: 'clm_2',
+    }),
+    at(2, 'plan', {
+      attemptId: 'att_1',
+      considered,
+      chosen: 'END_TOPIC',
+      pressureLevel: 1,
+      nextSubjectId: 'os.paging',
+    }),
+    at(3, 'policy_action', {
+      attemptId: 'att_2',
+      round: 'cs_fundamentals',
+      action: 'PROBE_MECHANISM',
+      pressureLevel: 1,
+      topicId: 'os.paging',
+    }),
+  ]
+  for (const event of log) assertValidEvent(event, `fixture #${event.seq}`)
+
+  const view = replay(log)
+
+  expect(view.session?.topicIds).toEqual(['os.deadlock', 'os.paging'])
+  expect(view.attempts.get('att_2')).toEqual({
+    id: 'att_2',
+    action: 'PROBE_MECHANISM',
+    pressureLevel: 1,
+    questionEventId: null,
+    topicId: 'os.paging',
+  })
+  expect(view.handoffs).toEqual(['clm_2', 'os.paging'])
 })

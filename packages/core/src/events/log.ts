@@ -3,7 +3,7 @@ import {
   type AnyEvent,
   type EventKind,
   type EventOf,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 import type { EventStore } from '../ports/event-store.ts'
 import { assertValidEvent } from './validate.ts'

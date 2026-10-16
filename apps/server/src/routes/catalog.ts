@@ -2,24 +2,32 @@ import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import {
   LEVEL_ORDER,
+  ROUND_ORDER,
   CompetencySchema,
   InterviewFormatSchema,
   LevelSchema,
   PersonaIdSchema,
   PolicyActionSchema,
   PressureLevelSchema,
+  RoleIdSchema,
   RolePackSchema,
+  RoundKindSchema,
   RubricSchema,
-} from '@closer/contracts'
+  TopicAreaSchema,
+} from '@levelhead/contracts'
 import {
   ACTIONS,
+  AREA_ROUND,
   INTERVIEW_FORMATS,
   PERSONAS,
   PRESSURE_INTENSITY,
   ROLE_PACKS,
+  ROUND_ARCS,
   RUBRIC_V1,
+  TOPICS,
+  topicSuitsRole,
   validationNotice,
-} from '@closer/core'
+} from '@levelhead/core'
 
 // Everything the policy is configured by, readable. A session is inspectable only if the thing it
 // was configured with is inspectable too.
@@ -41,6 +49,72 @@ export const catalogRoutes: FastifyPluginAsyncTypebox = async (app) => {
     },
     async () => ({
       roles: ROLE_PACKS.map((pack) => ({ pack, notice: validationNotice(pack.id) })),
+    }),
+  )
+
+  // The candidate's side of the table only: a topic's false premise, twist and expected concepts
+  // would hand over the questions and the answers.
+  app.get(
+    '/topics',
+    {
+      schema: {
+        summary: 'Roles and the authored topics an interview draws its questions from',
+        tags: ['catalog'],
+        response: {
+          200: Type.Object({
+            // In the order a loop chains them, each with what its questions are about.
+            rounds: Type.Array(
+              Type.Object({
+                kind: RoundKindSchema,
+                subject: Type.Union([
+                  Type.Literal('topic'),
+                  Type.Literal('claim'),
+                  Type.Literal('artifact'),
+                ]),
+              }),
+            ),
+            levels: Type.Array(LevelSchema),
+            roles: Type.Array(
+              Type.Object({
+                id: RoleIdSchema,
+                label: Type.String({ minLength: 1 }),
+                areas: Type.Array(TopicAreaSchema),
+                defaultRounds: Type.Array(RoundKindSchema),
+                defaultLevel: LevelSchema,
+                topicIds: Type.Array(Type.String({ minLength: 1 })),
+              }),
+            ),
+            topics: Type.Array(
+              Type.Object({
+                id: Type.String({ minLength: 1 }),
+                area: TopicAreaSchema,
+                title: Type.String({ minLength: 1 }),
+                minLevel: LevelSchema,
+                round: RoundKindSchema,
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async () => ({
+      rounds: ROUND_ORDER.map((kind) => ({ kind, subject: ROUND_ARCS[kind].subject })),
+      levels: [...LEVEL_ORDER],
+      roles: ROLE_PACKS.map((pack) => ({
+        id: pack.id,
+        label: pack.label,
+        areas: pack.areas,
+        defaultRounds: pack.defaultRounds,
+        defaultLevel: pack.defaultLevel,
+        topicIds: TOPICS.filter((topic) => topicSuitsRole(topic, pack.id)).map((topic) => topic.id),
+      })),
+      topics: TOPICS.map((topic) => ({
+        id: topic.id,
+        area: topic.area,
+        title: topic.title,
+        minLevel: topic.minLevel,
+        round: AREA_ROUND[topic.area],
+      })),
     }),
   )
 

@@ -1,11 +1,11 @@
-import { DEFAULT_SNAPSHOT_RETENTION_DAYS } from '@closer/contracts'
+import { DEFAULT_SNAPSHOT_RETENTION_DAYS } from '@levelhead/contracts'
 import type {
   CitationAvailability,
   DeletionReason,
   Evidence,
   Snapshot,
   SnapshotTombstone,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 import { resolveSpan } from '../events/sources.ts'
 import type { SessionView } from '../events/replay.ts'
 

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
-import { LOCAL_OWNER_ID } from '@closer/contracts'
-import { importJsonlDirectory } from '@closer/db'
+import { LOCAL_OWNER_ID } from '@levelhead/contracts'
+import { importJsonlDirectory } from '@levelhead/db'
 import { loadCliConfig } from '../config.ts'
 import { openStore } from '../store.ts'
 import { dim, heading, line } from '../terminal.ts'

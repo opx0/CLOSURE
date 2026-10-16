@@ -1,4 +1,4 @@
-import type { GapEntry } from '@closer/contracts'
+import type { GapEntry } from '@levelhead/contracts'
 
 // A table anyone can read and argue with, not an invented decay formula (§4.5 step 3, §15). Roughly
 // doubling, ending at a rung the row repeats forever — a gap is never "done". Chosen starting point,

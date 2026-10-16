@@ -35,5 +35,14 @@ research/.venv/
 __pycache__/
 
 # Local self-use loop state: append-only event log, private fixtures.
-.closer/
+.levelhead/
 fixtures/private/
+
+# Runtime session state written under an app directory. `.closer/` is the pre-rename directory
+# name; both are local only and never reviewed, so neither belongs in history.
+.closer/
+.levelhead/
+
+# Editor and agent-local files: local machine config, not a shared decision.
+.claude/
+.vscode/

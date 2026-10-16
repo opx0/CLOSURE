@@ -15,7 +15,7 @@ export function PrivacyPage() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `closer-export-${bundle.ownerId}.json`
+      link.download = `levelhead-export-${bundle.ownerId}.json`
       link.click()
       URL.revokeObjectURL(url)
     },
@@ -26,7 +26,7 @@ export function PrivacyPage() {
   return (
     <div className="space-y-4">
       <Panel
-        title="What CLOSER keeps"
+        title="What Levelhead keeps"
         subtitle="Stated here because a promise that is not written down is not a promise."
       >
         {promises.isLoading && <Loading what="the retention promises" />}
@@ -45,7 +45,7 @@ export function PrivacyPage() {
 
       <Panel
         title="Export"
-        subtitle="Every event, transcript, finding and gap held for you, in the form CLOSER reads."
+        subtitle="Every event, transcript, finding and gap held for you, in the form Levelhead reads."
       >
         <Button tone="primary" onClick={() => exported.mutate()} disabled={exported.isPending}>
           {exported.isPending ? 'building…' : 'Download everything'}

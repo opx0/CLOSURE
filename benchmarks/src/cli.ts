@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { rubricSetV1 } from '@closer/core'
+import { rubricSetV1 } from '@levelhead/core'
 import type { ArmContext } from './arms/arm.ts'
 import { ALL_ARMS } from './arms/index.ts'
 import { loadFixtures } from './fixtures.ts'

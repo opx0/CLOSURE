@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { EvaluationOutputSchema } from '@closer/core'
-import type { PolicyAction } from '@closer/contracts'
+import { ClaimEvaluationOutputSchema } from '@levelhead/core'
+import type { PolicyAction } from '@levelhead/contracts'
 import type {
   FindingOutcome,
   FixtureChunk,
@@ -11,7 +11,7 @@ import type {
 import { ItemRecorder, type Arm, type ArmContext } from './arm.ts'
 
 // PROJECT.md §6.1's third arm, and the opponent ticket 05 §8(b) measures provenance against:
-// retrieval over the repository, quoted back as evidence. If CLOSER's evidence-link quality isn't
+// retrieval over the repository, quoted back as evidence. If Levelhead's evidence-link quality isn't
 // separated from this arm's, the provenance machinery isn't earning its place.
 //
 // Retrieval is bag-of-words overlap — a real retrieval baseline, not a caricature, but ticket 16
@@ -137,7 +137,7 @@ export const repoRagArm: Arm = {
           promptHash: hashOf(SYSTEM + user),
           system: SYSTEM,
           user,
-          schema: EvaluationOutputSchema,
+          schema: ClaimEvaluationOutputSchema,
           schemaName: 'answer_evaluation',
           maxOutputTokens: 4096,
         })

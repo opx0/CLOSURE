@@ -19,13 +19,22 @@ export function headlineOf(finding: Finding): {
   if (finding.kind === 'claim_abstained') {
     return { text: `abstained — ${words(finding.abstention)}`, tone: 'quiet' }
   }
+  if (finding.kind === 'competency_abstained') {
+    return {
+      text: `${words(finding.competency)} — abstained, ${words(finding.abstention)}`,
+      tone: 'quiet',
+    }
+  }
   if (finding.kind === 'composure') {
     return { text: `composure — ${finding.signals.map(words).join(', ')}`, tone: 'held' }
   }
-  return {
-    text: `${words(finding.competency)} — met ${finding.levelMet ?? 'no level anchor'}`,
-    tone: finding.levelMet === null ? 'shaky' : 'held',
-  }
+  return finding.levelMet === null
+    ? { text: `${words(finding.competency)} — short of the ${finding.level} anchor`, tone: 'shaky' }
+    : { text: `${words(finding.competency)} — meets the ${finding.levelMet} anchor`, tone: 'held' }
+}
+
+export function abstained(finding: Finding): boolean {
+  return finding.kind === 'claim_abstained' || finding.kind === 'competency_abstained'
 }
 
 // No aggregate anywhere on this card, by construction: there is no field to put one in, and the
@@ -42,15 +51,26 @@ export function FindingCard({
     .map((id) => quotes.find((quote) => quote.evidenceId === id)?.quoted)
     .filter((quoted): quoted is string => quoted !== undefined)
   const headline = headlineOf(finding)
+  const focusCitations = () => {
+    if (
+      evidence.active.length !== cited.length ||
+      cited.some((quote, index) => evidence.active[index] !== quote)
+    ) {
+      evidence.focus(cited)
+    }
+  }
 
   return (
     <article
-      onMouseEnter={() => evidence.focus(cited)}
+      onMouseEnter={focusCitations}
+      // A reply can insert this card beneath a stationary pointer. Movement within it must also
+      // activate citations; relying only on the boundary-crossing event misses that layout change.
+      onMouseMove={focusCitations}
       onMouseLeave={evidence.clear}
-      onFocus={() => evidence.focus(cited)}
+      onFocus={focusCitations}
       onBlur={evidence.clear}
       tabIndex={0}
-      className="rounded-md border border-edge bg-[#111720] p-3 outline-none transition focus:border-accent/50 hover:border-accent/40"
+      className="finding-record outline-none transition"
     >
       <div className="flex flex-wrap items-center gap-2">
         <Tag tone={headline.tone}>{headline.text}</Tag>
@@ -62,22 +82,32 @@ export function FindingCard({
           rubric {finding.rubric.id} v{finding.rubric.version}
         </Tag>
       </div>
-      <p className="mt-2 text-sm">{finding.rationale}</p>
+      <p className="mt-2.5 text-sm leading-relaxed text-body">{finding.rationale}</p>
+      {abstained(finding) && (
+        <p className="mt-1.5 text-[12px] text-quiet">
+          The evaluator could not tell from this answer, so it says so rather than guess.
+        </p>
+      )}
       {cited.length === 0 ? (
         <p className="mt-2 text-xs text-broken">
           this finding cites nothing that resolved — that is a defect, not a judgment
         </p>
       ) : (
-        <ul className="mt-2 space-y-1">
-          {cited.map((quoted, index) => (
-            <li
-              key={`${quoted}-${index}`}
-              className="border-l-2 border-held/50 pl-3 text-sm text-held"
-            >
-              {quoted}
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-quiet/80">
+            your words
+          </p>
+          <ul className="mt-1 space-y-1">
+            {cited.map((quoted, index) => (
+              <li
+                key={`${quoted}-${index}`}
+                className="border-l-2 border-held/50 pl-3 text-sm text-held"
+              >
+                {quoted}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <p className="mt-2 text-[11px] text-quiet">
         {finding.modelVersion} · prompt {finding.promptVersion}

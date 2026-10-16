@@ -2,7 +2,7 @@
 apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
-  name: closer-migrate
+  name: levelhead-migrate
 spec:
   template:
     spec:
@@ -11,13 +11,13 @@ spec:
         spec:
           maxRetries: 0
           timeoutSeconds: 600
-          serviceAccountName: closer-worker@PROJECT.iam.gserviceaccount.com
+          serviceAccountName: levelhead-worker@PROJECT.iam.gserviceaccount.com
           containers:
-            - image: REGION-docker.pkg.dev/PROJECT/closer/worker:TAG
+            - image: REGION-docker.pkg.dev/PROJECT/levelhead/worker:TAG
               command: ['node', 'packages/db/src/migrate-cli.ts']
               env:
                 - name: DATABASE_URL
                   valueFrom:
                     secretKeyRef:
-                      name: closer-database-url
+                      name: levelhead-database-url
                       key: latest

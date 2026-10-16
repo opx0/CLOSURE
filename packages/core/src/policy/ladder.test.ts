@@ -5,7 +5,7 @@ import type {
   PersonaId,
   PolicyAction,
   RoundKind,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 import { ACTIONS } from './actions.ts'
 import {
   INITIAL_PRESSURE,
@@ -49,10 +49,10 @@ function walk(opts: {
   for (let turn = 0; turn < opts.turns; turn += 1) {
     const round = ROUNDS[CLAIMS.indexOf(claimId) % ROUNDS.length] as RoundKind
     const plan = selectAction({
-      confirmedClaimIds: CLAIMS,
-      currentClaimId: claimId,
+      subjectIds: CLAIMS,
+      currentSubjectId: claimId,
       askedCounts,
-      coveredForCurrentClaim: covered.get(claimId) ?? [],
+      coveredForCurrentSubject: covered.get(claimId) ?? [],
       recentActions,
       turnCount: turn,
       personaId: opts.personaId,
@@ -64,8 +64,8 @@ function walk(opts: {
     record.push({ claimId, round, level: pressure.level, plan })
 
     if (plan.chosen === 'END_TOPIC') {
-      if (plan.nextClaimId === undefined) break
-      claimId = plan.nextClaimId
+      if (plan.nextSubjectId === undefined) break
+      claimId = plan.nextSubjectId
       continue
     }
 

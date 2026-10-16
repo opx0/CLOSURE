@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { AnyEvent } from '@closer/contracts'
-import { assertValidEvent, type EventStore } from '@closer/core'
+import type { AnyEvent } from '@levelhead/contracts'
+import { assertValidEvent, type EventStore } from '@levelhead/core'
 
 const EXTENSION = '.jsonl'
 

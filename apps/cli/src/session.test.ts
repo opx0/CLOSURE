@@ -1,7 +1,8 @@
 import { test, expect } from 'bun:test'
-import { replay, resolveSpan } from '@closer/core'
-import type { Claim, GapEntry } from '@closer/contracts'
-import { runSession, type SessionIo } from '@closer/core'
+import { replay, resolveSpan, topicById } from '@levelhead/core'
+import type { PinnedContext, RepositoryPort } from '@levelhead/core'
+import type { Artifact, Claim, GapEntry, Topic } from '@levelhead/contracts'
+import { runSession, type SessionIo } from '@levelhead/core'
 import {
   FixedClock,
   MemoryEventStore,
@@ -9,6 +10,10 @@ import {
   ScriptedEvaluator,
   SeqIds,
 } from './testing/fakes.ts'
+import { citationFailures, runHarnessSession } from './testing/harness.ts'
+import { topicLabel } from './commands/catalog.ts'
+import { titled } from './commands/ledger.ts'
+import { excerpt } from './commands/session.ts'
 
 const CLAIM: Claim = {
   id: 'claim_0001',
@@ -306,5 +311,153 @@ test('a due gap comes back unannounced, and failing it reopens the row', async (
   )
   expect(retrievalTurn?.kind === 'policy_action' && retrievalTurn.payload.action).toBe(
     'TEST_FAILURE_MODE',
+  )
+})
+
+function topic(id: string): Topic {
+  const found = topicById(id)
+  if (found === undefined) throw new Error(`no topic ${id} in the catalog`)
+  return found
+}
+
+test('an interview with no résumé asks a labelled topic and cites the answer', async () => {
+  const deadlock = topic('os.deadlock')
+  const conductor = new ScriptedConductor(['Two threads, two locks: how do they end up stuck?'])
+  const { result, io } = await runHarnessSession({
+    claims: [],
+    rounds: ['cs_fundamentals'],
+    topics: [deadlock],
+    level: 'junior',
+    answers: ['Each one holds a lock and waits for the other. I am not sure how you prevent it.'],
+    conductor,
+    evaluator: new ScriptedEvaluator([
+      {
+        findings: [
+          {
+            kind: 'competency',
+            competency: 'mechanism',
+            levelMet: null,
+            rationale: 'hold-and-wait is named; breaking the cycle is not',
+            confidence: 0.7,
+            quotes: ['I am not sure how you prevent it'],
+          },
+        ],
+      },
+    ]),
+  })
+
+  const [asked] = io.asked
+  expect(asked?.text).toBe('Two threads, two locks: how do they end up stuck?')
+  expect(asked?.meta.topic).toEqual({ id: 'os.deadlock', area: 'os', title: 'Deadlock' })
+  expect(asked?.meta.topic === undefined ? '' : topicLabel(asked.meta.topic)).toBe('os · Deadlock')
+  expect(conductor.calls[0]?.claim).toBeNull()
+  expect(conductor.calls[0]?.topic).toEqual({
+    id: 'os.deadlock',
+    area: 'os',
+    title: 'Deadlock',
+    ask: deadlock.ask,
+  })
+  expect(result.view.session?.claimIds).toEqual([])
+  expect(result.view.session?.topicIds).toEqual(['os.deadlock'])
+
+  const [finding] = result.view.findings
+  expect(finding?.kind).toBe('competency')
+  expect(citationFailures(result.view)).toEqual([])
+  expect(result.view.spans.get(finding?.transcriptSpanIds[0] ?? '')?.quoted).toBe(
+    'I am not sure how you prevent it',
+  )
+
+  const gaps = [...result.view.gaps.values()]
+  expect(gaps.map((gap) => [gap.topicId, gap.claimId, gap.status])).toEqual([
+    ['os.deadlock', undefined, 'open'],
+  ])
+  expect(gaps.map((gap) => titled(gap).summary)).toEqual([
+    'Deadlock: hold-and-wait is named; breaking the cycle is not',
+  ])
+})
+
+test('a walkthrough with a pinned repository and no résumé opens the code it asks about', async () => {
+  const code = [
+    'export async function claimJob(db: Db) {',
+    '  const lease = Date.now() + 30_000',
+    '  return db.claim(lease)',
+    '}',
+  ].join('\n')
+  const artifact = (id: string, path: string, symbol: string, startLine: number): Artifact => ({
+    id,
+    snapshotId: 'snap_1',
+    kind: 'function',
+    path,
+    symbol,
+    startLine,
+    endLine: startLine + 3,
+  })
+  const repository: RepositoryPort = {
+    async pin() {
+      throw new Error('a session never pins')
+    },
+    async read(opened) {
+      return opened.id === 'art_claim' ? code : null
+    },
+  }
+  const pinned: PinnedContext = {
+    snapshot: {
+      id: 'snap_1',
+      repoPath: '/work/queue',
+      commit: 'abc123',
+      pinnedAt: '2026-09-24T08:00:00.000Z',
+      fileCount: 2,
+    },
+    artifacts: [
+      artifact('art_test', 'src/queue.test.ts', 'claimsOnce', 1),
+      artifact('art_claim', 'src/queue.ts', 'claimJob', 10),
+    ],
+    evidence: [],
+    repository,
+  }
+  const conductor = new ScriptedConductor(['In claimJob, what happens when the lease runs out?'])
+
+  const { result, io } = await runHarnessSession({
+    claims: [],
+    rounds: ['code_walkthrough'],
+    pinned,
+    answers: ['Another worker claims it. We never checked for a double completion.'],
+    conductor,
+    evaluator: new ScriptedEvaluator([
+      {
+        findings: [
+          {
+            kind: 'competency',
+            competency: 'failure_modes',
+            levelMet: null,
+            rationale: 'the expiry is described; the duplicate completion is not handled',
+            confidence: 0.75,
+            quotes: ['We never checked for a double completion'],
+          },
+        ],
+      },
+    ]),
+  })
+
+  const shown = io.asked[0]?.meta.artifact
+  expect(shown === undefined ? undefined : excerpt(shown)).toEqual({
+    where: 'src/queue.ts · claimJob · lines 10–13',
+    lines: [
+      '10 │ export async function claimJob(db: Db) {',
+      '11 │   const lease = Date.now() + 30_000',
+      '12 │   return db.claim(lease)',
+      '13 │ }',
+    ],
+  })
+  expect(conductor.calls[0]?.artifact?.code).toBe(code)
+  expect(conductor.calls[0]?.claim).toBeNull()
+  expect(result.view.session?.claimIds).toEqual([])
+  expect(result.view.session?.snapshotId).toBe('snap_1')
+
+  const [finding] = result.view.findings
+  expect(finding?.kind).toBe('competency')
+  expect(citationFailures(result.view)).toEqual([])
+  expect(result.view.spans.get(finding?.transcriptSpanIds[0] ?? '')?.quoted).toBe(
+    'We never checked for a double completion',
   )
 })

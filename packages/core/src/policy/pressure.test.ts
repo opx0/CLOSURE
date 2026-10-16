@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import type { ComposureSignal } from '@closer/contracts'
+import type { ComposureSignal } from '@levelhead/contracts'
 import { INITIAL_PRESSURE, nextPressure, type PressureState } from './pressure.ts'
 
 const simulation = { mode: 'simulation', ceiling: 3 } as const

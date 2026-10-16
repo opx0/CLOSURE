@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
-import { PostgresJobQueue, idempotencyKeyFor } from '@closer/db'
-import type { JobKind } from '@closer/contracts'
+import { PostgresJobQueue, idempotencyKeyFor } from '@levelhead/db'
+import type { JobKind } from '@levelhead/contracts'
 import { loadCliConfig } from '../config.ts'
 import { RandomIds } from '../runtime.ts'
 import { dim, heading, line } from '../terminal.ts'
@@ -45,7 +45,7 @@ export async function jobs(argv: readonly string[]): Promise<number> {
             return {
               kind: enqueue,
               fixturesDir: flag(argv, 'fixtures') ?? 'fixtures/benchmark',
-              outDir: flag(argv, 'out') ?? '.closer/benchmarks',
+              outDir: flag(argv, 'out') ?? '.levelhead/benchmarks',
               portsModule: flag(argv, 'ports') ?? 'apps/cli/src/benchmark-ports.ts',
               bar: flag(argv, 'bar') === 'flagship' ? 'flagship' : 'self_use',
             }

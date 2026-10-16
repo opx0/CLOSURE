@@ -1,28 +1,28 @@
 services:
   db:
     image: postgres:18
-    container_name: closer-db
+    container_name: levelhead-db
     environment:
-      POSTGRES_USER: closer
-      POSTGRES_PASSWORD: closer
-      POSTGRES_DB: closer
+      POSTGRES_USER: levelhead
+      POSTGRES_PASSWORD: levelhead
+      POSTGRES_DB: levelhead
     ports:
       - '5432:5432'
     volumes:
       # Postgres 18 images reject a mount at /var/lib/postgresql/data and ask for a single mount at
       # /var/lib/postgresql instead. With the old path the container refuses to start, so `db:up`
       # silently never worked.
-      - closer-db-data:/var/lib/postgresql
+      - levelhead-db-data:/var/lib/postgresql
       - ./sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U closer -d closer']
+      test: ['CMD-SHELL', 'pg_isready -U levelhead -d levelhead']
       interval: 5s
       timeout: 5s
       retries: 10
 
   llama:
     image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
-    container_name: closer-llama
+    container_name: levelhead-llama
     profiles: ['models']
     command: >
       -hf ${LLAMA_HF_REPO:-Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M}
@@ -35,5 +35,5 @@ services:
       - llama-cache:/root/.cache/llama.cpp
 
 volumes:
-  closer-db-data:
+  levelhead-db-data:
   llama-cache:

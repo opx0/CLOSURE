@@ -1,5 +1,5 @@
 import { dirname, basename } from 'node:path'
-import { buildExportBundle } from '@closer/core'
+import { buildExportBundle } from '@levelhead/core'
 import { LocalObjectStore } from '../store/objects.ts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
@@ -28,7 +28,7 @@ export async function exportAll(argv: readonly string[]): Promise<number> {
       sessions,
     })
 
-    const destination = flag(argv, 'out') ?? `.closer/exports/${config.ownerId}.json`
+    const destination = flag(argv, 'out') ?? `.levelhead/exports/${config.ownerId}.json`
     // Through the object-store port (ADR-017), so the same code writes to a bucket the day the
     // deployment has one.
     const objects = new LocalObjectStore(dirname(destination))
@@ -43,7 +43,7 @@ export async function exportAll(argv: readonly string[]): Promise<number> {
       `  ${bundle.sessions.length} sessions · ${events} events · ${findings} findings · ${written.bytes} bytes`,
     )
     dim(`  sha256 ${written.contentHash.slice(0, 16)}`)
-    dim('  this is everything CLOSER holds about you, in the form it reads it.')
+    dim('  this is everything Levelhead holds about you, in the form it reads it.')
     return 0
   } finally {
     await close()

@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import { PRESSURE_ACTIONS, isPressureAction, type PolicyAction } from '@closer/contracts'
+import { PRESSURE_ACTIONS, isPressureAction, type PolicyAction } from '@levelhead/contracts'
 import { ACTIONS, ACTION_ORDER } from './actions.ts'
 import { PRESSURE_INTENSITY } from './pressure.ts'
 

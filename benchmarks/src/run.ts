@@ -1,6 +1,6 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { ClaimVerdict } from '@closer/contracts'
+import type { ClaimVerdict } from '@levelhead/contracts'
 import type {
   ArmId,
   ArmMetrics,
@@ -217,7 +217,7 @@ async function nextRunDir(outDir: string, runId: string): Promise<string> {
 // writing the report, and no branch that inspects the numbers before deciding what to keep.
 export async function runBenchmark(input: RunInput): Promise<RunOutput> {
   const startedAt = input.context.clock.now()
-  const armUnderTest: ArmId = input.armUnderTest ?? 'closer_full'
+  const armUnderTest: ArmId = input.armUnderTest ?? 'levelhead_full'
   const humans = humanRatingsMatrix(input.labels)
   const humanHuman = alphaInterval(humans, input.seed)
 
@@ -313,7 +313,8 @@ export async function runBenchmark(input: RunInput): Promise<RunOutput> {
         : summary(under),
     baselines: baselines.map(summary),
     ablation:
-      reports.filter((report) => report.armId === 'closer_no_adaptation').map(summary)[0] ?? null,
+      reports.filter((report) => report.armId === 'levelhead_no_adaptation').map(summary)[0] ??
+      null,
     repoRag: reports.filter((report) => report.armId === 'repo_rag').map(summary)[0] ?? null,
     agreement: {
       modelHuman: under?.judgment.modelHumanAlpha ?? null,
@@ -392,7 +393,7 @@ export async function runBenchmark(input: RunInput): Promise<RunOutput> {
       'Ticket 05 section 7: this report was written by the run that produced it. There is no editorial step between running and publishing, and a re-run is published in addition, never instead.',
       ...(input.fixtures.synthetic
         ? [
-            'SYNTHETIC FIXTURE DATA. Every number here was produced over constructed inputs with scripted model ports. It is a check of the machinery and is not a result about CLOSER or about any arm.',
+            'SYNTHETIC FIXTURE DATA. Every number here was produced over constructed inputs with scripted model ports. It is a check of the machinery and is not a result about Levelhead or about any arm.',
           ]
         : []),
     ],

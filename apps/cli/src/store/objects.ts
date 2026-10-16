@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { Buffer } from 'node:buffer'
-import type { ObjectStorePort, StoredObject } from '@closer/core'
+import type { ObjectStorePort, StoredObject } from '@levelhead/core'
 
 // ADR-017: the domain talks to an object store, the deployment decides what backs it. This is the
 // development adapter — the local filesystem, rooted at one directory. Swapping in S3-compatible

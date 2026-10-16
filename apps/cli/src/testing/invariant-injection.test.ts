@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { extractClaims, spanViolations } from '@closer/core'
-import type { Claim } from '@closer/contracts'
+import { extractClaims, spanViolations } from '@levelhead/core'
+import type { Claim } from '@levelhead/contracts'
 import { FixedClock, SeqIds } from './fakes.ts'
 import {
   INJECTED_INSTRUCTIONS,
@@ -180,7 +180,7 @@ test('the boundary, stated: a compromised model that cites real words still gets
   expect(claimFindings[0]?.verdict).toBe('supported')
   expect(claimFindings[0]?.confidence).toBe(1)
 
-  // The edge of the invariant, made executable: CLOSER attaches the verdict to checkable bytes, but
+  // The edge of the invariant, made executable: Levelhead attaches the verdict to checkable bytes, but
   // doesn't claim a captured model is truthful — detecting a steered verdict is the benchmark's job.
   const quoted = claimFindings[0]!.transcriptSpanIds.map((id) => result.view.spans.get(id)?.quoted)
   expect(quoted).toEqual([REAL_QUOTE])

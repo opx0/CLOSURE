@@ -1,9 +1,10 @@
-import { planNextSession, replay } from '@closer/core'
-import type { GapEntry } from '@closer/contracts'
+import { planNextSession, replay, topicById } from '@levelhead/core'
+import type { GapEntry } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { SystemClock } from '../runtime.ts'
 import { dim, heading, line } from '../terminal.ts'
+import { topicLabel } from './catalog.ts'
 
 const REASON: Record<string, string> = {
   drill_the_open_gap: 'open — drill it',
@@ -43,13 +44,18 @@ export async function next(argv: readonly string[]): Promise<number> {
       return 0
     }
     for (const entry of plan.work) {
+      const topic = entry.gap.topicId === undefined ? undefined : topicById(entry.gap.topicId)
       line(`  ${entry.dueAt.slice(0, 10)}  ${entry.gap.summary}`)
-      dim(`            ${entry.gap.competency} · ${REASON[entry.reason] ?? entry.reason}`)
+      dim(
+        `            ${topic === undefined ? '' : `${topicLabel(topic)} · `}${entry.gap.competency} · ${REASON[entry.reason] ?? entry.reason}`,
+      )
     }
 
     line('')
-    dim(`  suggested rounds: ${plan.suggestedRounds.join(', ')}`)
-    dim(`  closer session --rounds ${plan.suggestedRounds.join(',')}`)
+    if (plan.suggestedRounds.length > 0) {
+      dim(`  suggested rounds: ${plan.suggestedRounds.join(', ')}`)
+      dim(`  levelhead session --rounds ${plan.suggestedRounds.join(',')}`)
+    }
     if (plan.retrievals.length > 0) {
       dim(
         `  ${plan.retrievals.length} of these arrive inside the session unannounced — that is deliberate.`,

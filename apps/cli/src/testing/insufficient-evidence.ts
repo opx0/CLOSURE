@@ -1,4 +1,4 @@
-import type { Claim } from '@closer/contracts'
+import type { Claim } from '@levelhead/contracts'
 
 // `cue` is the substring an abstaining evaluator cites, so the abstention is evidenced like any finding.
 export interface InsufficientEvidenceCase {
@@ -92,5 +92,8 @@ export function neverAbstains(cue: string): unknown {
 // Computed by code from existing findings — never a number the model chose.
 export function abstentionRate(kinds: readonly string[]): number {
   if (kinds.length === 0) return 0
-  return kinds.filter((kind) => kind === 'claim_abstained').length / kinds.length
+  return (
+    kinds.filter((kind) => kind === 'claim_abstained' || kind === 'competency_abstained').length /
+    kinds.length
+  )
 }

@@ -1,4 +1,4 @@
-import type { InterviewFormat, Level, PersonaId, RoundKind } from '@closer/contracts'
+import type { InterviewFormat, Level, PersonaId, RoundKind } from '@levelhead/contracts'
 
 const NOT_AFFILIATED =
   'Derived from the named published guidance only. Not affiliated with, endorsed by, or a reproduction of any company’s real interview loop, and no company’s private material is used.'
@@ -7,21 +7,21 @@ const AMAZON_GUIDE = {
   publisher: 'Amazon',
   title: 'Interview prep — software development topics',
   url: 'https://amazon.jobs/content/en/how-we-hire/interview-prep/software-development-topics',
-  readOn: '2026-09-03',
+  readOn: '2026-09-24',
 }
 
 const META_GUIDE = {
   publisher: 'Meta',
   title: 'Preparing for your software engineering interview at Meta',
   url: 'https://www.metacareers.com/blog/preparing-for-your-software-engineering-interview-at-meta/',
-  readOn: '2026-09-03',
+  readOn: '2026-09-24',
 }
 
 const MICROSOFT_GUIDE = {
   publisher: 'Microsoft',
   title: 'Hiring tips — technical interviewing',
   url: 'https://careers.microsoft.com/v2/global/en/hiring-tips/technical-interviewing',
-  readOn: '2026-09-03',
+  readOn: '2026-09-24',
 }
 
 const OPENAI_GUIDE = {
@@ -50,14 +50,15 @@ export const INTERVIEW_FORMATS: readonly InterviewFormat[] = [
     defaultLevel: 'mid',
     rounds: [
       round('behavioral', 'skeptic', 6, 2, 'what decision was yours alone, and what did it cost'),
-      round('project_deep_dive', 'bar_raiser', 6, 2, 'mechanism and the failure modes you own'),
       round(
-        'design_extension',
+        'cs_fundamentals',
         'bar_raiser',
         5,
         2,
-        'scale the thing you built and defend the change',
+        'object-oriented design, databases, operating systems and internet topics, applied',
       ),
+      round('problem_solving', 'bar_raiser', 5, 2, 'approach, analyse, then solve, out loud'),
+      round('system_design', 'bar_raiser', 5, 2, 'design it, then scale it and defend the change'),
     ],
   },
   {
@@ -67,9 +68,15 @@ export const INTERVIEW_FORMATS: readonly InterviewFormat[] = [
     disclaimer: NOT_AFFILIATED,
     defaultLevel: 'senior',
     rounds: [
-      round('project_deep_dive', 'collaborator', 5, 1, 'walk the system you actually built'),
-      round('design_extension', 'bar_raiser', 7, 3, 'constraints change fast; hold the thread'),
-      round('behavioral', 'collaborator', 4, 1, 'collaboration evidence, not adjectives'),
+      round('problem_solving', 'collaborator', 5, 1, 'data structures and algorithms, reasoned'),
+      round('system_design', 'bar_raiser', 7, 3, 'constraints change fast; hold the thread'),
+      round(
+        'behavioral',
+        'collaborator',
+        4,
+        1,
+        'what you built, and what you could have done better',
+      ),
     ],
   },
   {
@@ -79,9 +86,9 @@ export const INTERVIEW_FORMATS: readonly InterviewFormat[] = [
     disclaimer: NOT_AFFILIATED,
     defaultLevel: 'mid',
     rounds: [
-      round('project_deep_dive', 'collaborator', 6, 1, 'assumptions stated before solutions'),
-      round('code_walkthrough', 'skeptic', 5, 2, 'read your own code back and defend it'),
-      round('design_extension', 'skeptic', 5, 2, 'what you would change now, and why'),
+      round('problem_solving', 'collaborator', 6, 1, 'assumptions stated before solutions'),
+      round('cs_fundamentals', 'skeptic', 5, 2, 'the layered network model and its protocols'),
+      round('system_design', 'skeptic', 5, 2, 'resiliency and availability, and the corner cases'),
     ],
   },
   {

@@ -7,7 +7,7 @@ import {
   type Rubric,
   type RubricRef,
   type RubricSet,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 
 // The versioned unit is one rubric per scale (ticket 11) — this moves per rubric, never for the set.
 const V1 = 1

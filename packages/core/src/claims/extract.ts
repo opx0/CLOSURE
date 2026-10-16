@@ -1,6 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox'
-import { ClaimTypeSchema, type Claim, type InvocationRecord, type Span } from '@closer/contracts'
-import { claimExtractionPrompt } from '@closer/prompts'
+import { ClaimTypeSchema, type Claim, type InvocationRecord, type Span } from '@levelhead/contracts'
+import { claimExtractionPrompt } from '@levelhead/prompts'
 import { locateQuote } from '../events/sources.ts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 import type { EvaluatorPort, StructuredFailure } from '../ports/evaluator.ts'

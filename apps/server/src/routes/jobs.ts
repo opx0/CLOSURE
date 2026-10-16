@@ -1,13 +1,13 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { JobKindSchema, JobRecordSchema } from '@closer/contracts'
-import { idempotencyKeyFor } from '@closer/db'
+import { JobKindSchema, JobRecordSchema } from '@levelhead/contracts'
+import { idempotencyKeyFor } from '@levelhead/db'
 import type { ServerDeps } from '../deps.ts'
 import { ErrorSchema } from './shared.ts'
 
 const NO_QUEUE = {
   error: 'no durable queue is configured',
-  detail: 'set CLOSER_STORE=postgres and DATABASE_URL; the file-backed store has no job table',
+  detail: 'set LEVELHEAD_STORE=postgres and DATABASE_URL; the file-backed store has no job table',
 }
 
 // Work that must survive a crash goes here rather than into a request that might not finish
@@ -55,34 +55,6 @@ export function jobRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           return reply.code(404).send({ error: 'no such job', detail: request.params.id })
         }
         return { job }
-      },
-    )
-
-    app.post(
-      '/snapshots',
-      {
-        schema: {
-          summary: 'Queue a repository ingestion; parsing runs isolated, never in this process',
-          tags: ['jobs'],
-          body: Type.Object({
-            repoPath: Type.String({ minLength: 1 }),
-            ref: Type.Optional(Type.String({ minLength: 1 })),
-            sessionId: Type.Optional(Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$' })),
-          }),
-          response: { 202: Type.Object({ job: JobRecordSchema }), 503: ErrorSchema },
-        },
-      },
-      async (request, reply) => {
-        if (deps.queue === null) return reply.code(503).send(NO_QUEUE)
-        const ref = request.body.ref ?? 'HEAD'
-        const sessionId = request.body.sessionId ?? 'repo'
-        const job = await deps.queue.enqueue({
-          ownerId: request.principal.ownerId,
-          kind: 'ingest_repository',
-          payload: { kind: 'ingest_repository', repoPath: request.body.repoPath, ref, sessionId },
-          idempotencyKey: idempotencyKeyFor('ingest_repository', [request.body.repoPath, ref]),
-        })
-        return reply.code(202).send({ job })
       },
     )
 

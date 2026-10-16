@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import type { JobRecord } from '@closer/contracts'
+import type { JobRecord } from '@levelhead/contracts'
 import type { HandlerContext } from './context.ts'
 
 const BENCHMARK_CLI = fileURLToPath(new URL('../../../../benchmarks/src/cli.ts', import.meta.url))

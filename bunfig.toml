@@ -1,4 +1,4 @@
-# Bun is the package manager, workspace tool, and dev/test runner for CLOSER.
+# Bun is the package manager, workspace tool, and dev/test runner for Levelhead.
 # Node.js 24 is the production runtime; Bun does not execute production code.
 
 [install]

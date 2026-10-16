@@ -1,4 +1,4 @@
-import type { ClaimType, ClaimVerdict } from '@closer/contracts'
+import type { ClaimType, ClaimVerdict } from '@levelhead/contracts'
 import type {
   ExtractedClaimOutcome,
   ExtractionOutcome,

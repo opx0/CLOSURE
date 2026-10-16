@@ -1,12 +1,14 @@
 import { Type, type Static, type TSchema } from '@sinclair/typebox'
 import { ClaimSchema } from './claim.ts'
 import { DeliveryReportSchema } from './delivery.ts'
+import { ProsodyReportSchema } from './prosody.ts'
+import { KinematicsReportSchema } from './kinematics.ts'
 import { SnapshotTombstoneSchema } from './retention.ts'
 import { ArtifactSchema, EvidenceSchema, SpanSchema } from './provenance.ts'
 import { RoundKindSchema } from './round.ts'
 import { SnapshotSchema } from './snapshot.ts'
 import { FindingSchema } from './finding.ts'
-import { GapEntrySchema, GapStatusSchema } from './gap.ts'
+import { GapEntrySchema, GapStatusSchema, PracticeOutcomeSchema } from './gap.ts'
 import { InvocationRecordSchema } from './invocation.ts'
 import { PressureLevelSchema, SessionSchema, SessionStateSchema } from './session.ts'
 
@@ -93,7 +95,9 @@ export const PlanRecordedSchema = eventOf(
     ),
     chosen: PolicyActionSchema,
     pressureLevel: PressureLevelSchema,
-    // Present only with END_TOPIC — auditable in the plan that made the move, not inferred from the next action's claimId.
+    // Present only with END_TOPIC — auditable in the plan that made the move, not inferred from the next action.
+    nextSubjectId: Type.Optional(Type.String({ minLength: 1 })),
+    // Written by logs from before topics existed, when every subject was a claim. Read, never written.
     nextClaimId: Type.Optional(Type.String({ minLength: 1 })),
   }),
 )
@@ -105,6 +109,7 @@ export const PolicyActionSelectedSchema = eventOf(
     action: PolicyActionSchema,
     pressureLevel: PressureLevelSchema,
     claimId: Type.Optional(Type.String({ minLength: 1 })),
+    topicId: Type.Optional(Type.String({ minLength: 1 })),
     round: RoundKindSchema,
     artifactId: Type.Optional(Type.String({ minLength: 1 })),
   }),
@@ -194,6 +199,9 @@ export const StateChangeSchema = eventOf(
       index: Type.Integer({ minimum: 0 }),
       // The line the interviewer opened the round with — rendered, so it's logged like everything else rendered.
       brief: Type.Optional(Type.String({ minLength: 1 })),
+      // Present whenever the line was rendered, including a render refused as unusable: the call
+      // was still made, and replay and cost both need it.
+      briefInvocation: Type.Optional(InvocationRecordSchema),
     }),
     // Snapshot is deletable (§7); the code itself is never copied here, only what was found in it.
     Type.Object({
@@ -203,6 +211,10 @@ export const StateChangeSchema = eventOf(
       evidence: Type.Array(EvidenceSchema),
     }),
     Type.Object({ change: Type.Literal('gap_opened'), gap: GapEntrySchema }),
+    Type.Object({
+      change: Type.Literal('practice_outcome'),
+      ...PracticeOutcomeSchema.properties,
+    }),
     Type.Object({
       change: Type.Literal('gap_status'),
       gapId: Type.String({ minLength: 1 }),
@@ -231,6 +243,16 @@ export const StateChangeSchema = eventOf(
     Type.Object({
       change: Type.Literal('delivery_recorded'),
       report: DeliveryReportSchema,
+    }),
+    // The performance lane, recorded beside the interview exactly as delivery is. Baselines, notes
+    // and drills are all derived from these two by replay, so none of them is an event of its own.
+    Type.Object({
+      change: Type.Literal('prosody_recorded'),
+      report: ProsodyReportSchema,
+    }),
+    Type.Object({
+      change: Type.Literal('kinematics_recorded'),
+      report: KinematicsReportSchema,
     }),
     Type.Object({ change: Type.Literal('session_closed'), reason: Type.String({ minLength: 1 }) }),
   ]),

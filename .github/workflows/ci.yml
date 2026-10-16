@@ -48,18 +48,18 @@ jobs:
         # a different database.
         image: postgres:18
         env:
-          POSTGRES_USER: closer
-          POSTGRES_PASSWORD: closer
-          POSTGRES_DB: closer
+          POSTGRES_USER: levelhead
+          POSTGRES_PASSWORD: levelhead
+          POSTGRES_DB: levelhead
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U closer -d closer"
+          --health-cmd "pg_isready -U levelhead -d levelhead"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://closer:closer@localhost:5432/closer
+      DATABASE_URL: postgres://levelhead:levelhead@localhost:5432/levelhead
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

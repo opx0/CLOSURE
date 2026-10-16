@@ -1,4 +1,4 @@
-import type { Claim, InvocationRecord, Span, StateChangeOf } from '@closer/contracts'
+import type { Claim, InvocationRecord, Span, StateChangeOf } from '@levelhead/contracts'
 
 // The envelope (session, seq, causedBy, occurredAt) belongs to whoever appends — core only builds the payload.
 export function claimsExtractedPayload(input: {

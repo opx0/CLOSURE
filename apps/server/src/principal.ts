@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { LOCAL_PRINCIPAL, type Principal, type PrincipalRole } from '@closer/contracts'
+import { LOCAL_PRINCIPAL, type Principal, type PrincipalRole } from '@levelhead/contracts'
 
 export interface TokenGrant {
   ownerId: string
@@ -26,18 +26,26 @@ export function parseTokens(spec: string): TokenGrant[] {
     const role = (hasRole ? parts[1] : 'candidate') as PrincipalRole
     const token = (hasRole ? parts.slice(2) : parts.slice(1)).join(':')
     if (ownerId === '' || token === '') {
-      throw new Error(`CLOSER_API_TOKENS entry ${JSON.stringify(trimmed)} is not owner:token`)
+      throw new Error(`LEVELHEAD_API_TOKENS entry ${JSON.stringify(trimmed)} is not owner:token`)
     }
     grants.push({ ownerId, role, digest: digestOf(token) })
   }
   return grants
 }
 
+const SHOWCASE_GUEST: Principal = {
+  ownerId: 'showcase',
+  role: 'showcase',
+  label: 'showcase visitor',
+}
+
 export class Principals {
   readonly #grants: readonly TokenGrant[]
+  readonly #showcase: boolean
 
-  constructor(spec: string) {
+  constructor(spec: string, options: { showcase?: boolean } = {}) {
     this.#grants = parseTokens(spec)
+    this.#showcase = options.showcase ?? false
   }
 
   get open(): boolean {
@@ -46,8 +54,9 @@ export class Principals {
 
   // With no tokens configured the server is the developer's own machine and every caller is the
   // local owner. With tokens configured an unrecognised one is nobody, never a fallback to local.
+  // A showcase instance is public, so with no tokens every caller is a visitor, never the operator.
   resolve(header: string | undefined): Principal | null {
-    if (this.open) return LOCAL_PRINCIPAL
+    if (this.open) return this.#showcase ? SHOWCASE_GUEST : LOCAL_PRINCIPAL
     if (header === undefined) return null
 
     const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : ''

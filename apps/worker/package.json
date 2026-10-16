@@ -1,5 +1,5 @@
 {
-  "name": "@closer/worker",
+  "name": "@levelhead/worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,11 +9,11 @@
     "typecheck": "tsc --noEmit -p ../../tsconfig.json"
   },
   "dependencies": {
-    "@closer/cli": "workspace:*",
-    "@closer/contracts": "workspace:*",
-    "@closer/core": "workspace:*",
-    "@closer/db": "workspace:*",
-    "@closer/observability": "workspace:*",
+    "@levelhead/cli": "workspace:*",
+    "@levelhead/contracts": "workspace:*",
+    "@levelhead/core": "workspace:*",
+    "@levelhead/db": "workspace:*",
+    "@levelhead/observability": "workspace:*",
     "@sinclair/typebox": "0.34.52",
     "pg": "8.23.0"
   }

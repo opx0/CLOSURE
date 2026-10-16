@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { LOCAL_OWNER_ID } from '@closer/contracts'
+import { LOCAL_OWNER_ID } from '@levelhead/contracts'
 import { Principals, parseTokens } from './principal.ts'
 
 test('with no tokens configured the server is single-owner and local', () => {
@@ -7,6 +7,15 @@ test('with no tokens configured the server is single-owner and local', () => {
 
   expect(principals.open).toBe(true)
   expect(principals.resolve(undefined)?.ownerId).toBe(LOCAL_OWNER_ID)
+})
+
+// A showcase instance is deployed with no tokens and open to the internet; the local operator's
+// reach (pinning a path on the server's disk) must not come with an empty Authorization header.
+test('a showcase instance with no tokens configured makes every caller a visitor', () => {
+  const principals = new Principals('', { showcase: true })
+
+  expect(principals.resolve(undefined)?.role).toBe('showcase')
+  expect(principals.resolve('Bearer anything')?.role).toBe('showcase')
 })
 
 // An unrecognised token must be nobody. Falling back to the local owner would hand a stranger the

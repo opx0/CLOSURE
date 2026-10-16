@@ -2,8 +2,8 @@ import { afterAll, expect, test } from 'bun:test'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { EVENT_SCHEMA_VERSION, type AnyEvent } from '@closer/contracts'
-import { AppendOnlyViolation, type EventStore } from '@closer/core'
+import { EVENT_SCHEMA_VERSION, type AnyEvent } from '@levelhead/contracts'
+import { AppendOnlyViolation, type EventStore } from '@levelhead/core'
 import { importJsonlDirectory } from './migrate-from-jsonl.ts'
 import { runMigrations } from './migrations/runner.ts'
 import { PostgresEventStore } from './postgres-event-store.ts'
@@ -49,7 +49,7 @@ async function withLogDirectory(
   files: Record<string, string[]>,
   run: (dir: string) => Promise<void>,
 ): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-jsonl-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-jsonl-'))
   try {
     for (const [name, lines] of Object.entries(files)) {
       await writeFile(join(dir, name), lines.map((line) => `${line}\n`).join(''), 'utf8')
@@ -137,12 +137,16 @@ test('a corrupt line names the file and the line number', async () => {
 })
 
 test('a missing directory is nothing to migrate, not an error', async () => {
-  const report = await importJsonlDirectory(new MemoryEventStore(), join(tmpdir(), 'closer-absent'))
+  const report = await importJsonlDirectory(
+    new MemoryEventStore(),
+    join(tmpdir(), 'levelhead-absent'),
+  )
   expect(report).toEqual({ sessions: [], imported: 0, skipped: 0 })
 })
 
 const url = process.env['DATABASE_URL']
-const database = url === undefined ? undefined : await openTestDatabase(url, 'closer_test_import')
+const database =
+  url === undefined ? undefined : await openTestDatabase(url, 'levelhead_test_import')
 if (database === undefined) {
   console.log(
     '[skipped] packages/db JSONL-to-Postgres integration test: DATABASE_URL is unset or unreachable',

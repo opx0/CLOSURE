@@ -1,13 +1,13 @@
 import fp from 'fastify-plugin'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
-import { LOCAL_PRINCIPAL, type Principal } from '@closer/contracts'
+import { LOCAL_PRINCIPAL, type Principal } from '@levelhead/contracts'
 import {
   CORRELATION_HEADER,
   HTTP_DURATION,
   HTTP_REQUESTS,
   correlationIdFrom,
   metrics,
-} from '@closer/observability'
+} from '@levelhead/observability'
 import { Principals } from '../principal.ts'
 
 declare module 'fastify' {
@@ -29,7 +29,7 @@ export interface ContextOptions {
 // never read a header themselves.
 export const contextPlugin = fp(
   async (app: FastifyInstance, options: ContextOptions) => {
-    const principals = new Principals(options.tokens)
+    const principals = new Principals(options.tokens, { showcase: options.demoMode })
 
     // Showcase tokens are minted at runtime and live only as long as the process, so they are never
     // in the configured list and are never written into one.
@@ -95,5 +95,5 @@ export const contextPlugin = fp(
       )
     })
   },
-  { name: 'closer-context' },
+  { name: 'levelhead-context' },
 )

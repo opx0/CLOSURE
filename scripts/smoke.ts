@@ -1,4 +1,4 @@
-import { silentLogger } from '@closer/core'
+import { silentLogger } from '@levelhead/core'
 import { buildApp } from '../apps/server/src/app.ts'
 import { loadConfig } from '../apps/server/src/config.ts'
 import {
@@ -16,16 +16,18 @@ import {
 
 const RESUME = 'Built a durable job queue on PostgreSQL processing ~10k jobs/day.\n'
 const RESUME_QUOTE = 'Built a durable job queue on PostgreSQL'
-const ANSWER = 'We leased each job for thirty seconds. I do not think we handled double completion.'
-const ANSWER_QUOTE = 'I do not think we handled double completion'
+const ANSWER =
+  'An index keeps the keys sorted, so a lookup walks a few pages instead of every row. I am not sure what it costs on writes.'
+const ANSWER_QUOTE = 'I am not sure what it costs on writes'
 
 const judged = {
   findings: [
     {
-      kind: 'claim',
-      verdict: 'partially_supported',
-      rationale: 'lease recovery is described; duplicate completion is not',
-      confidence: 0.8,
+      kind: 'competency',
+      competency: 'mechanism',
+      levelMet: null,
+      rationale: 'the lookup is explained; what the index costs on writes is not',
+      confidence: 0.75,
       quotes: [ANSWER_QUOTE],
     },
   ],
@@ -38,35 +40,38 @@ function check(name: string, ok: boolean, detail: string): void {
 }
 
 const store = new MemoryEventStore()
-const app = await buildApp(loadConfig({ LOG_LEVEL: 'fatal', CLOSER_WEB_DIST: 'apps/web/dist' }), {
-  storeFor: () => store,
-  clock: new FixedClock(),
-  ids: new SeqIds(),
-  conductor: new ScriptedConductor([
-    'walk me through how a job is claimed',
-    'and what stops it completing twice?',
-  ]),
-  evaluator: new ScriptedEvaluator([
-    {
-      claims: [
-        {
-          quote: RESUME_QUOTE,
-          assertion: 'built a durable job queue on PostgreSQL',
-          type: 'built',
-          technologies: ['PostgreSQL'],
-          metrics: ['10k jobs/day'],
-          implied: false,
-        },
-      ],
-    },
-    judged,
-    judged,
-  ]),
-  ceilings: { sessionCostUsd: 2, sessionTokens: 120_000, modelCallsPerTurn: 3 },
-  logger: silentLogger,
-  queue: null,
-  retrieval: null,
-})
+const app = await buildApp(
+  loadConfig({ LOG_LEVEL: 'fatal', LEVELHEAD_WEB_DIST: 'apps/web/dist' }),
+  {
+    storeFor: () => store,
+    clock: new FixedClock(),
+    ids: new SeqIds(),
+    conductor: new ScriptedConductor([
+      'How does an index make a lookup faster?',
+      'And what does it cost you on writes?',
+    ]),
+    evaluator: new ScriptedEvaluator([
+      {
+        claims: [
+          {
+            quote: RESUME_QUOTE,
+            assertion: 'built a durable job queue on PostgreSQL',
+            type: 'built',
+            technologies: ['PostgreSQL'],
+            metrics: ['10k jobs/day'],
+            implied: false,
+          },
+        ],
+      },
+      judged,
+      judged,
+    ]),
+    ceilings: { sessionCostUsd: 2, sessionTokens: 120_000, modelCallsPerTurn: 3 },
+    logger: silentLogger,
+    queue: null,
+    retrieval: null,
+  },
+)
 await app.ready()
 
 const health = await app.inject({ method: 'GET', url: '/health' })
@@ -81,22 +86,20 @@ const claims = extracted.json() as { claims: { id: string; assertion: string }[]
 const claimId = claims.claims[0]?.id ?? ''
 check('claims extracted with byte-exact spans', claimId !== '', claims.claims[0]?.assertion ?? '—')
 
-await app.inject({
-  method: 'POST',
-  url: `/claims/${claimId}/confirm`,
-  payload: { confirmed: true },
-})
-
 const started = await app.inject({
   method: 'POST',
   url: '/sessions',
   payload: { mode: 'coach', turnsPerRound: 2, drill: false },
 })
-const start = started.json() as { sessionId: string; question?: { text: string; action: string } }
+const start = started.json() as {
+  sessionId: string
+  question?: { text: string; action: string; topic?: { area: string; title: string } }
+}
+const topic = start.question?.topic
 check(
-  'interview started, question chosen by code',
-  started.statusCode === 201 && start.question !== undefined,
-  `${start.question?.action ?? '—'}: ${start.question?.text ?? '—'}`,
+  'interview started with no résumé, topic and action chosen by code',
+  started.statusCode === 201 && topic !== undefined,
+  `${topic === undefined ? '—' : `${topic.area} · ${topic.title}`} · ${start.question?.action ?? '—'}: ${start.question?.text ?? '—'}`,
 )
 
 const answered = await app.inject({

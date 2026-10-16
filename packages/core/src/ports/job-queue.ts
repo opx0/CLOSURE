@@ -1,4 +1,4 @@
-import type { JobKind, JobPayload, JobRecord, OwnerId } from '@closer/contracts'
+import type { JobKind, JobPayload, JobRecord, OwnerId } from '@levelhead/contracts'
 
 export interface EnqueueInput {
   ownerId: OwnerId

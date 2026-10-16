@@ -463,7 +463,7 @@ function adaptationAddsNothing(input: GateInput): StopConditionOutcome {
       id,
       status: 'unknown',
       reason:
-        'the ablation needs a bootstrap interval for both full CLOSER and CLOSER-without-adaptation',
+        'the ablation needs a bootstrap interval for both full Levelhead and Levelhead-without-adaptation',
     }
   }
   const overlaps = intervalsOverlap(mine, ablated)
@@ -485,7 +485,7 @@ function provenanceAddsNothing(input: GateInput): StopConditionOutcome {
       id,
       status: 'unknown',
       reason:
-        'evidence-link precision needs a bootstrap interval for both full CLOSER and the repository-RAG arm',
+        'evidence-link precision needs a bootstrap interval for both full Levelhead and the repository-RAG arm',
     }
   }
   const overlaps = intervalsOverlap(mine, rag)

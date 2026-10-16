@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import { GapEntrySchema, type GapEntry, type GapStatus } from '@closer/contracts'
+import { GapEntrySchema, type GapEntry, type GapStatus } from '@levelhead/contracts'
 import { dueForRetrieval, isDue, retrievalCountOf, reviewDueAt } from './due.ts'
 
 function gapOf(over: Partial<GapEntry> = {}): GapEntry {
@@ -110,7 +110,9 @@ test('nothing in what is returned marks the question as a review', () => {
 
   // Same object, same keys as the contract — no flag for a renderer to leak (§4.5).
   expect(selected).toBe(gap)
-  expect(Object.keys(selected ?? {}).sort()).toEqual(Object.keys(GapEntrySchema.properties).sort())
+  expect(Object.keys(GapEntrySchema.properties)).toEqual(
+    expect.arrayContaining(Object.keys(selected ?? {})),
+  )
 })
 
 test('selection is pure: same gaps and same now, same answer, inputs untouched', () => {

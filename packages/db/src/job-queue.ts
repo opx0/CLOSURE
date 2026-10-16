@@ -7,8 +7,8 @@ import {
   type JobKind,
   type JobRecord,
   type OwnerId,
-} from '@closer/contracts'
-import type { ClaimInput, EnqueueInput, JobQueuePort } from '@closer/core'
+} from '@levelhead/contracts'
+import type { ClaimInput, EnqueueInput, JobQueuePort } from '@levelhead/core'
 import { jobs } from './schema.ts'
 import { toQuery } from './postgres-event-store.ts'
 import type { SqlExecutor } from './sql.ts'

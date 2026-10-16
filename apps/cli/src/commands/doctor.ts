@@ -45,7 +45,7 @@ async function gitPresent(): Promise<Check> {
           : {
               name: 'git (repository reader)',
               ok: false,
-              detail: 'git is not on PATH; `closer repo` reads snapshots through it',
+              detail: 'git is not on PATH; `levelhead repo` reads snapshots through it',
             },
       )
     })
@@ -111,13 +111,13 @@ export async function doctor(): Promise<number> {
     },
   ]
 
-  heading('closer doctor')
+  heading('levelhead doctor')
   for (const check of checks) {
     line(`${check.ok ? '✓' : '✗'} ${check.name}`)
     dim(`  ${check.detail}`)
   }
   line('')
   dim(`  owner: ${config.ownerId} · store: ${config.store}`)
-  dim('  practice only. CLOSER never runs during a real interview.')
+  dim('  practice only. Levelhead never runs during a real interview.')
   return checks.every((check) => check.ok) ? 0 : 1
 }

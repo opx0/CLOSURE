@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { EvaluationOutputSchema, ExtractedClaimsSchema } from '@closer/core'
-import type { PolicyAction } from '@closer/contracts'
+import { ClaimEvaluationOutputSchema, ExtractedClaimsSchema } from '@levelhead/core'
+import type { PolicyAction } from '@levelhead/contracts'
 import type {
   ExtractionOutcome,
   FindingOutcome,
@@ -81,7 +81,7 @@ export const genericLlmArm: Arm = {
       resumeId: resume.id,
       armId: 'generic_llm',
       // Kept exactly as the model returned them — a quote not in the resume verbatim stays here,
-      // where CLOSER would drop the claim, so the precision cost of skipping that check is a number
+      // where Levelhead would drop the claim, so the precision cost of skipping that check is a number
       // in the report rather than an argument.
       claims: result.value.claims.map((claim) => ({
         quote: claim.quote,
@@ -134,7 +134,7 @@ export const genericLlmArm: Arm = {
         promptHash: hashOf(JUDGMENT_SYSTEM + user),
         system: JUDGMENT_SYSTEM,
         user,
-        schema: EvaluationOutputSchema,
+        schema: ClaimEvaluationOutputSchema,
         schemaName: 'answer_evaluation',
         maxOutputTokens: 4096,
       })

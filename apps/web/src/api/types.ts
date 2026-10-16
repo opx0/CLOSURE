@@ -7,6 +7,7 @@ export type Claim = ClaimsResponse['claims'][number]
 export type Span = ClaimsResponse['spans'][number]
 
 export type TurnUpdate = JsonOf<paths['/sessions']['post']['responses'][201]>
+export type ShownArtifact = NonNullable<NonNullable<TurnUpdate['question']>['artifact']>
 export type Finding = TurnUpdate['findings'][number]
 export type QuotedEvidence = TurnUpdate['quotes'][number]
 
@@ -29,3 +30,7 @@ export type PrivacyResponse = JsonOf<paths['/privacy']['get']['responses'][200]>
 export type BenchmarkRuns = JsonOf<paths['/benchmark/runs']['get']['responses'][200]>
 export type DeliveryResponse = JsonOf<paths['/sessions/{id}/delivery']['get']['responses'][200]>
 export type JobsResponse = JsonOf<paths['/jobs']['get']['responses'][200]>
+export type TopicsResponse = JsonOf<paths['/topics']['get']['responses'][200]>
+export type SnapshotsResponse = JsonOf<paths['/snapshots']['get']['responses'][200]>
+export type PinnedSnapshot = SnapshotsResponse['snapshots'][number]
+export type ResumeFeedbackResponse = JsonOf<paths['/resume/feedback']['get']['responses'][200]>

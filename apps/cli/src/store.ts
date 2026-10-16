@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
-import { PostgresEventStore } from '@closer/db'
-import type { EventStore } from '@closer/core'
+import { PostgresEventStore } from '@levelhead/db'
+import type { EventStore } from '@levelhead/core'
 import { JsonlEventStore } from './store/jsonl.ts'
 import type { CliConfig } from './config.ts'
 
@@ -14,7 +14,7 @@ export function openStore(config: CliConfig): { store: EventStore; close: () => 
     }
   }
   if (config.databaseUrl === undefined) {
-    process.stderr.write('CLOSER_STORE=postgres needs DATABASE_URL.\n')
+    process.stderr.write('LEVELHEAD_STORE=postgres needs DATABASE_URL.\n')
     process.exit(1)
   }
   const pool = new Pool({ connectionString: config.databaseUrl })

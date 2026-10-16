@@ -1,15 +1,15 @@
-import type { Competency, Mode, PersonaId, PolicyAction, RoundKind } from '@closer/contracts'
+import type { Competency, Mode, PersonaId, PolicyAction, RoundKind } from '@levelhead/contracts'
 import { ACTIONS, ACTION_ORDER } from './actions.ts'
 import { actionWeight } from './persona.ts'
 import { pressureIntensity, type PressureState } from './pressure.ts'
-import { DEFAULT_ROUND, ROUND_ARCS, roundRole } from './rounds.ts'
+import { DEFAULT_ROUND, ROUND_ARCS, roundRole, type SubjectKind } from './rounds.ts'
 
 export interface PolicyInput {
-  // Ids rather than full Claims, to keep the policy decoupled from the extractor's shape.
-  confirmedClaimIds: readonly string[]
-  currentClaimId: string | null
+  // Ids rather than claims, topics or artifacts, so the policy never depends on what a subject is.
+  subjectIds: readonly string[]
+  currentSubjectId: string | null
   askedCounts: Readonly<Record<string, number>>
-  coveredForCurrentClaim: readonly Competency[]
+  coveredForCurrentSubject: readonly Competency[]
   // Most recent first.
   recentActions: readonly PolicyAction[]
   turnCount: number
@@ -20,6 +20,9 @@ export interface PolicyInput {
   round?: RoundKind
   // Absent reads as false, not as missing (§4.8).
   artifactAvailable?: boolean
+  // Seeded actions whose scenario has already been put on the current subject: asking one again
+  // repeats the same question in different words.
+  spent?: readonly PolicyAction[]
 }
 
 export interface ConsideredAction {
@@ -32,9 +35,9 @@ export interface Plan {
   considered: ConsideredAction[]
   chosen: PolicyAction
   pressureLevel: number
-  // Present only alongside END_TOPIC, and only while another confirmed claim is left — closing a
-  // topic and choosing what to open next are one decision.
-  nextClaimId?: string
+  // Present only alongside END_TOPIC, and only while another subject is left — closing a subject
+  // and choosing what to open next are one decision.
+  nextSubjectId?: string
 }
 
 // Deep dive's arc (§4.2). Composure is deliberately absent — it's what pressure tests, not an arc stage.
@@ -47,13 +50,22 @@ function roundOf(input: PolicyInput): RoundKind {
 }
 
 export function arcStage(input: PolicyInput): ArcStage {
-  if (input.currentClaimId === null) return 'closing'
+  if (input.currentSubjectId === null) return 'closing'
   const arc = ROUND_ARCS[roundOf(input)].arc
-  return arc.find((competency) => !input.coveredForCurrentClaim.includes(competency)) ?? 'closing'
+  return arc.find((competency) => !input.coveredForCurrentSubject.includes(competency)) ?? 'closing'
 }
 
-// Exported so a caller can size a session as turns-per-claim × claims.
-export const MAX_TURNS_PER_CLAIM = 4
+const MAX_TURNS_PER_SUBJECT = 4
+
+const SUBJECT_NOUN: Record<SubjectKind, { one: string; many: string }> = {
+  claim: { one: 'claim', many: 'confirmed claims' },
+  topic: { one: 'topic', many: 'planned topics' },
+  artifact: { one: 'file', many: 'files' },
+}
+
+function nounOf(round: RoundKind): { one: string; many: string } {
+  return SUBJECT_NOUN[ROUND_ARCS[round].subject]
+}
 
 // Gap must be wide enough that a persona weight can't reorder the round: ×1.2 vs ×0.8, lead still leads.
 const LEAD_FIT = 10
@@ -76,8 +88,8 @@ interface Fit {
   why: string
 }
 
-function askedCount(input: PolicyInput, claimId: string | null): number {
-  return claimId === null ? 0 : (input.askedCounts[claimId] ?? 0)
+function askedCount(input: PolicyInput, subjectId: string | null): number {
+  return subjectId === null ? 0 : (input.askedCounts[subjectId] ?? 0)
 }
 
 function isArcAction(action: PolicyAction): boolean {
@@ -93,13 +105,17 @@ function arcFit(action: PolicyAction, input: PolicyInput, stage: ArcStage, round
     }
   }
   const role = roundRole(round, action)
-  // Exception: a round that leads with evidence (behavioral) has something to ask for from turn one.
+  // Exception: a round that leads with evidence (the walkthrough, with its code already on the table)
+  // has something to ask for from turn one.
   if (
     action === 'REQUEST_EVIDENCE' &&
     role !== 'lead' &&
-    askedCount(input, input.currentClaimId) === 0
+    askedCount(input, input.currentSubjectId) === 0
   ) {
-    return { fit: 4, why: 'nothing has been described on this claim yet for evidence to back' }
+    return {
+      fit: 4,
+      why: `nothing has been described on this ${nounOf(round).one} yet for evidence to back`,
+    }
   }
   return role === 'lead'
     ? { fit: LEAD_FIT, why: `the ${round} round leads with this while ${stage} is uncovered` }
@@ -130,21 +146,22 @@ function baseFit(action: PolicyAction, input: PolicyInput, stage: ArcStage, roun
     case 'TRANSFER_TEST':
       return { fit: 16, why: 'transfer mode retests the concept under changed constraints' }
     case 'END_TOPIC': {
-      const asked = askedCount(input, input.currentClaimId)
-      const unasked = input.confirmedClaimIds.filter((id) => askedCount(input, id) === 0).length
+      const noun = nounOf(round)
+      const asked = askedCount(input, input.currentSubjectId)
+      const unasked = input.subjectIds.filter((id) => askedCount(input, id) === 0).length
       if (stage === 'closing') {
-        return input.currentClaimId === null
-          ? { fit: 10, why: 'no claim is open' }
+        return input.currentSubjectId === null
+          ? { fit: 10, why: `no ${noun.one} is open` }
           : { fit: 10, why: `every competency the ${round} round asks about is covered` }
       }
-      if (asked >= MAX_TURNS_PER_CLAIM) {
-        // Grows with every turn past the cap so a claim can't hold the session forever (§4.2).
+      if (asked >= MAX_TURNS_PER_SUBJECT) {
+        // Grows with every turn past the cap so a subject can't hold the session forever (§4.2).
         return {
-          fit: 8 + (asked - MAX_TURNS_PER_CLAIM),
-          why: `this claim has taken ${asked} turns and ${unasked} confirmed claims are still unasked`,
+          fit: 8 + (asked - MAX_TURNS_PER_SUBJECT),
+          why: `this ${noun.one} has taken ${asked} turns and ${unasked} ${noun.many} are still unasked`,
         }
       }
-      return { fit: 0, why: 'the arc on this claim is unfinished' }
+      return { fit: 0, why: `the arc on this ${noun.one} is unfinished` }
     }
     default:
       // Read from the catalogue, not a second copy of the pressure moves, so a new action can't
@@ -168,9 +185,13 @@ function ineligibleBecause(
   if (input.mode === 'review' && action !== 'END_TOPIC') {
     return 'Review compares past attempts; it does not interrogate'
   }
-  if (ROUND_ARCS[round].requiresArtifact && input.artifactAvailable !== true) {
-    // Ending the topic stays available, so a round that cannot run closes instead of stalling.
+  // §4.8: a walkthrough with nothing to walk through is a generic question wearing a round's name.
+  // Ending the topic stays available, so a round that cannot run closes instead of stalling.
+  if (ROUND_ARCS[round].subject === 'artifact' && input.artifactAvailable !== true) {
     if (action !== 'END_TOPIC') return `a ${round} round needs a pinned artifact to ask about`
+  }
+  if (input.spent?.includes(action) === true) {
+    return `what this puts to the candidate has already been put on this ${nounOf(round).one}`
   }
   if (action === 'DRILL' && input.mode !== 'drill')
     return 'a drill targets a gap, and this is not drill mode'
@@ -183,9 +204,9 @@ function ineligibleBecause(
   }
   if (!ACTIONS[action].isPressure) return null
   if (input.turnCount === 0) return 'there is no answer yet to apply pressure to'
-  // An overdue pressure move still doesn't outrank the exit once the claim has had its share (§4.3).
-  if (askedCount(input, input.currentClaimId) >= MAX_TURNS_PER_CLAIM) {
-    return 'this claim has taken its share of the session'
+  // An overdue pressure move still doesn't outrank the exit once the subject has had its share (§4.3).
+  if (askedCount(input, input.currentSubjectId) >= MAX_TURNS_PER_SUBJECT) {
+    return `this ${nounOf(round).one} has taken its share of the session`
   }
   if (input.pressure.level < 1) return 'pressure is at level 0'
   if (input.recentActions[0] !== undefined && ACTIONS[input.recentActions[0]].isPressure) {
@@ -244,15 +265,15 @@ function consider(
   }
 }
 
-// Least-asked confirmed claim other than the current one, ties to confirmation order; a claim past
-// MAX_TURNS_PER_CLAIM is not offered.
-function nextClaim(input: PolicyInput): string | null {
+// Least-asked subject other than the current one, ties to the order the subjects were given in; a
+// subject past MAX_TURNS_PER_SUBJECT is not offered.
+function nextSubject(input: PolicyInput): string | null {
   let chosen: string | null = null
   let fewest = Number.POSITIVE_INFINITY
-  for (const id of input.confirmedClaimIds) {
-    if (id === input.currentClaimId) continue
+  for (const id of input.subjectIds) {
+    if (id === input.currentSubjectId) continue
     const asked = askedCount(input, id)
-    if (asked >= MAX_TURNS_PER_CLAIM) continue
+    if (asked >= MAX_TURNS_PER_SUBJECT) continue
     if (asked < fewest) {
       chosen = id
       fewest = asked
@@ -269,11 +290,11 @@ export function selectAction(input: PolicyInput): Plan {
   const ranked = [...candidates].sort((a, b) => b.score - a.score)
   // END_TOPIC is never gated, so this is the floor of the ranking rather than a fallback.
   const chosen = ranked.find((candidate) => candidate.eligible)?.action ?? 'END_TOPIC'
-  const moveTo = chosen === 'END_TOPIC' ? nextClaim(input) : null
+  const moveTo = chosen === 'END_TOPIC' ? nextSubject(input) : null
   return {
     considered: ranked.map(({ action, score, reason }) => ({ action, score, reason })),
     chosen,
     pressureLevel: input.pressure.level,
-    ...(moveTo === null ? {} : { nextClaimId: moveTo }),
+    ...(moveTo === null ? {} : { nextSubjectId: moveTo }),
   }
 }

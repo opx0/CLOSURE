@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { planNextSession, replay } from '@closer/core'
-import type { GapEntry, JobRecord } from '@closer/contracts'
+import { planNextSession, replay } from '@levelhead/core'
+import type { GapEntry, JobRecord } from '@levelhead/contracts'
 import type { HandlerContext } from './context.ts'
 
 export async function planRetrieval(job: JobRecord, context: HandlerContext): Promise<void> {
@@ -23,7 +23,7 @@ export async function planRetrieval(job: JobRecord, context: HandlerContext): Pr
     retrievalLimit: 3,
   })
 
-  const directory = join(context.config.CLOSER_EVENT_DIR, '..', 'plans')
+  const directory = join(context.config.LEVELHEAD_EVENT_DIR, '..', 'plans')
   await mkdir(directory, { recursive: true })
   await writeFile(
     join(directory, `${job.ownerId}.json`),

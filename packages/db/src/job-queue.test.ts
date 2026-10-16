@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'bun:test'
-import { LOCAL_OWNER_ID, type JobPayload } from '@closer/contracts'
-import { backoffMs } from '@closer/core'
+import { LOCAL_OWNER_ID, type JobPayload } from '@levelhead/contracts'
+import { backoffMs } from '@levelhead/core'
 import {
   PostgresJobQueue,
   buryStatement,
@@ -79,7 +79,7 @@ test('a row that does not match the job contract is refused rather than coerced'
 })
 
 const url = process.env.DATABASE_URL
-const database = url === undefined ? undefined : await openTestDatabase(url, 'closer_jobs_test')
+const database = url === undefined ? undefined : await openTestDatabase(url, 'levelhead_jobs_test')
 
 if (database === undefined) {
   test.skip('packages/db job queue integration tests: DATABASE_URL is unset or unreachable', () => {})

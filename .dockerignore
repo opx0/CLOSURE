@@ -2,7 +2,7 @@ node_modules
 **/node_modules
 **/dist
 .git
-.closer
+.levelhead
 .env
 docs
 research

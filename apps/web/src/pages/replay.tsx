@@ -5,6 +5,7 @@ import { api } from '../api/client.ts'
 import { EvidenceProvider, Highlighted, useEvidence } from '../components/evidence.tsx'
 import { FindingCard } from '../components/finding-card.tsx'
 import { Button, Failed, Loading, Panel, Quiet, Tag } from '../components/primitives.tsx'
+import { topicLabel, useTopicById } from '../lib/catalog.ts'
 import { usd, words } from '../lib/format.ts'
 
 function ReplayBody({ sessionId }: { sessionId: string }) {
@@ -12,6 +13,7 @@ function ReplayBody({ sessionId }: { sessionId: string }) {
   const replay = useQuery({ queryKey: ['replay', sessionId], queryFn: () => api.replay(sessionId) })
   const view = useQuery({ queryKey: ['session', sessionId], queryFn: () => api.session(sessionId) })
   const events = useQuery({ queryKey: ['events', sessionId], queryFn: () => api.events(sessionId) })
+  const topicById = useTopicById()
 
   if (replay.isLoading || view.isLoading) return <Loading what="the session" />
   if (replay.isError) return <Failed error={replay.error} />
@@ -19,6 +21,15 @@ function ReplayBody({ sessionId }: { sessionId: string }) {
   const replayed = replay.data
   const session = view.data
   if (replayed === undefined || session === undefined) return null
+
+  const subjectOf = (id: string): string => {
+    const topic = topicById(id)
+    if (topic !== undefined) return topicLabel(topic)
+    return session.claims.find((claim) => claim.id === id)?.assertion ?? id
+  }
+  const plans = (events.data ?? []).flatMap((event) =>
+    event.kind === 'plan' ? [event.payload] : [],
+  )
 
   return (
     <div className="space-y-4">
@@ -62,34 +73,31 @@ function ReplayBody({ sessionId }: { sessionId: string }) {
         subtitle="Every plan the policy considered, and the action code chose. The model only phrased it."
       >
         <ol className="space-y-1 text-xs">
-          {(events.data ?? [])
-            .filter((event) => event.kind === 'plan')
-            .map((event, index) => {
-              const payload = event.payload as {
-                chosen: string
-                pressureLevel: number
-                considered: { action: string; score: number; reason: string }[]
-              }
-              return (
-                <li key={index} className="rounded border border-edge bg-[#111720] p-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Tag tone="accent">{words(payload.chosen.toLowerCase())}</Tag>
-                    <Tag>pressure {payload.pressureLevel}</Tag>
-                  </div>
-                  <ul className="mt-1 space-y-0.5 text-quiet">
-                    {payload.considered
-                      .slice()
-                      .sort((left, right) => right.score - left.score)
-                      .map((option, at) => (
-                        <li key={at}>
-                          {option.score.toFixed(2)} · {words(option.action.toLowerCase())} —{' '}
-                          {option.reason}
-                        </li>
-                      ))}
-                  </ul>
-                </li>
-              )
-            })}
+          {plans.map((plan, index) => {
+            const next = plan.nextSubjectId ?? plan.nextClaimId
+            return (
+              <li key={index} className="rounded border border-edge bg-[#111720] p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Tag tone="accent">{words(plan.chosen.toLowerCase())}</Tag>
+                  <Tag>pressure {plan.pressureLevel}</Tag>
+                  {next !== undefined && (
+                    <span className="text-[12px] text-muted">next: {subjectOf(next)}</span>
+                  )}
+                </div>
+                <ul className="mt-1 space-y-0.5 text-quiet">
+                  {plan.considered
+                    .slice()
+                    .sort((left, right) => right.score - left.score)
+                    .map((option, at) => (
+                      <li key={at}>
+                        {option.score.toFixed(2)} · {words(option.action.toLowerCase())} —{' '}
+                        {option.reason}
+                      </li>
+                    ))}
+                </ul>
+              </li>
+            )
+          })}
         </ol>
       </Panel>
     </div>

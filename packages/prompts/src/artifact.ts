@@ -1,4 +1,4 @@
-// Restated, not imported (importing @closer/core's types back would close a cycle) — one type for every prompt, since the Conductor and Evaluator must look at the same lines.
+// Restated, not imported (importing @levelhead/core's types back would close a cycle) — one type for every prompt, since the Conductor and Evaluator must look at the same lines.
 export interface PromptArtifact {
   path: string
   symbol?: string | undefined

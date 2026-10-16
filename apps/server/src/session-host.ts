@@ -7,10 +7,12 @@ import type {
   PersonaId,
   PolicyAction,
   Principal,
+  RoleId,
   RoundKind,
-} from '@closer/contracts'
-import type { IdSource, PressureLevel } from '@closer/core'
-import { runSession, type SessionIo, type SessionResult } from '@closer/core'
+  Topic,
+} from '@levelhead/contracts'
+import type { ArtifactContext, IdSource, PinnedContext, PressureLevel } from '@levelhead/core'
+import { runSession, type SessionIo, type SessionResult } from '@levelhead/core'
 import type { ServerDeps } from './deps.ts'
 
 // Reuses `runSession` unmodified rather than re-implementing the interview loop; `io.answer()`
@@ -26,6 +28,10 @@ export interface StartSessionInput {
   rounds: readonly RoundKind[]
   turnsPerRound: number
   drill: boolean
+  role?: RoleId
+  topics?: readonly Topic[]
+  topicHistory: readonly string[]
+  pinned?: PinnedContext
 }
 
 export interface TurnRound {
@@ -35,12 +41,28 @@ export interface TurnRound {
   brief?: string
 }
 
+export type TurnArtifact = Omit<ArtifactContext, 'artifactId'>
+
 export interface TurnQuestion {
+  attemptId: string
   text: string
   turn: number
   action: PolicyAction
   pressureLevel: number
   round: RoundKind
+  topic?: Pick<Topic, 'id' | 'area' | 'title'>
+  claim?: Pick<Claim, 'id' | 'assertion'>
+  artifact?: TurnArtifact
+}
+
+function shown(artifact: ArtifactContext): TurnArtifact {
+  return {
+    path: artifact.path,
+    ...(artifact.symbol === undefined ? {} : { symbol: artifact.symbol }),
+    ...(artifact.startLine === undefined ? {} : { startLine: artifact.startLine }),
+    ...(artifact.endLine === undefined ? {} : { endLine: artifact.endLine }),
+    code: artifact.code,
+  }
 }
 
 export interface QuotedEvidence {
@@ -126,6 +148,7 @@ export class LiveSession {
   }
 
   async begin(): Promise<TurnUpdate> {
+    const { role, topics, pinned } = this.#input
     const run = runSession({
       claims: this.#input.claims,
       mode: this.#input.mode,
@@ -135,6 +158,10 @@ export class LiveSession {
       rounds: this.#input.rounds,
       turnsPerRound: this.#input.turnsPerRound,
       drill: this.#input.drill,
+      topicHistory: this.#input.topicHistory,
+      ...(role === undefined ? {} : { role }),
+      ...(topics === undefined ? {} : { topics }),
+      ...(pinned === undefined ? {} : { pinned }),
       ceilings: this.#deps.ceilings,
       deps: {
         store: this.#deps.storeFor(this.#input.principal),
@@ -180,12 +207,19 @@ export class LiveSession {
         buffer().round = { kind, index, total, ...(brief === undefined ? {} : { brief }) }
       },
       question: (text, meta) => {
+        const { topic, claim, artifact } = meta
         buffer().question = {
+          attemptId: meta.attemptId,
           text,
           turn: meta.turn,
           action: meta.action,
           pressureLevel: meta.pressureLevel,
           round: meta.round,
+          ...(topic === undefined
+            ? {}
+            : { topic: { id: topic.id, area: topic.area, title: topic.title } }),
+          ...(claim === undefined ? {} : { claim: { id: claim.id, assertion: claim.assertion } }),
+          ...(artifact === undefined ? {} : { artifact: shown(artifact) }),
         }
       },
       answer: () =>

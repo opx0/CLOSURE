@@ -30,9 +30,11 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /srv
 ENV NODE_ENV=production
-COPY --from=deps /srv/node_modules ./node_modules
-COPY . .
-COPY --from=web /srv/apps/web/dist ./apps/web/dist
+# The whole built tree from the web stage: source, the built web dist, and every workspace's
+# node_modules. Bun installs into a `.bun` store with per-workspace symlinks (apps/server/node_modules
+# → the store), so copying only the root node_modules loses `pg` and every other workspace dependency.
+# Copying /srv wholesale preserves those symlinks and is what makes the runtime resolve them.
+COPY --from=web /srv /srv
 # Non-root: the process ingests untrusted repositories, so it runs with no more rights than it needs.
 USER node
 EXPOSE 3001

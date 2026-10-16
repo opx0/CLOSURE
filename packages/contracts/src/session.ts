@@ -1,5 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox'
 import { RoundKindSchema } from './round.ts'
+import { RoleIdSchema } from './role.ts'
 import { LevelSchema, RubricSetSchema } from './rubric.ts'
 
 export const ModeSchema = Type.Union([
@@ -45,6 +46,9 @@ export const SessionSchema = Type.Object({
   // Pinned at session start; changing a rubric mid-session would invalidate the session's labels.
   rubricSet: RubricSetSchema,
   claimIds: Type.Array(Type.String({ minLength: 1 })),
+  roleId: Type.Optional(RoleIdSchema),
+  // Chosen by code at session start and recorded here, so replay never re-runs topic selection.
+  topicIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
   // One element is the ordinary case, not a special one — Simulation can chain rounds like a real loop.
   rounds: Type.Array(RoundKindSchema, { minItems: 1 }),
   snapshotId: Type.Optional(Type.String({ minLength: 1 })),
@@ -57,6 +61,7 @@ export const AttemptSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   sessionId: Type.String({ minLength: 1 }),
   claimId: Type.Optional(Type.String({ minLength: 1 })),
+  topicId: Type.Optional(Type.String({ minLength: 1 })),
   questionEventId: Type.String({ minLength: 1 }),
 })
 export type Attempt = Static<typeof AttemptSchema>

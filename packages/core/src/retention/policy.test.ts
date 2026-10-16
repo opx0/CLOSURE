@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
-import type { AnyEvent, Snapshot } from '@closer/contracts'
-import { EVENT_SCHEMA_VERSION } from '@closer/contracts'
+import type { AnyEvent, Snapshot } from '@levelhead/contracts'
+import { EVENT_SCHEMA_VERSION } from '@levelhead/contracts'
 import { replay } from '../events/replay.ts'
 import {
   DEFAULT_RETENTION,

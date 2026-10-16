@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-export const CORRELATION_HEADER = 'x-closer-correlation-id'
+export const CORRELATION_HEADER = 'x-levelhead-correlation-id'
 
 const SHAPE = /^[A-Za-z0-9._-]{1,128}$/
 

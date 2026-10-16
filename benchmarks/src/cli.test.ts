@@ -7,7 +7,7 @@ import { main, parseArgs } from './cli.ts'
 import { syntheticFixtures } from './testing/synthetic.ts'
 
 async function fixtureDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'closer-bench-cli-'))
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-bench-cli-'))
   await writeFile(join(dir, FIXTURE_FILE), JSON.stringify(syntheticFixtures(), null, 2))
   return dir
 }
@@ -79,7 +79,7 @@ describe('the fixture loader', () => {
 describe('the CLI', () => {
   test('a dry run lists what it would do and invents no result', async () => {
     const dir = await fixtureDir()
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-out-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-out-'))
     const { code, out: printed } = await capture(['--fixtures', dir, '--out', out, '--dry-run'])
 
     expect(code).toBe(0)
@@ -96,7 +96,7 @@ describe('the CLI', () => {
 
   test('a real run without model ports refuses rather than fabricating them', async () => {
     const dir = await fixtureDir()
-    const out = await mkdtemp(join(tmpdir(), 'closer-bench-out-'))
+    const out = await mkdtemp(join(tmpdir(), 'levelhead-bench-out-'))
     const { code, err } = await capture(['--fixtures', dir, '--out', out])
 
     expect(code).toBe(2)

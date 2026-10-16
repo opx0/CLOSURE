@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import type { Claim, InvocationRecord, Span } from '@closer/contracts'
+import type { Claim, InvocationRecord, Span } from '@levelhead/contracts'
 import { claimConfirmedPayload, claimsExtractedPayload } from './confirm.ts'
 
 const span: Span = {

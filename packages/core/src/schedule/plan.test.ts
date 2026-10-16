@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { GapEntry } from '@closer/contracts'
+import type { GapEntry } from '@levelhead/contracts'
 import { planNextSession } from './plan.ts'
 
 const NOW = '2026-09-10T00:00:00.000Z'
@@ -52,18 +52,10 @@ test('a closed gap enters the plan only when its review falls inside the horizon
   ).toHaveLength(1)
 })
 
-test('the suggested rounds follow the competencies that are actually open', () => {
-  const mechanismOnly = planNextSession({
-    gaps: [gap('a')],
-    now: NOW,
-    horizonDays: 7,
-    retrievalLimit: 3,
-  })
-  expect(mechanismOnly.suggestedRounds).toEqual(['project_deep_dive'])
-
-  const wider = planNextSession({
+test('a résumé gap is practised in the rounds that cross-question the résumé on that competency', () => {
+  const plan = planNextSession({
     gaps: [
-      gap('a'),
+      gap('a', { claimId: 'claim_1' }),
       gap('b', { competency: 'failure_modes' }),
       gap('c', { competency: 'composure' }),
     ],
@@ -71,5 +63,48 @@ test('the suggested rounds follow the competencies that are actually open', () =
     horizonDays: 7,
     retrievalLimit: 3,
   })
-  expect(wider.suggestedRounds).toEqual(['project_deep_dive', 'design_extension', 'behavioral'])
+  expect(plan.suggestedRounds).toEqual(['behavioral', 'project_deep_dive', 'design_extension'])
+
+  const failureOnly = planNextSession({
+    gaps: [gap('b', { competency: 'failure_modes' })],
+    now: NOW,
+    horizonDays: 7,
+    retrievalLimit: 3,
+  })
+  expect(failureOnly.suggestedRounds).toEqual(['project_deep_dive'])
+})
+
+test('with nothing to practise, or only composure, no résumé round is suggested', () => {
+  const nothing = planNextSession({ gaps: [], now: NOW, horizonDays: 7, retrievalLimit: 3 })
+  expect(nothing.suggestedRounds).toEqual([])
+
+  const composure = planNextSession({
+    gaps: [gap('c', { competency: 'composure' })],
+    now: NOW,
+    horizonDays: 7,
+    retrievalLimit: 3,
+  })
+  expect(composure.suggestedRounds).toEqual(['behavioral'])
+})
+
+test('a topic gap is practised in the round its topic is asked in', () => {
+  const topicsOnly = planNextSession({
+    gaps: [gap('a', { topicId: 'os.deadlock' })],
+    now: NOW,
+    horizonDays: 7,
+    retrievalLimit: 3,
+  })
+  expect(topicsOnly.suggestedRounds).toEqual(['cs_fundamentals'])
+
+  const mixed = planNextSession({
+    gaps: [
+      gap('a', { topicId: 'dsa.hash_maps', competency: 'trade_offs' }),
+      gap('b', { topicId: 'os.deadlock' }),
+      gap('c', { competency: 'composure' }),
+    ],
+    now: NOW,
+    horizonDays: 7,
+    retrievalLimit: 3,
+  })
+  expect(mixed.suggestedRounds).toEqual(['cs_fundamentals', 'problem_solving', 'behavioral'])
 })

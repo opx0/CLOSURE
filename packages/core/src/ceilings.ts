@@ -1,4 +1,4 @@
-import type { InvocationRecord } from '@closer/contracts'
+import type { InvocationRecord } from '@levelhead/contracts'
 
 // Ticket 10 §3: cost is authoritative for the session; tokens are a per-port sub-budget (the ~$0
 // local-model Conductor is bounded by tokens, the Evaluator by cost). A breach ends the session —

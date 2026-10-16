@@ -6,11 +6,11 @@ import { join } from 'node:path'
 // benchmark needs a *commit* to pin (§4.8) — so the commit is produced here, deterministically,
 // rather than checked in.
 const SOURCE = 'fixtures/repos'
-const OUT = process.env.CLOSER_FIXTURE_DIR ?? '.closer/fixtures'
+const OUT = process.env.LEVELHEAD_FIXTURE_DIR ?? '.levelhead/fixtures'
 
 // Fixed author and date: a snapshot id derived from a commit that changes on every rebuild would
 // make two runs of the same fixture set incomparable, which is the opposite of the point.
-const AUTHOR = ['-c', 'user.email=fixtures@closer.local', '-c', 'user.name=CLOSER fixtures']
+const AUTHOR = ['-c', 'user.email=fixtures@levelhead.local', '-c', 'user.name=Levelhead fixtures']
 const WHEN = '2026-01-01T00:00:00Z'
 
 async function git(cwd: string, args: string[]): Promise<string> {

@@ -1,4 +1,4 @@
-export const VOICE_URL_KEY = 'closer.voiceUrl'
+export const VOICE_URL_KEY = 'levelhead.voiceUrl'
 export const DEFAULT_VOICE_URL = 'http://localhost:8091'
 
 export function voiceUrl(): string {

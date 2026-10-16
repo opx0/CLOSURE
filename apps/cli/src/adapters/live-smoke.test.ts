@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { Type } from '@sinclair/typebox'
-import { answerEvaluationPrompt } from '@closer/prompts'
+import { answerEvaluationPrompt } from '@levelhead/prompts'
 import { StructuredEvaluator } from './evaluator-structured.ts'
 import { defaultResilience } from './resilience.ts'
 
@@ -9,7 +9,7 @@ import { defaultResilience } from './resilience.ts'
 // mocked model boundary tests only the mock. So this exists, and it is behind an explicit opt-in
 // and a cost limit, because a live call on every pull request is how a test suite becomes a bill.
 //
-//   CLOSER_LIVE_SMOKE=1 MODEL_PROVIDER_API_KEY=... bun test apps/cli/src/adapters/live-smoke
+//   LEVELHEAD_LIVE_SMOKE=1 MODEL_PROVIDER_API_KEY=... bun test apps/cli/src/adapters/live-smoke
 //
 // It asserts the *contract*, never the prose: that a real provider returns something the schema
 // accepts, or a named failure — and never a coerced result. What the model actually said is not
@@ -19,7 +19,7 @@ import { defaultResilience } from './resilience.ts'
 // measurement, and a run that exceeds it is a failure rather than a surprising invoice.
 const COST_CEILING_USD = 0.05
 
-const enabled = process.env.CLOSER_LIVE_SMOKE === '1'
+const enabled = process.env.LEVELHEAD_LIVE_SMOKE === '1'
 const apiKey = process.env.MODEL_PROVIDER_API_KEY
 const modelAlias = process.env.MODEL_ID ?? 'claude-opus-5'
 
@@ -49,7 +49,7 @@ const ShapeSchema = Type.Object(
 const ANSWER = 'We leased each job for thirty seconds. I do not think we handled double completion.'
 
 if (!enabled || apiKey === undefined) {
-  test.skip('live model smoke: set CLOSER_LIVE_SMOKE=1 and MODEL_PROVIDER_API_KEY to run', () => {})
+  test.skip('live model smoke: set LEVELHEAD_LIVE_SMOKE=1 and MODEL_PROVIDER_API_KEY to run', () => {})
 } else {
   test('a real provider returns a schema-valid result or a named failure, and stays under the cost ceiling', async () => {
     const evaluator = new StructuredEvaluator({

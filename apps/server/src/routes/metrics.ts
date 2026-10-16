@@ -1,5 +1,5 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { metrics } from '@closer/observability'
+import { metrics } from '@levelhead/observability'
 
 // Opaque counters only: no candidate content ever reaches a metric label (STACK §15).
 export const metricsRoutes: FastifyPluginAsyncTypebox = async (app) => {

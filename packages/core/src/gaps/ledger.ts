@@ -5,7 +5,7 @@ import {
   type Finding,
   type GapEntry,
   type GapStatus,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 import type { Clock, IdSource } from '../ports/clock.ts'
 
 export interface GapTransition {
@@ -19,41 +19,79 @@ export interface LedgerDeps {
   clock: Clock
 }
 
-// One gap per competency per claim, so the same weakness found again lands on the existing row.
-export function gapKey(competency: Competency, claimId?: string): string {
-  return `${competency}:${claimId ?? '-'}`
+// One gap per competency per claim or topic, so the same weakness found again lands on the existing row.
+export function gapKey(competency: Competency, claimId?: string, topicId?: string): string {
+  const key = `${competency}:${claimId ?? '-'}`
+  return topicId === undefined ? key : `${key}:${topicId}`
 }
 
 export function indexGaps(gaps: readonly GapEntry[]): Map<string, GapEntry> {
-  return new Map(gaps.map((gap) => [gapKey(gap.competency, gap.claimId), gap]))
+  return new Map(gaps.map((gap) => [gapKey(gap.competency, gap.claimId, gap.topicId), gap]))
+}
+
+// What the attempt behind the findings was about. Findings do not carry it; the policy action did.
+export interface GapSubject {
+  topicId?: string
 }
 
 interface GapNeed {
   competency: Competency
   claimId: string | undefined
+  topicId: string | undefined
   status: Extract<GapStatus, 'open' | 'unverified'>
 }
 
-function needFrom(finding: Finding): GapNeed | null {
+function needFrom(finding: Finding, topicId: string | undefined): GapNeed | null {
   switch (finding.kind) {
     case 'claim':
       // A claim-shaped gap files under Mechanism (§4.6): unexplained, not a competency judgment.
       return finding.verdict === 'supported'
         ? null
-        : { competency: 'mechanism', claimId: finding.claimId, status: 'open' }
+        : { competency: 'mechanism', claimId: finding.claimId, topicId: undefined, status: 'open' }
     case 'claim_abstained':
-      return { competency: 'mechanism', claimId: finding.claimId, status: 'unverified' }
+      return {
+        competency: 'mechanism',
+        claimId: finding.claimId,
+        topicId: undefined,
+        status: 'unverified',
+      }
     case 'composure':
-      // A gap opens only when a signal outside COMPOSURE_HELD appears (§4.3).
+      // A gap opens only when a signal outside COMPOSURE_HELD appears (§4.3). Composure belongs to
+      // the candidate, not to whatever was being asked, so it never carries the topic.
       return finding.signals.every((signal) => COMPOSURE_HELD.includes(signal))
         ? null
-        : { competency: 'composure', claimId: undefined, status: 'open' }
+        : { competency: 'composure', claimId: undefined, topicId: undefined, status: 'open' }
     case 'competency': {
       const met = finding.levelMet
       const short = met === null || LEVEL_ORDER.indexOf(met) < LEVEL_ORDER.indexOf(finding.level)
-      return short ? { competency: finding.competency, claimId: undefined, status: 'open' } : null
+      return short
+        ? { competency: finding.competency, claimId: undefined, topicId, status: 'open' }
+        : null
     }
+    case 'competency_abstained':
+      return { competency: finding.competency, claimId: undefined, topicId, status: 'unverified' }
   }
+}
+
+function bearsOn(finding: Finding, gap: GapEntry): boolean {
+  switch (finding.kind) {
+    case 'claim':
+    case 'claim_abstained':
+      return finding.claimId === gap.claimId
+    case 'composure':
+      return gap.competency === 'composure'
+    case 'competency':
+    case 'competency_abstained':
+      return gap.claimId === undefined && finding.competency === gap.competency
+  }
+}
+
+// Judged by the same rule that opens a gap: held only when something was judged on this gap's own
+// competency or claim and none of it would open the gap again. An abstention is not a pass, and
+// neither is a pass on a different competency in the same answer.
+export function gapHeld(gap: GapEntry, findings: readonly Finding[]): boolean {
+  const bearing = findings.filter((finding) => bearsOn(finding, gap))
+  return bearing.length > 0 && bearing.every((finding) => needFrom(finding, gap.topicId) === null)
 }
 
 // Reopening is possible; un-closing on an abstention is not — silence is not evidence against a gap
@@ -70,17 +108,19 @@ export function gapsFromFindings(
   findings: readonly Finding[],
   existing: ReadonlyMap<string, GapEntry>,
   deps: LedgerDeps,
+  subject: GapSubject = {},
 ): { opened: GapEntry[]; transitions: GapTransition[] } {
   const opened: GapEntry[] = []
   const openedByKey = new Map<string, GapEntry>()
   const transitions: GapTransition[] = []
   const statusByKey = new Map<string, GapStatus>()
+  const usedIds = new Set([...existing.values()].map((gap) => gap.id))
 
   for (const finding of findings) {
-    const need = needFrom(finding)
+    const need = needFrom(finding, subject.topicId)
     if (need === null) continue
 
-    const key = gapKey(need.competency, need.claimId)
+    const key = gapKey(need.competency, need.claimId, need.topicId)
     const fresh = openedByKey.get(key)
     if (fresh !== undefined) {
       // A second finding about the same gap in this batch joins that row, not a duplicate of it.
@@ -91,11 +131,15 @@ export function gapsFromFindings(
 
     const known = existing.get(key)
     if (known === undefined) {
+      let id = deps.ids.next('gap')
+      while (usedIds.has(id)) id = deps.ids.next('gap')
+      usedIds.add(id)
       const now = deps.clock.now()
       const entry: GapEntry = {
-        id: deps.ids.next('gap'),
+        id,
         competency: need.competency,
         ...(need.claimId === undefined ? {} : { claimId: need.claimId }),
+        ...(need.topicId === undefined ? {} : { topicId: need.topicId }),
         summary: finding.rationale,
         status: need.status,
         findingIds: [finding.id],
@@ -121,42 +165,6 @@ export function gapsFromFindings(
   return { opened, transitions }
 }
 
-export function applyDrillResult(
-  gap: GapEntry,
-  passed: boolean,
-  deps: { clock: Clock },
-): { gap: GapEntry; transition: GapTransition | null } {
-  // A passed drill moves open to drilled and stops there (§4.5) — do not reach for
-  // closed_under_transfer here.
-  if (!passed || gap.status !== 'open') return { gap, transition: null }
-
-  return {
-    gap: { ...gap, status: 'drilled', lastTouchedAt: deps.clock.now() },
-    transition: { gapId: gap.id, from: gap.status, to: 'drilled' },
-  }
-}
-
-export function applyTransferResult(
-  gap: GapEntry,
-  attemptId: string,
-  passed: boolean,
-  deps: { clock: Clock },
-): { gap: GapEntry; transition: GapTransition | null } {
-  const transferAttemptIds = gap.transferAttemptIds.includes(attemptId)
-    ? gap.transferAttemptIds
-    : [...gap.transferAttemptIds, attemptId]
-
-  // The recorded attempt licenses the close — a closed_under_transfer row with nothing behind it is
-  // a closed gap nobody can audit.
-  const closes = passed && transferAttemptIds.length > 0
-  const to: GapStatus = closes ? 'closed_under_transfer' : 'open'
-
-  return {
-    gap: { ...gap, transferAttemptIds, status: to, lastTouchedAt: deps.clock.now() },
-    transition: to === gap.status ? null : { gapId: gap.id, from: gap.status, to },
-  }
-}
-
 const STATUS_LABEL: Record<GapStatus, string> = {
   open: 'open',
   drilled: 'drilled — transfer pending',
@@ -177,7 +185,7 @@ function clip(text: string, width: number): string {
 }
 
 // §4.6's four columns and nothing else — no aggregate column, ever (that's the readiness percentage
-// CLOSER refuses to produce).
+// Levelhead refuses to produce).
 export function renderLedger(
   gaps: readonly GapEntry[],
   quotes: ReadonlyMap<string, string> = new Map(),

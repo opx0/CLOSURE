@@ -60,3 +60,80 @@ test('a delivery report declares that it is never competence', () => {
   expect(contract).not.toContain('verdict')
   expect(contract).not.toContain('confidence')
 })
+
+// ---------------------------------------------------------------------------------------------
+// Extended September 22, 2026, when the performance lane grew from three delivery numbers to a
+// measured set covering speech, rhythm and body. The wall did not move. It got longer, so the check
+// covering it got longer too.
+//
+// The new pressure on it is the debrief: the first surface that renders both lanes on one screen,
+// and therefore the first place a well-meant change could average them into a single line.
+const PERFORMANCE_TYPES =
+  /\b(ProsodyReport|KinematicsReport|PerformanceObservation|PerformanceNote|PerformanceBaseline|PerformanceDrill|ScreenSimulation|SignalId|SIGNALS)\b/
+
+const COMPETENCE_TYPES = /\b(Finding|GapEntry|Rubric|Competency|ClaimVerdict|ComposureSignal)\b/
+
+test('the finding contract has no performance-lane type', () => {
+  const contract = readFileSync('packages/contracts/src/finding.ts', 'utf8')
+
+  expect(PERFORMANCE_TYPES.test(contract)).toBe(false)
+})
+
+test('no performance-lane type is read where an answer is judged or a gap is moved', () => {
+  const offenders: string[] = []
+  for (const root of JUDGMENT_PATHS) {
+    for (const file of sourceFiles(root)) {
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .forEach((line, index) => {
+          if (PERFORMANCE_TYPES.test(line)) offenders.push(`${file}:${index + 1}: ${line.trim()}`)
+        })
+    }
+  }
+  expect(offenders).toEqual([])
+})
+
+// The two halves of the debrief are separate modules precisely so this check can exist. One may
+// name findings and gaps. The other may name signals and observations. Neither may name both, so
+// no function in the tree can see enough to merge them.
+test('the debrief computes its two lanes in modules that cannot see each other', () => {
+  const competence = readFileSync('packages/core/src/debrief/competence.ts', 'utf8')
+  const performance = readFileSync('packages/core/src/debrief/performance.ts', 'utf8')
+
+  expect(PERFORMANCE_TYPES.test(competence)).toBe(false)
+  expect(DELIVERY_SIGNALS.test(competence)).toBe(false)
+  expect(COMPETENCE_TYPES.test(performance)).toBe(false)
+})
+
+test('the performance modules never import the judgment modules', () => {
+  const offenders: string[] = []
+  for (const root of ['packages/core/src/performance', 'packages/core/src/debrief']) {
+    for (const file of sourceFiles(root)) {
+      if (file.endsWith('competence.ts')) continue
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .forEach((line, index) => {
+          if (/from '\.\.\/(evaluation|gaps|policy)\//.test(line)) {
+            offenders.push(`${file}:${index + 1}: ${line.trim()}`)
+          }
+        })
+    }
+  }
+  expect(offenders).toEqual([])
+})
+
+// The screen mirror models what an outside system would say about the candidate. Letting that model
+// reach the evaluator would make Levelhead grade the candidate on a guess about a third party.
+test('the screen mirror never reaches a judgment path', () => {
+  const offenders: string[] = []
+  for (const root of [...JUDGMENT_PATHS, 'packages/core/src/debrief']) {
+    for (const file of sourceFiles(root)) {
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .forEach((line, index) => {
+          if (/from '.*\/mirror/.test(line)) offenders.push(`${file}:${index + 1}: ${line.trim()}`)
+        })
+    }
+  }
+  expect(offenders).toEqual([])
+})

@@ -1,7 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client.ts'
 import type { GapEntry } from '../api/types.ts'
+import { Link } from 'react-router-dom'
 import { Empty, Failed, Loading, Panel, Tag } from '../components/primitives.tsx'
+import { ClaimChip, TopicChip } from '../components/question.tsx'
+import { useTopicById } from '../lib/catalog.ts'
+import { useClaimSet } from '../lib/claim-set.ts'
 import { day, words } from '../lib/format.ts'
 
 const TONE: Record<GapEntry['status'], 'held' | 'shaky' | 'broken' | 'quiet'> = {
@@ -20,6 +24,8 @@ const MEANING: Record<GapEntry['status'], string> = {
 
 export function LedgerPage() {
   const ledger = useQuery({ queryKey: ['ledger'], queryFn: api.ledger })
+  const topicById = useTopicById()
+  const claimSet = useClaimSet()
 
   if (ledger.isLoading) return <Loading what="the gap ledger" />
   if (ledger.isError) return <Failed error={ledger.error} />
@@ -33,7 +39,13 @@ export function LedgerPage() {
         subtitle="This is what replaces a readiness score. There is no number here, and there will not be one."
       >
         {data.gaps.length === 0 ? (
-          <Empty>No gaps yet — run a session.</Empty>
+          <Empty>
+            No gaps yet.{' '}
+            <Link to="/session" className="text-accent-soft underline underline-offset-2">
+              Start an interview
+            </Link>
+            ; anything it finds lands here beside the words that showed it.
+          </Empty>
         ) : (
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -45,27 +57,49 @@ export function LedgerPage() {
               </tr>
             </thead>
             <tbody>
-              {data.gaps.map((gap) => (
-                <tr key={gap.id} className="border-b border-edge/60 align-top">
-                  <td className="py-2 pr-3">{gap.summary}</td>
-                  <td className="py-2 pr-3 text-quiet">{words(gap.competency)}</td>
-                  <td className="py-2 pr-3 text-quiet">
-                    {gap.evidenceIds
-                      .map((id) => data.quotes.find((quote) => quote.evidenceId === id)?.quoted)
-                      .filter((quoted): quoted is string => quoted !== undefined)
-                      .map((quoted, index) => (
-                        <span key={index} className="block border-l-2 border-edge pl-2 text-held">
-                          {quoted}
+              {data.gaps.map((gap) => {
+                const topic = topicById(gap.topicId)
+                const claim = claimSet.data?.claims.find((entry) => entry.id === gap.claimId)
+                return (
+                  <tr key={gap.id} className="border-b border-edge/60 align-top">
+                    <td className="py-2 pr-3">
+                      {topic !== undefined && (
+                        <span className="mb-1 block">
+                          <TopicChip topic={topic} />
                         </span>
-                      ))}
-                    <span className="block text-[11px]">opened {day(gap.openedAt)}</span>
-                  </td>
-                  <td className="py-2">
-                    <Tag tone={TONE[gap.status]}>{words(gap.status)}</Tag>
-                    <span className="mt-1 block text-[11px] text-quiet">{MEANING[gap.status]}</span>
-                  </td>
-                </tr>
-              ))}
+                      )}
+                      {gap.claimId !== undefined && (
+                        <span className="mb-1 block">
+                          {claim === undefined ? (
+                            <Tag tone="accent">résumé claim</Tag>
+                          ) : (
+                            <ClaimChip assertion={claim.assertion} />
+                          )}
+                        </span>
+                      )}
+                      {gap.summary}
+                    </td>
+                    <td className="py-2 pr-3 text-quiet">{words(gap.competency)}</td>
+                    <td className="py-2 pr-3 text-quiet">
+                      {gap.evidenceIds
+                        .map((id) => data.quotes.find((quote) => quote.evidenceId === id)?.quoted)
+                        .filter((quoted): quoted is string => quoted !== undefined)
+                        .map((quoted, index) => (
+                          <span key={index} className="block border-l-2 border-edge pl-2 text-held">
+                            {quoted}
+                          </span>
+                        ))}
+                      <span className="block text-[11px]">opened {day(gap.openedAt)}</span>
+                    </td>
+                    <td className="py-2">
+                      <Tag tone={TONE[gap.status]}>{words(gap.status)}</Tag>
+                      <span className="mt-1 block text-[11px] text-quiet">
+                        {MEANING[gap.status]}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
@@ -75,7 +109,7 @@ export function LedgerPage() {
         <p className="text-sm">
           {data.unresolvedCitations === 0
             ? 'Every citation in every session resolves byte-for-byte against the text it quotes.'
-            : `${data.unresolvedCitations} citations do not resolve. That is a defect in CLOSER, not a judgment about you.`}
+            : `${data.unresolvedCitations} citations do not resolve. That is a defect in Levelhead, not a judgment about you.`}
         </p>
       </Panel>
     </div>

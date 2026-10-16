@@ -9,7 +9,7 @@ import {
   type ConductorPort,
   type EvaluatorPort,
   type IdSource,
-} from '@closer/core'
+} from '@levelhead/core'
 import type {
   Claim,
   Evidence,
@@ -22,7 +22,7 @@ import type {
   PolicyAction,
   RubricSet,
   Span,
-} from '@closer/contracts'
+} from '@levelhead/contracts'
 import type {
   ArmId,
   EvidenceLinkOutcome,
@@ -39,8 +39,8 @@ import type {
 // every item rather than quietly running the default adapter and reporting it as a local-model
 // result (ticket 16).
 export interface AlternateConductors {
-  closer_local_model?: ConductorPort
-  closer_headless_agent?: ConductorPort
+  levelhead_local_model?: ConductorPort
+  levelhead_headless_agent?: ConductorPort
 }
 
 // Identical for every arm — budget equivalence (ticket 16) is then measured via each outcome's own
@@ -116,7 +116,10 @@ export function findingOutcome(finding: Finding, spans: ReadonlyMap<string, Span
     competency:
       finding.kind === 'claim' || finding.kind === 'claim_abstained' ? null : finding.competency,
     verdict: finding.kind === 'claim' ? finding.verdict : null,
-    abstention: finding.kind === 'claim_abstained' ? finding.abstention : null,
+    abstention:
+      finding.kind === 'claim_abstained' || finding.kind === 'competency_abstained'
+        ? finding.abstention
+        : null,
     confidence: finding.confidence,
     rationale: finding.rationale,
     quotes: finding.transcriptSpanIds.map((id) => spans.get(id)?.quoted ?? ''),

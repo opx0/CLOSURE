@@ -1,9 +1,9 @@
-import { EXPORT_FORMAT_VERSION, widenFindings } from '@closer/contracts'
-import type { AnyEvent, ExportBundle, ExportedSession, OwnerId } from '@closer/contracts'
+import { EXPORT_FORMAT_VERSION, widenFindings } from '@levelhead/contracts'
+import type { AnyEvent, ExportBundle, ExportedSession, OwnerId } from '@levelhead/contracts'
 import { replay } from '../events/replay.ts'
 
 const NOTE =
-  'Everything CLOSER holds about this owner, as raw append-only events plus the view they fold into. ' +
+  'Everything Levelhead holds about this owner, as raw append-only events plus the view they fold into. ' +
   'Deleted repository snapshots appear as tombstones: the citation is kept, the bytes are gone.'
 
 export interface ExportableSession {

@@ -5,7 +5,8 @@ import type {
   PersonaId,
   PolicyAction,
   RoundKind,
-} from '@closer/contracts'
+  Topic,
+} from '@levelhead/contracts'
 
 // §4.8: code travels with the request rather than being fetched by the renderer — the snapshot is
 // deletable, and reading it is the caller's business, not the adapter's.
@@ -30,6 +31,8 @@ export interface RenderQuestionInput {
   level: Level
   personaId: PersonaId
   claim: Claim | null
+  // Only what the question may be phrased from; the false premise and the twist arrive as a seed.
+  topic?: Pick<Topic, 'id' | 'area' | 'title' | 'ask'>
   round: RoundKind
   artifact?: ArtifactContext
   transcript: readonly TranscriptTurn[]

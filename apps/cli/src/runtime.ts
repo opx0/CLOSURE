@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Clock, IdSource } from '@closer/core'
+import type { Clock, IdSource } from '@levelhead/core'
 
 export class SystemClock implements Clock {
   now(): string {

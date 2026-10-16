@@ -1,4 +1,4 @@
-import type { PersonaId, PolicyAction } from '@closer/contracts'
+import type { PersonaId, PolicyAction } from '@levelhead/contracts'
 import type { PressureLevel } from './pressure.ts'
 
 export interface PersonaConfig {

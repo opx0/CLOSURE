@@ -49,7 +49,7 @@ export function ReviewPage() {
         </Panel>
 
         {review.data?.subjects.map((entry) => (
-          <Panel key={entry.subject} title={entry.subject}>
+          <Panel key={entry.subject} title={entry.label}>
             <div className="space-y-3">
               {entry.attempts.map((attempt, index) => (
                 <div key={index} className="space-y-1">

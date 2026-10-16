@@ -1,5 +1,5 @@
-import { evaluateAnswer, gapsFromFindings, indexGaps } from '@closer/core'
-import type { GapEntry, PolicyAction, Span } from '@closer/contracts'
+import { evaluateAnswer, gapsFromFindings, indexGaps } from '@levelhead/core'
+import type { GapEntry, PolicyAction, Span } from '@levelhead/contracts'
 import type { FixtureItem, FixtureResume, ItemOutcome } from '../contract.ts'
 import { ItemRecorder, claimFromFixture, findingOutcome, type Arm, type ArmContext } from './arm.ts'
 

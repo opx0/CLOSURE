@@ -1,4 +1,4 @@
-import { EVENT_SCHEMA_VERSION, type AnyEvent, type EventKind } from '@closer/contracts'
+import { EVENT_SCHEMA_VERSION, type AnyEvent, type EventKind } from '@levelhead/contracts'
 import { assertValidEvent } from './validate.ts'
 
 // STACK §6: a breaking payload change requires an upcaster registered alongside the schema, plus a

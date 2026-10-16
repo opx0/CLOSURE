@@ -11,16 +11,16 @@ export default function benchmarkPorts() {
 
   // The two model-layer arms (PROJECT.md §6.1). Each is present only when it is actually reachable;
   // an absent one makes its arm publish a failure rather than a number produced by another model.
-  const headlessCommand = process.env.CLOSER_HEADLESS_AGENT_URL
+  const headlessCommand = process.env.LEVELHEAD_HEADLESS_AGENT_URL
   const alternateConductors = {
-    closer_local_model: new OpenAiCompatibleConductor({
+    levelhead_local_model: new OpenAiCompatibleConductor({
       baseUrl: config.llamaBaseUrl,
       modelAlias: LOCAL_MODEL_ALIAS,
     }),
     ...(headlessCommand === undefined
       ? {}
       : {
-          closer_headless_agent: new OpenAiCompatibleConductor({
+          levelhead_headless_agent: new OpenAiCompatibleConductor({
             baseUrl: headlessCommand,
             modelAlias: `${LOCAL_MODEL_ALIAS}-headless`,
             ...(config.apiKey === undefined ? {} : { apiKey: config.apiKey }),

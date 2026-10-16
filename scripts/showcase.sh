@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Stand the showcase up, show it, and take it down again. Not a deploy pipeline: CLOSER is not an
+# Stand the showcase up, show it, and take it down again. Not a deploy pipeline: Levelhead is not an
 # always-on public service (ADR-025), and the teardown step is the point rather than an afterthought.
 set -euo pipefail
 
-PROJECT="${CLOSER_GCP_PROJECT:-}"
-REGION="${CLOSER_GCP_REGION:-asia-south1}"
-REPO="${CLOSER_ARTIFACT_REPO:-closer}"
-TAG="${CLOSER_IMAGE_TAG:-$(git rev-parse --short HEAD)}"
-SERVICE="closer-showcase"
+PROJECT="${LEVELHEAD_GCP_PROJECT:-}"
+REGION="${LEVELHEAD_GCP_REGION:-asia-south1}"
+REPO="${LEVELHEAD_ARTIFACT_REPO:-levelhead}"
+TAG="${LEVELHEAD_IMAGE_TAG:-$(git rev-parse --short HEAD)}"
+SERVICE="levelhead-showcase"
 
 usage() {
   cat <<'USAGE'
@@ -20,16 +20,16 @@ usage: scripts/showcase.sh <up|down|status|url|logs>
   logs    tail the showcase logs
 
 environment:
-  CLOSER_GCP_PROJECT   required
-  CLOSER_GCP_REGION    default asia-south1
-  CLOSER_ARTIFACT_REPO default closer
-  CLOSER_IMAGE_TAG     default the current commit
+  LEVELHEAD_GCP_PROJECT   required
+  LEVELHEAD_GCP_REGION    default asia-south1
+  LEVELHEAD_ARTIFACT_REPO default levelhead
+  LEVELHEAD_IMAGE_TAG     default the current commit
 USAGE
 }
 
 require_project() {
   if [ -z "$PROJECT" ]; then
-    echo "CLOSER_GCP_PROJECT is not set; refusing to guess which project to deploy into." >&2
+    echo "LEVELHEAD_GCP_PROJECT is not set; refusing to guess which project to deploy into." >&2
     exit 1
   fi
 }
@@ -50,18 +50,18 @@ case "${1:-}" in
     docker push "$(image worker)"
 
     # Forward-only migrations, as their own step, before anything serves traffic.
-    gcloud run jobs deploy closer-migrate \
+    gcloud run jobs deploy levelhead-migrate \
       --image "$(image worker)" --region "$REGION" --project "$PROJECT" \
       --command node --args packages/db/src/migrate-cli.ts \
-      --set-secrets DATABASE_URL=closer-database-url:latest --quiet
-    gcloud run jobs execute closer-migrate --region "$REGION" --project "$PROJECT" --wait
+      --set-secrets DATABASE_URL=levelhead-database-url:latest --quiet
+    gcloud run jobs execute levelhead-migrate --region "$REGION" --project "$PROJECT" --wait
 
     gcloud run deploy "$SERVICE" \
       --image "$(image server)" --region "$REGION" --project "$PROJECT" \
       --allow-unauthenticated \
       --min-instances 0 --max-instances 2 --concurrency 20 --timeout 120 \
-      --set-env-vars NODE_ENV=production,CLOSER_STORE=postgres,CLOSER_DEMO_MODE=true,CLOSER_RATE_LIMIT_PER_MINUTE=60 \
-      --set-secrets DATABASE_URL=closer-database-url:latest,MODEL_PROVIDER_API_KEY=closer-model-key:latest \
+      --set-env-vars NODE_ENV=production,LEVELHEAD_STORE=postgres,LEVELHEAD_DEMO_MODE=true,LEVELHEAD_RATE_LIMIT_PER_MINUTE=60 \
+      --set-secrets DATABASE_URL=levelhead-database-url:latest,MODEL_PROVIDER_API_KEY=levelhead-model-key:latest \
       --quiet
 
     echo

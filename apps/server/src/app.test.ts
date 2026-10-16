@@ -28,6 +28,10 @@ test('every route is in the generated document, because the schemas are the cont
       '/sessions/{id}/events',
       '/sessions/{id}/replay',
       '/ledger',
+      '/topics',
+      '/snapshots',
+      '/snapshots/{id}/artifacts/{artifactId}',
+      '/resume/feedback',
     ]),
   )
 })

@@ -1,13 +1,13 @@
 import type { Static, TSchema } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
-import type { AnyEvent, Finding, InvocationRecord, Span } from '@closer/contracts'
+import type { AnyEvent, Finding, InvocationRecord, Span } from '@levelhead/contracts'
 import type {
   ConductorPort,
   EvaluatorPort,
   RenderedQuestion,
   StructuredRequest,
   StructuredResult,
-} from '@closer/core'
+} from '@levelhead/core'
 
 // Ports that answer strictly from an event log — no fresh generation, no fallback; an exhausted log
 // throws rather than quietly inventing a turn.
@@ -54,6 +54,13 @@ function judgmentFrom(finding: Finding, spans: ReadonlyMap<string, Span>): unkno
         competency: finding.competency,
         levelMet: finding.levelMet,
       }
+    case 'competency_abstained':
+      return {
+        ...judgment,
+        kind: 'competency_abstained',
+        competency: finding.competency,
+        abstention: finding.abstention,
+      }
   }
 }
 
@@ -76,11 +83,32 @@ export function recordedEvaluations(events: readonly AnyEvent[]): RecordedEvalua
   })
 }
 
+// A refused brief was never logged as text; an empty one is refused again, so the log replays as written.
+export function recordedBriefs(events: readonly AnyEvent[]): RecordedQuestion[] {
+  return events.flatMap((event) =>
+    event.kind === 'state_change' &&
+    event.payload.change === 'round_started' &&
+    event.payload.briefInvocation !== undefined
+      ? [{ text: event.payload.brief ?? '', invocation: event.payload.briefInvocation }]
+      : [],
+  )
+}
+
 export class RecordedConductor implements ConductorPort {
   #queue: RecordedQuestion[]
+  // Only a log that rendered briefs replays them; otherwise the round opens with none, as it did.
+  readonly renderRoundBrief?: () => Promise<RenderedQuestion>
 
   constructor(events: readonly AnyEvent[]) {
     this.#queue = recordedQuestions(events)
+    const briefs = recordedBriefs(events)
+    if (briefs.length > 0) {
+      this.renderRoundBrief = async () => {
+        const next = briefs.shift()
+        if (next === undefined) throw new Error('recorded: the log has no further brief to replay')
+        return next
+      }
+    }
   }
 
   // `input` is ignored on purpose — reading it would be the door a fresh generation walks in through.

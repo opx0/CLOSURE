@@ -1,4 +1,4 @@
-import type { FailureKind, Result } from '@closer/core'
+import type { FailureKind, Result } from '@levelhead/core'
 import type { FastifyReply } from 'fastify'
 
 const STATUS: Record<FailureKind, number> = {

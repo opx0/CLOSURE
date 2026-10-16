@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { Span } from '@closer/contracts'
+import type { Span } from '@levelhead/contracts'
 import { locateQuote, resolveSpan, spanViolations } from './sources.ts'
 
 // 'café' is 5 bytes over 4 characters, '☕' is 3 bytes over 1 — the failure this module catches.

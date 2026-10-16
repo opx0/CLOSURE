@@ -1,5 +1,5 @@
 {
-  "name": "@closer/server",
+  "name": "@levelhead/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     "typecheck": "tsc --noEmit -p ../../tsconfig.json"
   },
   "dependencies": {
-    "@closer/contracts": "workspace:*",
-    "@closer/core": "workspace:*",
-    "@closer/db": "workspace:*",
-    "@closer/observability": "workspace:*",
+    "@levelhead/contracts": "workspace:*",
+    "@levelhead/core": "workspace:*",
+    "@levelhead/db": "workspace:*",
+    "@levelhead/observability": "workspace:*",
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
     "@fastify/rate-limit": "11.2.0",
@@ -20,7 +20,7 @@
     "@fastify/swagger": "9.8.1",
     "@fastify/type-provider-typebox": "6.1.0",
     "@sinclair/typebox": "0.34.52",
-    "fastify": "5.12.3",
+    "fastify": "5.12.5",
     "fastify-plugin": "6.0.0",
     "pg": "8.23.0"
   }

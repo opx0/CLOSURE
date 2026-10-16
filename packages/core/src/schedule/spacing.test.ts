@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import type { GapEntry } from '@closer/contracts'
+import type { GapEntry } from '@levelhead/contracts'
 import { INTERVALS, intervalDays, nextReviewAt, reviewCountAfter } from './spacing.ts'
 
 function gapOf(over: Partial<GapEntry> = {}): GapEntry {
