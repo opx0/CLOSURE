@@ -19,6 +19,8 @@ COPY benchmarks/package.json benchmarks/
 RUN bun install --frozen-lockfile
 
 FROM deps AS web
+ARG LEVELHEAD_PREVIEW_MODE=false
+ENV VITE_LEVELHEAD_PREVIEW_MODE=${LEVELHEAD_PREVIEW_MODE}
 COPY . .
 RUN bun run --cwd apps/web build
 
@@ -38,7 +40,8 @@ COPY --from=web /srv /srv
 # Non-root: the process ingests untrusted repositories, so it runs with no more rights than it needs.
 USER node
 EXPOSE 3001
-CMD ["node", "apps/server/src/index.ts"]
+# Parameter properties in core require transformation, not Node's strip-only TS loader.
+CMD ["node", "--experimental-transform-types", "apps/server/src/index.ts"]
 
 FROM runtime AS worker
 CMD ["node", "apps/worker/src/index.ts"]

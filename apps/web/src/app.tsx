@@ -145,6 +145,12 @@ export function App() {
           {open ? '✕' : '☰'}
         </button>
       </header>
+      {import.meta.env.VITE_LEVELHEAD_PREVIEW_MODE === 'true' && (
+        <aside role="status" className="border-b border-current/10 px-6 py-3 text-center text-sm">
+          UI preview — explore the screens. Live interviews and uploads are unavailable. Do not
+          enter personal material.
+        </aside>
+      )}
       <main className={`studio-main ${primaryPage ? '' : 'legacy-surface legacy-page'}`}>
         <Routes>
           <Route path="/" element={<PreparePage />} />
