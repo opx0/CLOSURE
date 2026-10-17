@@ -38,6 +38,7 @@ const ConfigSchema = Type.Object({
   LEVELHEAD_MAX_BODY_BYTES: Type.Integer({ minimum: 1024, default: 256 * 1024 }),
   // A showcase instance runs on a synthetic résumé and refuses to keep anyone's real material.
   LEVELHEAD_DEMO_MODE: Type.Boolean({ default: false }),
+  LEVELHEAD_PREVIEW_MODE: Type.Boolean({ default: false }),
   LEVELHEAD_WEB_DIST: Type.String({ minLength: 1, default: 'apps/web/dist' }),
   SNAPSHOT_RETENTION_DAYS: Type.Integer({ minimum: 1, default: 90 }),
   OTEL_ENABLED: Type.Boolean({ default: false }),

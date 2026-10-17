@@ -50,6 +50,25 @@ export async function buildApp(config: Config, deps: ServerDeps): Promise<Fastif
     genReqId: () => newCorrelationId(),
   }).withTypeProvider<TypeBoxTypeProvider>()
 
+  // A public UI preview must not accept personal material or attempt unconfigured model calls.
+  // Reject before parsing bodies; only the throwaway visitor identity may be created.
+  if (config.LEVELHEAD_PREVIEW_MODE) {
+    app.addHook('onRequest', async (request, reply) => {
+      if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return
+      if (
+        config.LEVELHEAD_DEMO_MODE &&
+        request.method === 'POST' &&
+        request.url.split('?')[0] === '/demo/token'
+      ) {
+        return
+      }
+      return reply.code(503).send({
+        error: 'read-only UI preview',
+        detail: 'Live interviews and uploads are unavailable until a model provider is configured.',
+      })
+    })
+  }
+
   await app.register(fastifyHelmet, {
     // The bundled page and the built client are same-origin and inline nothing they did not ship.
     contentSecurityPolicy: {

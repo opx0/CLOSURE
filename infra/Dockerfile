@@ -19,6 +19,8 @@ COPY benchmarks/package.json benchmarks/
 RUN bun install --frozen-lockfile
 
 FROM deps AS web
+ARG LEVELHEAD_PREVIEW_MODE=false
+ENV VITE_LEVELHEAD_PREVIEW_MODE=${LEVELHEAD_PREVIEW_MODE}
 COPY . .
 RUN bun run --cwd apps/web build
 

@@ -7,3 +7,14 @@ node_modules
 docs
 research
 *.log
+**/.levelhead
+**/.closer
+.claude
+.vscode
+.env.*
+**/.env
+**/.env.*
+fixtures/private
+test-results
+playwright-report
+AGENTS.md
