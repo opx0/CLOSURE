@@ -167,7 +167,7 @@ test('summaries separate heldout, no-answer and failed rows, with paired query d
 
 test('CLI requires an explicit temporary report path and refuses misleading partial modes', () => {
   expect(() => parseArgs([])).toThrow('--out')
-  expect(() => parseArgs(['--out', 'reports/result.json'])).toThrow('/tmp/opencode')
+  expect(() => parseArgs(['--out', '/var/tmp/enm62-result.json'])).toThrow('/tmp/opencode')
   expect(() => parseArgs(['--out', '/tmp/opencode/result.json', '--mode', 'dense'])).toThrow('mode')
   expect(() => parseArgs(['--out', '/tmp/opencode/result.json', '--hosted'])).toThrow('Unknown')
   expect(parseArgs(['--out', '/tmp/opencode/result.json', '--mode', 'lexical-only'])).toEqual({
