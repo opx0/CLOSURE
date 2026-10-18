@@ -7,6 +7,7 @@
   "scripts": {
     "bench": "bun run src/cli.ts",
     "retrieval": "bun run src/retrieval/cli.ts",
+    "retrieval:generation": "bun run src/retrieval/generation.ts",
     "typecheck": "tsc --noEmit -p ../tsconfig.json"
   },
   "dependencies": {

@@ -189,3 +189,55 @@ Real local embedding and PostgreSQL checks are separate from scripted applicatio
 checks. Scripted Conductor and Evaluator responses do not validate generation or judgment quality.
 Independent human review, personal-corpus effectiveness, evaluator calibration, and a complete
 offline interview workflow remain unproven. No learning-outcome result follows from this run.
+
+### Opt-in real generation diagnostic
+
+Unlike the scripted HTTP integration above, this command uses the production Conductor and
+structured Evaluator, actual PostgreSQL hybrid search and the pinned local embedding adapter.
+It never substitutes scripted engines, repairs an output or retries a judgment. It creates only a
+public authored Git fixture and an isolated disposable database schema, and removes both in
+`finally`. It does not start services, download models, unload models or touch existing volumes.
+
+Prepare a **dedicated** loopback Ollama completion runtime, separate from the embedding daemon.
+Use a fitting local quantized artifact of at most 1 GiB, an explicit `local/` alias, and model
+parameters `num_ctx 4096` (or smaller) and `num_gpu 0`, visible in `/api/show`. Independently configure
+runtime concurrency, allocation limits and an own-process watchdog before use. The diagnostic
+checks alias/manifest digest before and after; this is **not atomic generation digest pinning**.
+Its host-memory sampler cancels HTTP work below 1.5 GiB available; it cannot enforce runtime RSS,
+unload a caller-owned model or stop a daemon continuing computation after cancellation. Linux
+`MemAvailable` must be at least 3 GiB at startup. Neither swap nor free GPU memory substitutes.
+
+```sh
+export RETRIEVAL_GENERATION=1
+export RETRIEVAL_GENERATION_DISPOSABLE_DB=yes
+export RETRIEVAL_GENERATION_DATABASE_URL='postgres://USER:PASSWORD@127.0.0.1:PORT/DISPOSABLE_DB'
+export RETRIEVAL_GENERATION_ORIGIN=http://127.0.0.1:18462
+export RETRIEVAL_GENERATION_MODEL=local/YOUR_PREPARED_ALIAS
+export RETRIEVAL_GENERATION_DIGEST=FULL_64_CHARACTER_MANIFEST_SHA256
+# Optional: 128–1024, default 512. Truncation is a failure, never abstention.
+export RETRIEVAL_GENERATION_MAX_OUTPUT_TOKENS=512
+bun run --cwd benchmarks retrieval:generation /tmp/opencode/generation-report-UNIQUE.json
+```
+
+The embedding origin uses `LEVELHEAD_EMBEDDING_BASE_URL`, default `http://127.0.0.1:11434`;
+its model/digest/dimension/input bounds are the validated all-minilm profile above. The database
+URL must be loopback and explicitly disposable: migrations require installed pgvector and may
+create its extension. A schema is dropped only after this run creates it. Do not point at valuable
+data. Provider keys and application `MODEL_ID` are not read by these directly constructed adapters.
+
+The fixed fresh diagnostics exercise an explained comparison, a false locking/exactly-once claim,
+unknown deployment configuration, and repository/answer injection. They do not change the ranking
+benchmark's tuning/held-out cases or invent a similarity threshold for abstention. Each case runs
+once. An answer-and-source-cited finding and an explicit answer-cited abstention are reported
+separately; an empty list, dropped judgment, malformed/truncated response or dependency failure
+exits nonzero, never passes as abstention. The unknown-deployment case requires abstention; the
+false-code case refuses positive competency credit. These authored checks are not calibration.
+
+The exclusive-create, mode-0600 JSON report includes code/fixture hashes, runtime/model identity,
+prompt versions/hashes, token usage, sampled host headroom, exact public fixture sources, structured
+responses, accepted findings and deletion checks. Only public fixture inputs are sent; do not
+replace them with personal material. Errors omit upstream messages/credentials. The fetch guard
+allows only the two configured origins, refuses redirects, and cancels HTTP work after 180 seconds
+(each request also has a 60-second bound). This is not an OS network sandbox or a hard bound on
+database/cleanup settlement. Runtime RSS, semantic citation support, human review, microphone use
+and physical offline operation remain unmeasured. A mechanical pass establishes none of those.
