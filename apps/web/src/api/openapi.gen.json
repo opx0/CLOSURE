@@ -2605,6 +2605,28 @@
                     "minLength": 1,
                     "type": "string"
                   },
+                  "repositorySearch": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "lexical"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "dense"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "hybrid"
+                        ]
+                      }
+                    ]
+                  },
                   "mode": {
                     "anyOf": [
                       {
@@ -3181,6 +3203,153 @@
                             },
                             "code": {
                               "type": "string"
+                            },
+                            "repositoryContext": {
+                              "type": "object",
+                              "required": [
+                                "sources",
+                                "trace"
+                              ],
+                              "properties": {
+                                "sources": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "artifactId",
+                                      "snapshotId",
+                                      "commit",
+                                      "path",
+                                      "startLine",
+                                      "endLine",
+                                      "contentHash",
+                                      "text"
+                                    ],
+                                    "properties": {
+                                      "artifactId": {
+                                        "type": "string"
+                                      },
+                                      "snapshotId": {
+                                        "type": "string"
+                                      },
+                                      "commit": {
+                                        "type": "string"
+                                      },
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "startLine": {
+                                        "type": "integer"
+                                      },
+                                      "endLine": {
+                                        "type": "integer"
+                                      },
+                                      "contentHash": {
+                                        "type": "string"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                },
+                                "trace": {
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "queryHash",
+                                    "strategy",
+                                    "sources",
+                                    "contextHash",
+                                    "retrievedCount",
+                                    "sourceCount",
+                                    "tokenCount"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "queryHash": {
+                                      "type": "string"
+                                    },
+                                    "strategy": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "lexical"
+                                          ]
+                                        },
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "dense"
+                                          ]
+                                        },
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "hybrid"
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "embeddingProfileId": {
+                                      "type": "string"
+                                    },
+                                    "sources": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "required": [
+                                          "artifactId",
+                                          "snapshotId",
+                                          "commit",
+                                          "path",
+                                          "startLine",
+                                          "endLine",
+                                          "contentHash"
+                                        ],
+                                        "properties": {
+                                          "artifactId": {
+                                            "type": "string"
+                                          },
+                                          "snapshotId": {
+                                            "type": "string"
+                                          },
+                                          "commit": {
+                                            "type": "string"
+                                          },
+                                          "path": {
+                                            "type": "string"
+                                          },
+                                          "startLine": {
+                                            "type": "integer"
+                                          },
+                                          "endLine": {
+                                            "type": "integer"
+                                          },
+                                          "contentHash": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "contextHash": {
+                                      "type": "string"
+                                    },
+                                    "retrievedCount": {
+                                      "type": "integer"
+                                    },
+                                    "sourceCount": {
+                                      "type": "integer"
+                                    },
+                                    "tokenCount": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
                             }
                           }
                         }
@@ -4540,6 +4709,153 @@
                             },
                             "code": {
                               "type": "string"
+                            },
+                            "repositoryContext": {
+                              "type": "object",
+                              "required": [
+                                "sources",
+                                "trace"
+                              ],
+                              "properties": {
+                                "sources": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "artifactId",
+                                      "snapshotId",
+                                      "commit",
+                                      "path",
+                                      "startLine",
+                                      "endLine",
+                                      "contentHash",
+                                      "text"
+                                    ],
+                                    "properties": {
+                                      "artifactId": {
+                                        "type": "string"
+                                      },
+                                      "snapshotId": {
+                                        "type": "string"
+                                      },
+                                      "commit": {
+                                        "type": "string"
+                                      },
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "startLine": {
+                                        "type": "integer"
+                                      },
+                                      "endLine": {
+                                        "type": "integer"
+                                      },
+                                      "contentHash": {
+                                        "type": "string"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                },
+                                "trace": {
+                                  "type": "object",
+                                  "required": [
+                                    "version",
+                                    "queryHash",
+                                    "strategy",
+                                    "sources",
+                                    "contextHash",
+                                    "retrievedCount",
+                                    "sourceCount",
+                                    "tokenCount"
+                                  ],
+                                  "properties": {
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "queryHash": {
+                                      "type": "string"
+                                    },
+                                    "strategy": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "lexical"
+                                          ]
+                                        },
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "dense"
+                                          ]
+                                        },
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "hybrid"
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "embeddingProfileId": {
+                                      "type": "string"
+                                    },
+                                    "sources": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "required": [
+                                          "artifactId",
+                                          "snapshotId",
+                                          "commit",
+                                          "path",
+                                          "startLine",
+                                          "endLine",
+                                          "contentHash"
+                                        ],
+                                        "properties": {
+                                          "artifactId": {
+                                            "type": "string"
+                                          },
+                                          "snapshotId": {
+                                            "type": "string"
+                                          },
+                                          "commit": {
+                                            "type": "string"
+                                          },
+                                          "path": {
+                                            "type": "string"
+                                          },
+                                          "startLine": {
+                                            "type": "integer"
+                                          },
+                                          "endLine": {
+                                            "type": "integer"
+                                          },
+                                          "contentHash": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "contextHash": {
+                                      "type": "string"
+                                    },
+                                    "retrievedCount": {
+                                      "type": "integer"
+                                    },
+                                    "sourceCount": {
+                                      "type": "integer"
+                                    },
+                                    "tokenCount": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
                             }
                           }
                         }
@@ -27601,6 +27917,153 @@
                         },
                         "code": {
                           "type": "string"
+                        },
+                        "repositoryContext": {
+                          "type": "object",
+                          "required": [
+                            "sources",
+                            "trace"
+                          ],
+                          "properties": {
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "artifactId",
+                                  "snapshotId",
+                                  "commit",
+                                  "path",
+                                  "startLine",
+                                  "endLine",
+                                  "contentHash",
+                                  "text"
+                                ],
+                                "properties": {
+                                  "artifactId": {
+                                    "type": "string"
+                                  },
+                                  "snapshotId": {
+                                    "type": "string"
+                                  },
+                                  "commit": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  },
+                                  "startLine": {
+                                    "type": "integer"
+                                  },
+                                  "endLine": {
+                                    "type": "integer"
+                                  },
+                                  "contentHash": {
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "trace": {
+                              "type": "object",
+                              "required": [
+                                "version",
+                                "queryHash",
+                                "strategy",
+                                "sources",
+                                "contextHash",
+                                "retrievedCount",
+                                "sourceCount",
+                                "tokenCount"
+                              ],
+                              "properties": {
+                                "version": {
+                                  "type": "string"
+                                },
+                                "queryHash": {
+                                  "type": "string"
+                                },
+                                "strategy": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "lexical"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "dense"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "hybrid"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "embeddingProfileId": {
+                                  "type": "string"
+                                },
+                                "sources": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "artifactId",
+                                      "snapshotId",
+                                      "commit",
+                                      "path",
+                                      "startLine",
+                                      "endLine",
+                                      "contentHash"
+                                    ],
+                                    "properties": {
+                                      "artifactId": {
+                                        "type": "string"
+                                      },
+                                      "snapshotId": {
+                                        "type": "string"
+                                      },
+                                      "commit": {
+                                        "type": "string"
+                                      },
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "startLine": {
+                                        "type": "integer"
+                                      },
+                                      "endLine": {
+                                        "type": "integer"
+                                      },
+                                      "contentHash": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                },
+                                "contextHash": {
+                                  "type": "string"
+                                },
+                                "retrievedCount": {
+                                  "type": "integer"
+                                },
+                                "sourceCount": {
+                                  "type": "integer"
+                                },
+                                "tokenCount": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
                         }
                       }
                     }

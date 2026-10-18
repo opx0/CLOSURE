@@ -14,6 +14,12 @@ import type {
 import type { ArtifactContext, IdSource, PinnedContext, PressureLevel } from '@levelhead/core'
 import { runSession, type SessionIo, type SessionResult } from '@levelhead/core'
 import type { ServerDeps } from './deps.ts'
+import type {
+  RunSessionInput,
+  RepositorySource,
+  RepositorySearchTrace,
+  RepositorySourceReference,
+} from '@levelhead/core'
 
 // Reuses `runSession` unmodified rather than re-implementing the interview loop; `io.answer()`
 // suspends between HTTP requests instead of stepping a turn per request.
@@ -32,6 +38,7 @@ export interface StartSessionInput {
   topics?: readonly Topic[]
   topicHistory: readonly string[]
   pinned?: PinnedContext
+  repositorySearch?: RunSessionInput['repositorySearch']
 }
 
 export interface TurnRound {
@@ -41,7 +48,12 @@ export interface TurnRound {
   brief?: string
 }
 
-export type TurnArtifact = Omit<ArtifactContext, 'artifactId'>
+export type TurnArtifact = Omit<ArtifactContext, 'artifactId' | 'repositoryContext'> & {
+  repositoryContext?: {
+    sources: RepositorySource[]
+    trace: Omit<RepositorySearchTrace, 'sources'> & { sources: RepositorySourceReference[] }
+  }
+}
 
 export interface TurnQuestion {
   attemptId: string
@@ -62,6 +74,17 @@ function shown(artifact: ArtifactContext): TurnArtifact {
     ...(artifact.startLine === undefined ? {} : { startLine: artifact.startLine }),
     ...(artifact.endLine === undefined ? {} : { endLine: artifact.endLine }),
     code: artifact.code,
+    ...(artifact.repositoryContext === undefined
+      ? {}
+      : {
+          repositoryContext: {
+            sources: [...artifact.repositoryContext.sources],
+            trace: {
+              ...artifact.repositoryContext.trace,
+              sources: [...artifact.repositoryContext.trace.sources],
+            },
+          },
+        }),
   }
 }
 
@@ -162,6 +185,9 @@ export class LiveSession {
       ...(role === undefined ? {} : { role }),
       ...(topics === undefined ? {} : { topics }),
       ...(pinned === undefined ? {} : { pinned }),
+      ...(this.#input.repositorySearch === undefined
+        ? {}
+        : { repositorySearch: this.#input.repositorySearch }),
       ceilings: this.#deps.ceilings,
       deps: {
         store: this.#deps.storeFor(this.#input.principal),

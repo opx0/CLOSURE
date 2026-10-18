@@ -1,7 +1,10 @@
 import { LOCAL_OWNER_ID } from '@levelhead/contracts'
+import { repositoryStrategy } from './repository-search.ts'
+import type { RetrievalStrategy } from '@levelhead/core'
 
 // DATABASE_URL is deliberately not required — the default `jsonl` store needs no running container.
 export interface CliConfig {
+  repositorySearch?: RetrievalStrategy
   ownerId: string
   store: 'jsonl' | 'postgres'
   databaseUrl: string | undefined
@@ -16,6 +19,9 @@ export interface CliConfig {
 
 export function loadCliConfig(env: Record<string, string | undefined> = process.env): CliConfig {
   return {
+    ...(env.LEVELHEAD_REPOSITORY_SEARCH === undefined
+      ? {}
+      : { repositorySearch: repositoryStrategy(env.LEVELHEAD_REPOSITORY_SEARCH)! }),
     // ADR-023: one fixed local owner in development, a real identity later, and the same boundary
     // either way.
     ownerId: env.LEVELHEAD_OWNER ?? LOCAL_OWNER_ID,

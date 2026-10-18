@@ -101,6 +101,8 @@
       "dependencies": {
         "@levelhead/contracts": "workspace:*",
         "@levelhead/core": "workspace:*",
+        "@levelhead/db": "workspace:*",
+        "pg": "8.23.0",
       },
     },
     "packages/contracts": {

@@ -26,6 +26,8 @@ export interface StructuredEvaluatorConfig {
   // for wiring only — not honesty-critical, and no calibration/agreement number may come from it.
   apiKey?: string | undefined
   localBaseUrl: string
+  // Optional local runtime ceiling; the prompt's smaller request budget still wins.
+  maxOutputTokens?: number | undefined
   anthropicBaseUrl?: string | undefined
   // Retries are transport-level only. A schema violation is never retried into shape — an Evaluator
   // that quietly re-rolls a malformed answer makes every agreement number meaningless.
@@ -53,6 +55,12 @@ export class StructuredEvaluator implements EvaluatorPort {
   readonly #useAnthropic: boolean
 
   constructor(private readonly config: StructuredEvaluatorConfig) {
+    if (
+      config.maxOutputTokens !== undefined &&
+      (!Number.isSafeInteger(config.maxOutputTokens) || config.maxOutputTokens < 1)
+    ) {
+      throw new RangeError('maxOutputTokens must be a positive integer')
+    }
     this.#price = priceFor(config.modelAlias)
     this.#useAnthropic = Boolean(config.apiKey)
   }
@@ -147,7 +155,10 @@ export class StructuredEvaluator implements EvaluatorPort {
       this.config.apiKey,
       {
         model: this.config.modelAlias,
-        max_tokens: request.maxOutputTokens,
+        max_tokens: Math.min(
+          request.maxOutputTokens,
+          this.config.maxOutputTokens ?? request.maxOutputTokens,
+        ),
         messages: [
           { role: 'system', content: request.system },
           { role: 'user', content: request.user },

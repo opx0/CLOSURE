@@ -162,5 +162,5 @@ test('the rendered prompt moves with the round; the prompt it is attributed by d
   })
   expect(new Set(digests).size).toBe(ROUND_ORDER.length)
   expect(answerEvaluationPrompt.id).toBe('answer-evaluation')
-  expect(answerEvaluationPrompt.version).toBe(2)
+  expect(answerEvaluationPrompt.version).toBe(3)
 })

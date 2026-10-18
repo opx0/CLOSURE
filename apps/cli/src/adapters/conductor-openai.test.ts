@@ -48,6 +48,46 @@ const completion = {
   usage: { prompt_tokens: 900, completion_tokens: 30 },
 }
 
+test('questions and round briefs have bounded output by default', async () => {
+  const capture: { request?: unknown } = {}
+  stubFetch(completion, capture)
+  const conductor = new OpenAiCompatibleConductor({
+    baseUrl: 'http://localhost:8081/v1',
+    modelAlias: 'local/test',
+  })
+  await conductor.renderQuestion(input)
+  expect(capture.request).toHaveProperty('max_tokens', 512)
+  await conductor.renderRoundBrief({
+    round: 'project_deep_dive',
+    personaId: 'skeptic',
+    roundIndex: 0,
+    totalRounds: 1,
+    claim: input.claim,
+  })
+  expect(capture.request).toHaveProperty('max_tokens', 512)
+})
+
+test('explicit output limits are honored and invalid ones fail closed', async () => {
+  const capture: { request?: unknown } = {}
+  stubFetch(completion, capture)
+  await new OpenAiCompatibleConductor({
+    baseUrl: 'http://localhost:8081/v1',
+    modelAlias: 'local/test',
+    maxOutputTokens: 256,
+  }).renderQuestion(input)
+  expect(capture.request).toHaveProperty('max_tokens', 256)
+  for (const maxOutputTokens of [0, -1, Infinity, NaN, 1.5]) {
+    expect(
+      () =>
+        new OpenAiCompatibleConductor({
+          baseUrl: 'http://localhost:8081/v1',
+          modelAlias: 'local/test',
+          maxOutputTokens,
+        }),
+    ).toThrow('maxOutputTokens')
+  }
+})
+
 test('a rendered question carries the text and an invocation record, and nothing else', async () => {
   stubFetch(completion)
   const conductor = new OpenAiCompatibleConductor({
@@ -79,7 +119,7 @@ test('the invocation record is fully populated from the prompt and the response 
   expect(invocation.port).toBe('conductor')
   expect(invocation.modelAlias).toBe('local/llama.cpp')
   expect(invocation.promptId).toBe('question-render')
-  expect(invocation.promptVersion).toBe(2)
+  expect(invocation.promptVersion).toBe(3)
   expect(invocation.promptHash).toMatch(/^[0-9a-f]{16}$/)
   expect(invocation.inputTokens).toBe(900)
   expect(invocation.outputTokens).toBe(30)

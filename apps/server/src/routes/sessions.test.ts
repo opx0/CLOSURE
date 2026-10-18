@@ -1,4 +1,6 @@
 import { test, expect } from 'bun:test'
+import { SessionLog, type RetrievalPort } from '@levelhead/core'
+import { FixedClock, SeqIds } from '../../../cli/src/testing/fakes.ts'
 import {
   ANSWER,
   ANSWER_QUOTE,
@@ -10,6 +12,92 @@ import {
 } from '../testing/harness.ts'
 
 const QUESTION = 'How does a job get picked up, and what happens if the worker dies mid-job?'
+
+for (const strategy of ['lexical', 'dense', 'hybrid'] as const) {
+  for (const availablePin of [false, true]) {
+    test(`configured ${strategy} skips repository search for topic-only sessions (pin: ${availablePin})`, async () => {
+      const searches: unknown[] = []
+      const retrieval: RetrievalPort = {
+        async index() {},
+        async forget() {},
+        async isLive() {
+          return true
+        },
+        async search(...args) {
+          searches.push(args)
+          return []
+        },
+      }
+      const { app, store } = await testApi({
+        questions: [QUESTION],
+        deps: { retrieval, repositorySearch: strategy },
+      })
+      try {
+        if (availablePin) {
+          const log = await SessionLog.open(
+            { store, clock: new FixedClock(), ids: new SeqIds() },
+            'repo',
+          )
+          await log.append('state_change', {
+            change: 'snapshot_pinned',
+            snapshot: {
+              id: 'snap_topic',
+              repoPath: '/unused',
+              commit: 'abc123',
+              pinnedAt: '2026-10-18T00:00:00.000Z',
+              fileCount: 0,
+            },
+            artifacts: [],
+            evidence: [],
+          })
+        }
+        const response = await app.inject({
+          method: 'POST',
+          url: '/sessions',
+          payload: {
+            rounds: ['cs_fundamentals'],
+            ...(availablePin ? { snapshotId: 'snap_topic' } : {}),
+          },
+        })
+        expect(response.statusCode).toBe(201)
+        expect(response.json().status).toBe('awaiting_answer')
+        expect(response.json().question.text).toBe(QUESTION)
+        expect(searches).toHaveLength(0)
+        const explicit = await app.inject({
+          method: 'POST',
+          url: '/sessions',
+          payload: { rounds: ['cs_fundamentals'], repositorySearch: strategy },
+        })
+        expect(explicit.statusCode).toBe(409)
+        expect(explicit.json().error).toContain('indexed pinned snapshot')
+        expect(searches).toHaveLength(0)
+      } finally {
+        await app.close()
+      }
+    })
+  }
+}
+
+test('repositorySearch rejects invalid strategy and missing pinned/index configuration explicitly', async () => {
+  const { app } = await testApi()
+  try {
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      payload: { repositorySearch: 'auto' },
+    })
+    expect(invalid.statusCode).toBe(400)
+    const unavailable = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      payload: { repositorySearch: 'hybrid' },
+    })
+    expect(unavailable.statusCode).toBe(409)
+    expect(unavailable.json().error).toContain('indexed pinned snapshot')
+  } finally {
+    await app.close()
+  }
+})
 
 function scripted() {
   return {

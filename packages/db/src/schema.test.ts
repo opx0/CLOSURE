@@ -9,6 +9,10 @@ import {
   events,
   jobs,
   snapshots,
+  retrievalProfiles,
+  retrievalPublications,
+  retrievalChunks,
+  retrievalVectors,
 } from './schema.ts'
 import { MIGRATIONS_DIR, loadMigrations } from './migrations/runner.ts'
 
@@ -37,11 +41,28 @@ test('the append-only constraint is on (session_id, seq)', () => {
 // The Drizzle tables and the SQL files are two statements of one shape, and only the SQL runs —
 // a column missing from one compiles and then fails in production.
 test('every column in every Drizzle table exists in the migrations', () => {
-  for (const table of [events, jobs, snapshots, artifactIndex]) {
+  for (const table of [
+    events,
+    jobs,
+    snapshots,
+    artifactIndex,
+    retrievalProfiles,
+    retrievalPublications,
+    retrievalChunks,
+    retrievalVectors,
+  ]) {
     for (const column of Object.values(getTableColumns(table))) {
       expect(allMigrations).toContain(column.name)
     }
   }
+})
+
+test('hybrid migration requires native exact pgvector and immutable encoding profiles', () => {
+  expect(allMigrations).toContain('CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public')
+  expect(allMigrations).toContain('embedding public.vector NOT NULL')
+  expect(allMigrations).toContain('retrieval_profile_immutable BEFORE UPDATE OR DELETE')
+  expect(allMigrations).toContain('public.vector_dims(NEW.embedding)')
+  expect(allMigrations).not.toMatch(/USING (hnsw|ivfflat)/i)
 })
 
 test('the ownership boundary is a column and an index, not a convention', () => {

@@ -18,6 +18,13 @@ export interface ChatCompletionResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number }
 }
 
+export const DEFAULT_COMPLETION_TIMEOUT_MS = 60_000
+
+export interface CompletionRequestOptions {
+  timeoutMs?: number
+  signal?: AbortSignal
+}
+
 export class ProviderHttpError extends Error {
   constructor(
     readonly status: number,
@@ -49,20 +56,62 @@ export async function postChatCompletion(
   apiKey: string | undefined,
   request: ChatCompletionRequest,
   resilience?: ProviderResilience,
+  options: CompletionRequestOptions = {},
 ): Promise<ChatCompletionResponse> {
+  if (
+    request.max_tokens !== undefined &&
+    (!Number.isSafeInteger(request.max_tokens) || request.max_tokens < 1)
+  ) {
+    throw new RangeError('max_tokens must be a positive integer')
+  }
+  const timeoutMs = options.timeoutMs ?? DEFAULT_COMPLETION_TIMEOUT_MS
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
+    throw new RangeError('timeoutMs must be a positive integer within the timer range')
+  }
+  const deadline = new AbortController()
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, deadline.signal])
+    : deadline.signal
+  const timer = setTimeout(
+    () => deadline.abort(new DOMException('Completion deadline exceeded', 'TimeoutError')),
+    timeoutMs,
+  )
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (apiKey) headers.authorization = `Bearer ${apiKey}`
 
-  return guarded(resilience, async () => {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(request),
-    })
+  try {
+    return await guarded(resilience, async () => {
+      // One deadline covers retries and response consumption; an expired call cannot start again.
+      signal.throwIfAborted()
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(request),
+        signal,
+      })
 
-    if (!response.ok) throw new ProviderHttpError(response.status, await response.text())
-    return (await response.json()) as ChatCompletionResponse
-  })
+      if (!response.ok) {
+        // Provider error bodies can echo the untrusted source/transcript sent in the request.
+        await response.body?.cancel()
+        throw new ProviderHttpError(response.status, '')
+      }
+      try {
+        return (await response.json()) as ChatCompletionResponse
+      } catch (error) {
+        signal.throwIfAborted()
+        /* eslint-disable preserve-caught-error -- Provider messages/causes can contain sensitive input. */
+        // Preserve retryable body transport failures without retaining sensitive diagnostics.
+        if (error instanceof TypeError)
+          throw new TypeError('Provider response body transport failed')
+        // JSON parser diagnostics may include provider-echoed source bytes too.
+        if (error instanceof SyntaxError) throw new Error('Provider returned invalid JSON')
+        throw new Error('Provider response body read failed')
+        /* eslint-enable preserve-caught-error */
+      }
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export function firstChoiceText(response: ChatCompletionResponse): string {

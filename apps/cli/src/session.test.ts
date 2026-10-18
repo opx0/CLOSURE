@@ -1,4 +1,8 @@
 import { test, expect } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { startFakeProvider } from './testing/fake-provider.ts'
 import { replay, resolveSpan, topicById } from '@levelhead/core'
 import type { PinnedContext, RepositoryPort } from '@levelhead/core'
 import type { Artifact, Claim, GapEntry, Topic } from '@levelhead/contracts'
@@ -28,6 +32,67 @@ const CLAIM: Claim = {
 }
 
 const ANSWER = 'We leased each job for 30 seconds. I do not think we handled double completion.'
+
+for (const strategy of ['lexical', 'dense', 'hybrid'] as const) {
+  test(`CLI configured ${strategy} allows topic-only sessions but explicit search still rejects`, async () => {
+    const eventDir = await mkdtemp(join(tmpdir(), 'levelhead-topic-'))
+    const question = 'How do two threads end up deadlocked?'
+    const provider = startFakeProvider({
+      questions: ['Let us discuss threads.', question],
+      evaluations: [{ findings: [] }],
+    })
+    try {
+      const invoke = async (extra: string[]) => {
+        const proc = Bun.spawn(
+          [
+            'bun',
+            'apps/cli/src/index.ts',
+            'session',
+            '--rounds',
+            'cs_fundamentals',
+            '--topics',
+            'os.deadlock',
+            '--turns',
+            '1',
+            '--no-drill',
+            ...extra,
+          ],
+          {
+            env: {
+              ...process.env,
+              LEVELHEAD_EVENT_DIR: join(eventDir, 'events'),
+              LEVELHEAD_STORE: 'jsonl',
+              LEVELHEAD_REPOSITORY_SEARCH: strategy,
+              LLAMA_BASE_URL: `http://127.0.0.1:${provider.port}/v1`,
+              MODEL_PROVIDER_API_KEY: '',
+            },
+            stdin: new TextEncoder().encode('Each holds a lock and waits for the other.\n\n'),
+            stdout: 'pipe',
+            stderr: 'pipe',
+          },
+        )
+        const [out, err, code] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+          proc.exited,
+        ])
+        return { code, out: out + err }
+      }
+      const inherited = await invoke([])
+      expect(inherited.code).toBe(0)
+      expect(inherited.out).toContain(question)
+      expect(inherited.out).toContain('CS fundamentals')
+      const explicit = await invoke(['--repository-search', strategy])
+      expect(explicit.code).toBe(1)
+      expect(explicit.out).toContain(
+        'repositorySearch requires a pinned repository and postgres index',
+      )
+    } finally {
+      provider.stop(true)
+      await rm(eventDir, { recursive: true, force: true })
+    }
+  })
+}
 
 function judged(quote: string) {
   return {

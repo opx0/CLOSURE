@@ -705,6 +705,7 @@ export interface paths {
                         topicIds?: string[];
                         claimIds?: string[];
                         snapshotId?: string;
+                        repositorySearch?: "lexical" | "dense" | "hybrid";
                         mode?: "simulation" | "coach" | "drill" | "transfer" | "review";
                         level?: "junior" | "mid" | "senior" | "staff";
                         personaId?: "collaborator" | "skeptic" | "bar_raiser" | "rusher";
@@ -753,6 +754,37 @@ export interface paths {
                                     startLine?: number;
                                     endLine?: number;
                                     code: string;
+                                    repositoryContext?: {
+                                        sources: {
+                                            artifactId: string;
+                                            snapshotId: string;
+                                            commit: string;
+                                            path: string;
+                                            startLine: number;
+                                            endLine: number;
+                                            contentHash: string;
+                                            text: string;
+                                        }[];
+                                        trace: {
+                                            version: string;
+                                            queryHash: string;
+                                            strategy: "lexical" | "dense" | "hybrid";
+                                            embeddingProfileId?: string;
+                                            sources: {
+                                                artifactId: string;
+                                                snapshotId: string;
+                                                commit: string;
+                                                path: string;
+                                                startLine: number;
+                                                endLine: number;
+                                                contentHash: string;
+                                            }[];
+                                            contextHash: string;
+                                            retrievedCount: number;
+                                            sourceCount: number;
+                                            tokenCount: number;
+                                        };
+                                    };
                                 };
                             };
                             findings: ({
@@ -951,6 +983,37 @@ export interface paths {
                                     startLine?: number;
                                     endLine?: number;
                                     code: string;
+                                    repositoryContext?: {
+                                        sources: {
+                                            artifactId: string;
+                                            snapshotId: string;
+                                            commit: string;
+                                            path: string;
+                                            startLine: number;
+                                            endLine: number;
+                                            contentHash: string;
+                                            text: string;
+                                        }[];
+                                        trace: {
+                                            version: string;
+                                            queryHash: string;
+                                            strategy: "lexical" | "dense" | "hybrid";
+                                            embeddingProfileId?: string;
+                                            sources: {
+                                                artifactId: string;
+                                                snapshotId: string;
+                                                commit: string;
+                                                path: string;
+                                                startLine: number;
+                                                endLine: number;
+                                                contentHash: string;
+                                            }[];
+                                            contextHash: string;
+                                            retrievedCount: number;
+                                            sourceCount: number;
+                                            tokenCount: number;
+                                        };
+                                    };
                                 };
                             };
                             findings: ({
@@ -5027,6 +5090,37 @@ export interface paths {
                                 startLine?: number;
                                 endLine?: number;
                                 code: string;
+                                repositoryContext?: {
+                                    sources: {
+                                        artifactId: string;
+                                        snapshotId: string;
+                                        commit: string;
+                                        path: string;
+                                        startLine: number;
+                                        endLine: number;
+                                        contentHash: string;
+                                        text: string;
+                                    }[];
+                                    trace: {
+                                        version: string;
+                                        queryHash: string;
+                                        strategy: "lexical" | "dense" | "hybrid";
+                                        embeddingProfileId?: string;
+                                        sources: {
+                                            artifactId: string;
+                                            snapshotId: string;
+                                            commit: string;
+                                            path: string;
+                                            startLine: number;
+                                            endLine: number;
+                                            contentHash: string;
+                                        }[];
+                                        contextHash: string;
+                                        retrievedCount: number;
+                                        sourceCount: number;
+                                        tokenCount: number;
+                                    };
+                                };
                             };
                         };
                     };

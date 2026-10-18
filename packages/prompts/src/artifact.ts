@@ -6,4 +6,18 @@ export interface PromptArtifact {
   startLine?: number | undefined
   endLine?: number | undefined
   code: string
+  repositoryContext?:
+    | {
+        sources: readonly {
+          artifactId: string
+          snapshotId: string
+          commit: string
+          path: string
+          startLine: number
+          endLine: number
+          contentHash: string
+          text: string
+        }[]
+      }
+    | undefined
 }

@@ -6,6 +6,16 @@ export * from './ports/clock.ts'
 export * from './ports/repository.ts'
 export * from './ports/job-queue.ts'
 export * from './ports/retrieval.ts'
+export type { EmbeddingProfile, EmbeddingPort } from './ports/embedding.ts'
+export {
+  chunkArtifact,
+  InvalidRetrievalSourceError,
+  RetrievalBudgetError,
+  OversizedSourceLineError,
+  type RetrievalDocument,
+} from './retrieval/chunks.ts'
+export { reciprocalRankFusion } from './retrieval/ranking.ts'
+export { buildRepositoryContext } from './retrieval/context.ts'
 export * from './ports/object-store.ts'
 export * from './ports/logger.ts'
 export * from './errors.ts'

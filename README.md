@@ -49,6 +49,8 @@ _Illustrative. The shape is real — this is what a session produces — but the
 
 ## How it's built
 
+Repository search uses PostgreSQL full-text search with `ts_rank_cd` for lexical matches, pgvector exact cosine search for embedding neighbors, and deterministic reciprocal rank fusion to combine their rankings. Ollama's native API supplies local embeddings with digest and locality checks. These tools supply bounded, cited project context, not evidence of candidate competence. See the [repository-search configuration and usage guide](docs/RETRIEVAL.md).
+
 _For the technical reader; skip freely._
 
 Two engines behind clean interfaces. A **Conductor** runs the interview — it is generative, determinism doesn't matter, and it can sit on any model, including a local one. An **Evaluator** judges — on a controlled path with strict output schemas, exact token and cost accounting, and enforced budgets, because it is the part that must be honest and measurable.

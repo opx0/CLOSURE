@@ -34,6 +34,19 @@ const judgment = {
   // The model supplies the words, code supplies the offsets — a model-produced byte offset would be
   // an opinion formatted as an integer (ticket 05 §2).
   quotes: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+  sourceQuotes: Type.Optional(
+    Type.Array(
+      Type.Object(
+        {
+          artifactId: Type.String({ minLength: 1 }),
+          contentHash: Type.String({ minLength: 1 }),
+          quote: Type.String({ minLength: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 1 },
+    ),
+  ),
 }
 
 // `composure` is missing on purpose: it arrives as its own kind, only on a pressure turn. Offering
@@ -211,6 +224,7 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
             startLine: input.artifact.startLine,
             endLine: input.artifact.endLine,
             code: input.artifact.code,
+            repositoryContext: input.artifact.repositoryContext,
           },
         }),
     transcript: input.transcript,
@@ -287,6 +301,30 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
       continue
     }
 
+    const sourceIds = new Set<string>()
+    const context = input.artifact?.repositoryContext
+    const requiresSource =
+      context !== undefined &&
+      judged.kind !== 'composure' &&
+      judged.kind !== 'claim_abstained' &&
+      judged.kind !== 'competency_abstained'
+    let invalidSource = false
+    for (const citation of judged.sourceQuotes ?? []) {
+      const source = context?.sources.find(
+        (source) =>
+          source.artifactId === citation.artifactId && source.contentHash === citation.contentHash,
+      )
+      if (source === undefined || locateQuote(source.text, citation.quote) === null) {
+        invalidSource = true
+        break
+      }
+      sourceIds.add(source.artifactId)
+    }
+    if (invalidSource || (requiresSource && sourceIds.size === 0)) {
+      drop('unresolvable_repository_source')
+      continue
+    }
+
     const rubricId = rubricIdFor(judged)
     const rubric = input.rubricSet.find((ref) => ref.id === rubricId)
     if (rubric === undefined) {
@@ -329,6 +367,17 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
     ]
     for (const spanId of restSpanIds) {
       evidenceIds.push(evidenceFor(subject, spanId, 'transcript_observed'))
+    }
+    // Persist only the reference. Deletable source quotes never become permanent answer spans.
+    for (const artifactId of sourceIds) {
+      const id = input.ids.next('evidence')
+      evidence.push({
+        id,
+        subject,
+        target: { kind: 'artifact', artifactId },
+        trust: 'repository_observed',
+      })
+      evidenceIds.push(id)
     }
     // Only a claim finding gets the résumé link — irrelevant to a judgment about how they answered.
     const aboutTheClaim = judged.kind === 'claim' || judged.kind === 'claim_abstained'

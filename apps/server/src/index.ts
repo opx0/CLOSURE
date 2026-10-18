@@ -2,7 +2,7 @@ import { Pool } from 'pg'
 import { LOCAL_OWNER_ID, type OwnerId, type Principal } from '@levelhead/contracts'
 import { PostgresEventStore, PostgresJobQueue, PostgresRetrieval } from '@levelhead/db'
 import { createLogger, startTracing } from '@levelhead/observability'
-import type { EventStore, JobQueuePort, RetrievalPort } from '@levelhead/core'
+import type { EventStore, JobQueuePort } from '@levelhead/core'
 import { loadConfig } from './config.ts'
 import { buildApp } from './app.ts'
 import { ownerOf } from './deps.ts'
@@ -11,6 +11,7 @@ import { ownerOf } from './deps.ts'
 import { JsonlEventStore } from '../../cli/src/store/jsonl.ts'
 import { fromEnv } from '../../cli/src/adapters/index.ts'
 import { RandomIds, SystemClock } from '../../cli/src/runtime.ts'
+import { repositoryStrategy, retrievalOptions } from '../../cli/src/repository-search.ts'
 
 const config = loadConfig()
 const { conductor, evaluator } = fromEnv(process.env)
@@ -37,7 +38,8 @@ const storeFor = (owner: OwnerId | Principal): EventStore => {
 
 const queue: JobQueuePort | null =
   pool === null ? null : new PostgresJobQueue(pool, () => ids.next('job'))
-const retrieval: RetrievalPort | null = pool === null ? null : new PostgresRetrieval(pool)
+const options = retrievalOptions(process.env)
+const retrieval = pool === null ? null : new PostgresRetrieval(pool, options)
 
 // The only place in the server that reads the environment. Everything below takes what it is given.
 const app = await buildApp(config, {
@@ -49,6 +51,10 @@ const app = await buildApp(config, {
   logger,
   queue,
   retrieval,
+  ...(config.LEVELHEAD_REPOSITORY_SEARCH === undefined
+    ? {}
+    : { repositorySearch: repositoryStrategy(config.LEVELHEAD_REPOSITORY_SEARCH)! }),
+  ...(options.embedding === undefined ? {} : { embeddingProfileId: options.embedding.profile.id }),
   ceilings: {
     sessionCostUsd: config.SESSION_COST_CEILING_USD,
     sessionTokens: config.SESSION_TOKEN_CEILING,

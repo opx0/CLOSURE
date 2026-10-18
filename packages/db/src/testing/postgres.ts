@@ -49,7 +49,7 @@ export async function openTestDatabase(
   if (bootstrap === undefined) return undefined
 
   await bootstrap.query(`create schema if not exists "${schema}"`)
-  const scoped = await openPool(url, `-c search_path=${schema}`)
+  const scoped = await openPool(url, `-c search_path=${schema},public`)
   if (scoped === undefined) {
     await bootstrap.end()
     return undefined

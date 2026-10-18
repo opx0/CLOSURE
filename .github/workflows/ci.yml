@@ -46,7 +46,7 @@ jobs:
       postgres:
         # Same major version as production: a concurrency test against a different one is a test of
         # a different database.
-        image: postgres:18
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: levelhead
           POSTGRES_PASSWORD: levelhead

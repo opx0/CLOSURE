@@ -6,10 +6,13 @@
   "main": "./src/index.ts",
   "scripts": {
     "bench": "bun run src/cli.ts",
+    "retrieval": "bun run src/retrieval/cli.ts",
     "typecheck": "tsc --noEmit -p ../tsconfig.json"
   },
   "dependencies": {
     "@levelhead/contracts": "workspace:*",
-    "@levelhead/core": "workspace:*"
+    "@levelhead/core": "workspace:*",
+    "@levelhead/db": "workspace:*",
+    "pg": "8.23.0"
   }
 }

@@ -68,8 +68,17 @@ export function privacyRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
         })
 
         const log = await SessionLog.open({ store, clock: deps.clock, ids: deps.ids }, REPO_SESSION)
+        if (deps.retrieval?.markDeleted !== undefined) {
+          await deps.retrieval.markDeleted(
+            request.principal.ownerId,
+            snapshot.id,
+            'candidate_requested',
+            tombstone.deletedAt,
+          )
+        } else {
+          await deps.retrieval?.forget(request.principal.ownerId, snapshot.id)
+        }
         await log.append('state_change', { change: 'snapshot_deleted', tombstone })
-        await deps.retrieval?.forget(request.principal.ownerId, snapshot.id)
 
         return { tombstone }
       },

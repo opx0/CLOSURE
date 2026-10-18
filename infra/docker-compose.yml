@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18
+    image: pgvector/pgvector:pg18
     container_name: levelhead-db
     environment:
       POSTGRES_USER: levelhead

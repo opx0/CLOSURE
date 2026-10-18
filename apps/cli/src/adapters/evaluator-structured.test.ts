@@ -56,6 +56,38 @@ function message(text: string, stopReason: string, inputTokens = 1200, outputTok
   }
 }
 
+test('an optional local output ceiling caps requests without increasing smaller budgets', async () => {
+  const capture: { request?: unknown } = {}
+  stubAnthropic(
+    {
+      choices: [
+        { message: { content: '{"verdict":"supported","confidence":0.8}' }, finish_reason: 'stop' },
+      ],
+    },
+    200,
+    capture,
+  )
+  const evaluator = new StructuredEvaluator({
+    modelAlias: 'local/test',
+    localBaseUrl: 'http://localhost:8081/v1',
+    maxOutputTokens: 256,
+  })
+  await evaluator.complete(request)
+  expect(capture.request).toHaveProperty('max_tokens', 256)
+  await evaluator.complete({ ...request, maxOutputTokens: 128 })
+  expect(capture.request).toHaveProperty('max_tokens', 128)
+  for (const maxOutputTokens of [0, -1, NaN, Infinity, 1.5]) {
+    expect(
+      () =>
+        new StructuredEvaluator({
+          modelAlias: 'local/test',
+          localBaseUrl: 'http://localhost:8081/v1',
+          maxOutputTokens,
+        }),
+    ).toThrow('maxOutputTokens')
+  }
+})
+
 test('happy path returns the validated value with computed, non-zero accounting', async () => {
   const capture: { request?: unknown } = {}
   stubAnthropic(message('{"verdict":"supported","confidence":0.8}', 'end_turn'), 200, capture)
@@ -188,6 +220,7 @@ test('with no key the Evaluator uses the local OpenAI-compatible endpoint and a 
   expect(result.value).toEqual({ verdict: 'contradicted', confidence: 0.2 })
   expect(result.invocation.inputTokens).toBe(700)
   expect(result.invocation.costUsd).toBe(0)
+  expect(capture.request).toHaveProperty('max_tokens', request.maxOutputTokens)
   expect((capture.request as Record<string, unknown>).response_format).toEqual({
     type: 'json_schema',
     json_schema: { name: 'verdict', schema: WIRE_SCHEMA, strict: true },

@@ -219,6 +219,9 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             topicIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             claimIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+            repositorySearch: Type.Optional(
+              Type.Union([Type.Literal('lexical'), Type.Literal('dense'), Type.Literal('hybrid')]),
+            ),
             mode: Type.Optional(ModeSchema),
             level: Type.Optional(LevelSchema),
             personaId: Type.Optional(PersonaIdSchema),
@@ -274,7 +277,11 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
         let pinned: PinnedContext | undefined
         if (resolved.needsSnapshot) {
           pinned = await openSnapshot(store, deps, body.snapshotId)
-          if (pinned === undefined) {
+          if (
+            pinned === undefined ||
+            (deps.retrieval?.isLive !== undefined &&
+              !(await deps.retrieval.isLive(request.principal.ownerId, pinned.snapshot.id)))
+          ) {
             return reply.code(400).send({
               error: 'pin a repository first',
               detail:
@@ -285,6 +292,28 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
           }
         }
 
+        // A configured default is only relevant when these rounds actually open repository code.
+        const strategy =
+          body.repositorySearch ?? (pinned === undefined ? undefined : deps.repositorySearch)
+        if (
+          strategy !== undefined &&
+          (pinned === undefined ||
+            deps.retrieval?.isLive === undefined ||
+            !(await deps.retrieval.isLive(request.principal.ownerId, pinned.snapshot.id)))
+        ) {
+          return reply
+            .code(409)
+            .send({ error: 'repositorySearch needs a live indexed pinned snapshot' })
+        }
+        if (
+          strategy !== undefined &&
+          strategy !== 'lexical' &&
+          deps.embeddingProfileId === undefined
+        ) {
+          return reply
+            .code(409)
+            .send({ error: 'repositorySearch dense/hybrid needs a configured local embedder' })
+        }
         const update = await host.start({
           principal: request.principal,
           claims: resolved.readsClaims ? selected : [],
@@ -293,6 +322,18 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
           ...(topics === undefined ? {} : { topics }),
           topicHistory: await askedTopics(store),
           ...(pinned === undefined ? {} : { pinned }),
+          ...(strategy === undefined
+            ? {}
+            : {
+                repositorySearch: {
+                  strategy,
+                  ownerId: request.principal.ownerId,
+                  retrieval: deps.retrieval!,
+                  ...(deps.embeddingProfileId === undefined
+                    ? {}
+                    : { embeddingProfileId: deps.embeddingProfileId }),
+                },
+              }),
           mode: body.mode ?? 'simulation',
           level: body.level ?? pack.defaultLevel,
           // Gentle by default, as in `levelhead session`: a skeptic at full pressure is opted into.

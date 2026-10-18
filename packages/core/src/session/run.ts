@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto'
+import { buildRepositoryContext } from '../retrieval/context.ts'
+import type { RetrievalPort, RetrievalStrategy } from '../ports/retrieval.ts'
+import type { OwnerId } from '@levelhead/contracts'
 import { PERSONA_VOICE } from '@levelhead/prompts'
 import {
   ACTIONS,
@@ -128,6 +131,12 @@ export interface RunSessionInput {
   // Gaps due for spaced retrieval; asked as ordinary questions, never announced as reviews (§4.5).
   retrievals?: readonly GapEntry[]
   pinned?: PinnedContext
+  repositorySearch?: {
+    strategy: RetrievalStrategy
+    ownerId: OwnerId
+    retrieval: RetrievalPort
+    embeddingProfileId?: string
+  }
   ceilings: Ceilings
   deps: SessionDeps
 }
@@ -248,6 +257,22 @@ function planRoundTopics(input: RunSessionInput, seed: string, roleId: RoleId): 
 }
 
 export async function runSession(input: RunSessionInput): Promise<SessionResult> {
+  const search = input.repositorySearch
+  if (search !== undefined) {
+    if (!['lexical', 'dense', 'hybrid'].includes(search.strategy))
+      throw new Error('invalid repositorySearch strategy')
+    if (input.pinned === undefined) throw new Error('repositorySearch needs a pinned snapshot')
+    if (input.transferGap !== undefined)
+      throw new Error(
+        'repositorySearch is not available for Transfer without an unfamiliar-source boundary',
+      )
+    if (
+      search.retrieval.isLive === undefined ||
+      !(await search.retrieval.isLive(search.ownerId, input.pinned.snapshot.id))
+    ) {
+      throw new Error('repositorySearch snapshot is deleted or not indexed')
+    }
+  }
   const { deps } = input
   const sessionId = deps.ids.next('ses')
   const log = await SessionLog.open(deps, sessionId)
@@ -426,7 +451,78 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     const attemptId = deps.ids.next('att')
     const claim = claimOf(subject)
     const topic = subject.kind === 'topic' ? subject.topic : undefined
-    const artifact = subject.kind === 'artifact' ? subject.artifact : undefined
+    let artifact = subject.kind === 'artifact' ? subject.artifact : undefined
+    if (artifact !== undefined && search !== undefined && input.pinned !== undefined) {
+      const { snapshot, repository } = input.pinned
+      if (!(await search.retrieval.isLive!(search.ownerId, snapshot.id)))
+        throw new Error('repositorySearch snapshot is unavailable')
+      if (action === 'TRANSFER_TEST')
+        throw new Error('repositorySearch cannot expose familiar code during Transfer')
+      const query = [artifact.path, artifact.symbol, claim?.assertion].filter(Boolean).join(' ')
+      const searchStarted = performance.now()
+      const hits = await search.retrieval.search(search.ownerId, snapshot.id, query, 8, {
+        strategy: search.strategy,
+      })
+      const searchElapsedMs = performance.now() - searchStarted
+      const candidates = []
+      for (const hit of hits) {
+        const known = input.pinned.artifacts.find((candidate) => candidate.id === hit.artifact.id)
+        if (
+          known === undefined ||
+          known.snapshotId !== snapshot.id ||
+          hit.artifact.snapshotId !== snapshot.id ||
+          known.path !== hit.artifact.path ||
+          known.kind !== hit.artifact.kind ||
+          known.symbol !== hit.artifact.symbol ||
+          known.startLine !== hit.artifact.startLine ||
+          known.endLine !== hit.artifact.endLine
+        )
+          throw new Error('repositorySearch returned a source outside the pinned artifacts')
+        const text = await repository.read(known)
+        if (text === null) throw new Error('repositorySearch source is no longer readable')
+        candidates.push({
+          artifact: known,
+          text,
+          ...(hit.chunk === undefined ? {} : { chunk: hit.chunk }),
+        })
+      }
+      // The selected subject stays code-selected. Re-read it too: never resurrect openArtifacts' cache.
+      const selected = input.pinned.artifacts.find(
+        (candidate) => candidate.id === artifact!.artifactId,
+      )
+      const code = selected === undefined ? null : await repository.read(selected)
+      if (code === null || !(await search.retrieval.isLive!(search.ownerId, snapshot.id)))
+        throw new Error('repositorySearch source is unavailable')
+      const repositoryContext = buildRepositoryContext({
+        snapshot,
+        candidates: [{ artifact: selected!, text: code }, ...candidates],
+        strategy: search.strategy,
+        query,
+        maxTokens: 2048,
+        maxSources: 4,
+        maxLinesPerSource: 80,
+        ...(search.embeddingProfileId === undefined
+          ? {}
+          : { embeddingProfileId: search.embeddingProfileId }),
+      })
+      if (repositoryContext.sources.length === 0)
+        throw new Error('repositorySearch found no supporting source')
+      const opened = repositoryContext.sources.find((source) => source.artifactId === selected!.id)
+      if (opened === undefined)
+        throw new Error('repositorySearch selected artifact exceeds the context budget')
+      artifact = {
+        ...artifact,
+        code: opened.text,
+        startLine: opened.startLine,
+        endLine: opened.endLine,
+        repositoryContext,
+      }
+      await log.append('observation', {
+        attemptId,
+        note: `repository_search:${JSON.stringify({ ...repositoryContext.trace, status: 'resolved', searchElapsedMs, contextElapsedMs: performance.now() - searchStarted - searchElapsedMs, budgets: { maxTokens: 2048, maxSources: 4, maxLinesPerSource: 80, searchLimit: 8 }, retrievedCount: hits.length, hits: hits.map((hit) => ({ artifactId: hit.artifact.id, rank: hit.rank, ...(hit.chunk === undefined ? {} : { chunkId: hit.chunk.id, contentHash: hit.chunk.contentHash }) })) })}`,
+        spanIds: [],
+      })
+    }
     await log.append('policy_action', {
       attemptId,
       action,
@@ -500,6 +596,16 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     transcript.push({ role: 'candidate', text: answerText })
     await goto('answer_received')
 
+    // Source deletion is authoritative even while the candidate was answering.
+    if (
+      artifact?.repositoryContext !== undefined &&
+      search !== undefined &&
+      input.pinned !== undefined &&
+      !(await search.retrieval.isLive!(search.ownerId, input.pinned.snapshot.id))
+    ) {
+      throw new Error('repositorySearch snapshot was deleted during the answer; evaluation refused')
+    }
+
     ceilings.assertCanCall()
     const evaluated = await evaluateAnswer({
       attemptId,
@@ -520,6 +626,15 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       ...(topic === undefined ? {} : { topic }),
     })
     ceilings.record(evaluated.invocation)
+
+    if (
+      artifact?.repositoryContext !== undefined &&
+      search !== undefined &&
+      input.pinned !== undefined &&
+      !(await search.retrieval.isLive!(search.ownerId, input.pinned.snapshot.id))
+    ) {
+      throw new Error('repositorySearch snapshot was deleted during evaluation; findings refused')
+    }
 
     if ('failed' in evaluated) {
       // Stop rather than continue judging nothing — that would leave a session that looks complete but isn't.

@@ -5,6 +5,9 @@ import { GitRepository } from '../repo/git-repository.ts'
 import { loadCliConfig } from '../config.ts'
 import { RandomIds, SystemClock } from '../runtime.ts'
 import { dim, heading, line } from '../terminal.ts'
+import { Pool } from 'pg'
+import { PostgresRetrieval } from '@levelhead/db'
+import { indexRepository, retrievalOptions } from '../repository-search.ts'
 
 // Snapshots outlive any one interview, so they get their own log, same as the claim set.
 export const REPO_SESSION = 'repo'
@@ -44,6 +47,28 @@ export async function repo(argv: readonly string[]): Promise<number> {
     claimSet.confirmedClaimIds.has(claim.id),
   )
   const evidence = linkSnapshotToClaims(pinned.artifacts, confirmed, ids)
+
+  if (config.repositorySearch !== undefined && config.store !== 'postgres')
+    throw new Error('repositorySearch indexing requires the postgres store')
+  if (config.store === 'postgres') {
+    const pool = new Pool({ connectionString: config.databaseUrl })
+    try {
+      const entries = []
+      for (const artifact of pinned.artifacts) {
+        const text = await repository.read(artifact)
+        if (text === null) throw new Error('repository artifact became unreadable during indexing')
+        entries.push({ artifact, text })
+      }
+      await indexRepository(
+        new PostgresRetrieval(pool, retrievalOptions(process.env)),
+        config.ownerId,
+        pinned.snapshot,
+        entries,
+      )
+    } finally {
+      await pool.end()
+    }
+  }
 
   const log = await SessionLog.open({ store, clock, ids }, REPO_SESSION)
   await log.append('state_change', {

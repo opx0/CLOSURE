@@ -14,6 +14,9 @@ const LogLevel = Type.Union(
 )
 
 const ConfigSchema = Type.Object({
+  LEVELHEAD_REPOSITORY_SEARCH: Type.Optional(
+    Type.Union([Type.Literal('lexical'), Type.Literal('dense'), Type.Literal('hybrid')]),
+  ),
   NODE_ENV: Type.Union(
     [Type.Literal('development'), Type.Literal('test'), Type.Literal('production')],
     { default: 'development' },

@@ -7,6 +7,7 @@ import type {
   RoundKind,
   Topic,
 } from '@levelhead/contracts'
+import type { RepositoryContext } from './retrieval.ts'
 
 // §4.8: code travels with the request rather than being fetched by the renderer — the snapshot is
 // deletable, and reading it is the caller's business, not the adapter's.
@@ -17,6 +18,7 @@ export interface ArtifactContext {
   startLine?: number
   endLine?: number
   code: string
+  repositoryContext?: RepositoryContext
 }
 
 export interface TranscriptTurn {

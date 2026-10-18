@@ -1,7 +1,7 @@
 import { Type, type Static } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { JobRecordSchema } from '@levelhead/contracts'
-import { openPinned, pinnedSnapshots, type PinnedEntry } from '@levelhead/core'
+import { SessionLog, openPinned, pinnedSnapshots, type PinnedEntry } from '@levelhead/core'
 import { idempotencyKeyFor } from '@levelhead/db'
 import { REPO_SESSION } from '../../../cli/src/commands/repo.ts'
 import { GitRepository } from '../../../cli/src/repo/git-repository.ts'
@@ -12,6 +12,7 @@ import {
 import { IngestFailed } from '../../../worker/src/parse/isolated.ts'
 import type { ServerDeps } from '../deps.ts'
 import { ErrorSchema } from './shared.ts'
+import { indexRepository } from '../../../cli/src/repository-search.ts'
 
 const PinnedSnapshotSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
@@ -29,6 +30,47 @@ export const ShownArtifactSchema = Type.Object({
   startLine: Type.Optional(Type.Integer({ minimum: 1 })),
   endLine: Type.Optional(Type.Integer({ minimum: 1 })),
   code: Type.String(),
+  repositoryContext: Type.Optional(
+    Type.Object({
+      sources: Type.Array(
+        Type.Object({
+          artifactId: Type.String(),
+          snapshotId: Type.String(),
+          commit: Type.String(),
+          path: Type.String(),
+          startLine: Type.Integer(),
+          endLine: Type.Integer(),
+          contentHash: Type.String(),
+          text: Type.String(),
+        }),
+      ),
+      trace: Type.Object({
+        version: Type.String(),
+        queryHash: Type.String(),
+        strategy: Type.Union([
+          Type.Literal('lexical'),
+          Type.Literal('dense'),
+          Type.Literal('hybrid'),
+        ]),
+        embeddingProfileId: Type.Optional(Type.String()),
+        sources: Type.Array(
+          Type.Object({
+            artifactId: Type.String(),
+            snapshotId: Type.String(),
+            commit: Type.String(),
+            path: Type.String(),
+            startLine: Type.Integer(),
+            endLine: Type.Integer(),
+            contentHash: Type.String(),
+          }),
+        ),
+        contextHash: Type.String(),
+        retrievedCount: Type.Integer(),
+        sourceCount: Type.Integer(),
+        tokenCount: Type.Integer(),
+      }),
+    }),
+  ),
 })
 
 // Pinning and reading pinned code both read a path on this server's own disk.
@@ -89,14 +131,23 @@ export function snapshotRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
         const { id, artifactId } = request.params
         const entry = openPinned(await deps.storeFor(request.principal).read(REPO_SESSION), id)
         const artifact = entry?.artifacts.find((candidate) => candidate.id === artifactId)
-        if (entry === undefined || artifact === undefined) {
+        if (
+          entry === undefined ||
+          artifact === undefined ||
+          (deps.retrieval?.isLive !== undefined &&
+            !(await deps.retrieval.isLive(request.principal.ownerId, id)))
+        ) {
           return reply.code(404).send({ error: 'no such artifact', detail: `${id} ${artifactId}` })
         }
 
         const repository = new GitRepository({ ids: deps.ids, clock: deps.clock })
         repository.register(entry.snapshot)
         const code = await repository.read(artifact)
-        if (code === null) {
+        if (
+          code === null ||
+          (deps.retrieval?.isLive !== undefined &&
+            !(await deps.retrieval.isLive(request.principal.ownerId, id)))
+        ) {
           return reply.code(404).send({
             error: 'the code is no longer readable',
             detail: `${artifact.path} at ${entry.snapshot.commit}`,
@@ -159,9 +210,39 @@ export function snapshotRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
             { store: deps.storeFor(request.principal), clock: deps.clock, ids: deps.ids },
             { repoPath, ref, sessionId },
             DEFAULT_INGEST_LIMITS,
-            { reuseIdentical: true },
+            { reuseIdentical: true, publish: deps.retrieval === null },
           )
           const { snapshot, artifacts, evidence } = pinned
+          if (deps.retrieval !== null) {
+            if (deps.retrieval.recordSnapshot === undefined)
+              throw new Error('repository index cannot publish snapshots')
+            await indexRepository(
+              {
+                recordSnapshot: deps.retrieval.recordSnapshot.bind(deps.retrieval),
+                index: deps.retrieval.index.bind(deps.retrieval),
+              },
+              request.principal.ownerId,
+              snapshot,
+              artifacts.map((artifact) => ({ artifact, text: pinned.bodies[artifact.id] ?? '' })),
+            )
+            const store = deps.storeFor(request.principal)
+            if (
+              !pinnedSnapshots(await store.read(sessionId)).some(
+                (entry) => entry.snapshot.id === snapshot.id,
+              )
+            ) {
+              const log = await SessionLog.open(
+                { store, clock: deps.clock, ids: deps.ids },
+                sessionId,
+              )
+              await log.append('state_change', {
+                change: 'snapshot_pinned',
+                snapshot,
+                artifacts,
+                evidence,
+              })
+            }
+          }
           return reply
             .code(201)
             .send({ snapshot: summaryOf({ snapshot, artifacts, evidence, deleted: false }) })

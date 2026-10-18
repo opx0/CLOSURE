@@ -12,6 +12,7 @@ import {
   type EvaluationResult,
 } from './evaluate.ts'
 import { rubricSetV1 } from './rubrics.ts'
+import { buildRepositoryContext } from '../retrieval/context.ts'
 
 const ANSWER =
   'The worker takes a lease with a thirty second expiry and renews it while it works. ' +
@@ -67,6 +68,86 @@ function idSource(): IdSource {
 }
 
 const clock: Clock = { now: () => '2026-09-09T10:00:00.000Z' }
+
+test('repository findings require valid separate source quotes as well as answer spans', async () => {
+  const code = 'export const leaseSeconds = 30\n'
+  const repositoryContext = buildRepositoryContext({
+    snapshot: {
+      id: 'snap_source',
+      commit: 'commit_exact',
+      repoPath: '/project',
+      fileCount: 1,
+      pinnedAt: clock.now(),
+    },
+    candidates: [
+      {
+        artifact: {
+          id: 'artifact_source',
+          snapshotId: 'snap_source',
+          path: 'queue.ts',
+          kind: 'file',
+        },
+        text: code,
+      },
+    ],
+    strategy: 'hybrid',
+    query: 'queue lease',
+  })
+  const source = repositoryContext.sources[0]!
+  const finding = {
+    kind: 'competency' as const,
+    competency: 'mechanism' as const,
+    levelMet: null,
+    rationale: 'The answer claims renewal the source does not establish.',
+    confidence: 0.7,
+    quotes: ['renews it while it works'],
+  }
+  for (const [citations, accepted] of [
+    [undefined, false],
+    [[{ artifactId: source.artifactId, contentHash: 'wrong', quote: 'leaseSeconds = 30' }], false],
+    [
+      [
+        {
+          artifactId: source.artifactId,
+          contentHash: source.contentHash,
+          quote: 'invented source quote',
+        },
+      ],
+      false,
+    ],
+    [
+      [
+        {
+          artifactId: source.artifactId,
+          contentHash: source.contentHash,
+          quote: 'leaseSeconds = 30',
+        },
+      ],
+      true,
+    ],
+  ] as const) {
+    const { port } = fakeEvaluator({
+      ok: true,
+      invocation: INVOCATION,
+      value: {
+        findings: [
+          { ...finding, ...(citations === undefined ? {} : { sourceQuotes: [...citations] }) },
+        ],
+      },
+    })
+    const result = await evaluateAnswer({
+      ...inputFor(port),
+      artifact: { artifactId: source.artifactId, path: source.path, code, repositoryContext },
+    })
+    if ('failed' in result) throw new Error('unexpected evaluator failure')
+    expect(result.findings).toHaveLength(accepted ? 1 : 0)
+    if (accepted) {
+      expect(result.evidence.some((link) => link.target.kind === 'artifact')).toBe(true)
+      expect(result.spans.every((span) => ANSWER.includes(span.quoted))).toBe(true)
+      expect(JSON.stringify(result)).not.toContain('export const')
+    } else expect(result.dropped[0]?.reason).toBe('unresolvable_repository_source')
+  }
+})
 
 const TOPIC: Topic = {
   id: 'os.deadlock',
@@ -322,7 +403,7 @@ test('the request carries the versioned prompt and the level anchors the turn ca
 
   const request = requests[0]
   expect(request?.promptId).toBe('answer-evaluation')
-  expect(request?.promptVersion).toBe(2)
+  expect(request?.promptVersion).toBe(3)
   expect(request?.promptHash).toHaveLength(16)
   expect(request?.user).toContain('failure_modes (v1)')
   expect(request?.user).toContain('claim_status (v1)')

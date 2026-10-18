@@ -80,6 +80,7 @@ export async function testApi(
     scripted?: readonly unknown[]
     config?: Partial<Config>
     queue?: JobQueuePort
+    deps?: Partial<ServerDeps>
   } = {},
 ): Promise<TestApi> {
   const store = new MemoryEventStore()
@@ -93,6 +94,7 @@ export async function testApi(
     logger: silentLogger,
     queue: input.queue ?? null,
     retrieval: null,
+    ...input.deps,
   }
   const app = await buildApp({ ...TEST_CONFIG, ...input.config }, deps)
   await app.ready()

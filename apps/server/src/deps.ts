@@ -8,8 +8,10 @@ import type {
   JobQueuePort,
   Logger,
   RetrievalPort,
+  RetrievalStrategy,
 } from '@levelhead/core'
 import type { OwnerId, Principal } from '@levelhead/contracts'
+import type { PostgresRetrieval } from '@levelhead/db'
 
 // Built once at the edge and handed down — a route reaching for `process.env` itself would be a
 // second composition root, drifting from this one the first time they disagreed about a ceiling.
@@ -26,7 +28,10 @@ export interface ServerDeps {
   // Present only where a durable queue and a retrieval index exist; the file-backed local setup has
   // neither, and a route that needs one says so rather than pretending.
   queue: JobQueuePort | null
-  retrieval: RetrievalPort | null
+  retrieval:
+    (RetrievalPort & Partial<Pick<PostgresRetrieval, 'markDeleted' | 'recordSnapshot'>>) | null
+  repositorySearch?: RetrievalStrategy
+  embeddingProfileId?: string
 }
 
 export function ownerOf(owner: OwnerId | Principal): OwnerId {

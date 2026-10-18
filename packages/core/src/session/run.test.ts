@@ -21,6 +21,8 @@ import type { EvaluatorPort, StructuredRequest, StructuredResult } from '../port
 import type { EventStore } from '../ports/event-store.ts'
 import type { RepositoryPort } from '../ports/repository.ts'
 import { runSession, type PinnedContext, type RunSessionInput, type SessionIo } from './run.ts'
+import type { RetrievalHit, RetrievalPort, RetrievalStrategy } from '../ports/retrieval.ts'
+import { sourceHash } from '../retrieval/chunks.ts'
 
 const ANSWER =
   'A deadlock needs all four conditions at once. I would break circular wait by ordering the locks, ' +
@@ -89,6 +91,7 @@ type Judge = (action: PolicyAction) => unknown
 
 // Held to the schema the request carries, so a script cannot pass with a shape no model could return.
 class ScriptedEvaluator implements EvaluatorPort {
+  readonly requests: StructuredRequest<TSchema>[] = []
   constructor(
     private readonly conductor: RecordingConductor,
     private readonly judge: Judge,
@@ -96,6 +99,7 @@ class ScriptedEvaluator implements EvaluatorPort {
   async complete<T extends TSchema>(
     request: StructuredRequest<T>,
   ): Promise<StructuredResult<Static<T>>> {
+    this.requests.push(request)
     const value = this.judge(this.conductor.lastAction())
     if (!Value.Check(request.schema, value)) {
       const errors = [...Value.Errors(request.schema, value)].map((e) => `${e.path}: ${e.message}`)
@@ -203,17 +207,27 @@ const CLAIM: Claim = {
 }
 
 async function run(
-  over: Partial<Omit<RunSessionInput, 'deps'>> & { judge?: Judge; clock?: Clock } = {},
+  over: Partial<Omit<RunSessionInput, 'deps'>> & {
+    judge?: Judge
+    clock?: Clock
+    onAnswer?: () => void
+  } = {},
 ) {
   const {
     judge = () => ({ findings: [knew('mechanism')] }),
     clock = new TickingClock(),
+    onAnswer,
     ...input
   } = over
   const store = new MemoryStore()
   const conductor = new RecordingConductor()
   const evaluator = new ScriptedEvaluator(conductor, judge)
   const recorded = recordingIo()
+  if (onAnswer !== undefined)
+    recorded.io.answer = async () => {
+      onAnswer()
+      return ANSWER
+    }
   const result = await runSession({
     claims: [],
     mode: 'simulation',
@@ -235,7 +249,7 @@ async function run(
     },
   })
   const events = await store.read(result.sessionId)
-  return { result, events, conductor, ...recorded }
+  return { result, events, conductor, evaluator, ...recorded }
 }
 
 function payloads<K extends AnyEvent['kind']>(
@@ -246,6 +260,229 @@ function payloads<K extends AnyEvent['kind']>(
     event.kind === kind ? [event.payload as EventOf<K>['payload']] : [],
   )
 }
+
+function ragFixture() {
+  const code = 'export function lock() { return acquire() }\n'
+  const artifact: Artifact = {
+    id: 'artifact_lock',
+    snapshotId: 'snapshot_rag',
+    kind: 'file',
+    path: 'src/lock.ts',
+  }
+  let live = true
+  const searches: {
+    owner: string
+    snapshot: string
+    query: string
+    strategy?: RetrievalStrategy
+  }[] = []
+  let hit: RetrievalHit = {
+    artifact,
+    rank: 1,
+    excerpt: 'untrusted stale index excerpt',
+    chunk: { id: 'chunk_lock', startLine: 1, endLine: 1, contentHash: sourceHash(code) },
+  }
+  const retrieval: RetrievalPort = {
+    async index() {},
+    async forget() {
+      live = false
+    },
+    async isLive() {
+      return live
+    },
+    async search(owner, snapshot, query, _limit, options) {
+      searches.push({
+        owner,
+        snapshot,
+        query,
+        ...(options?.strategy === undefined ? {} : { strategy: options.strategy }),
+      })
+      return [hit]
+    },
+  }
+  const pinned: PinnedContext = {
+    snapshot: {
+      id: artifact.snapshotId,
+      repoPath: '/untrusted/project',
+      commit: 'commit_pinned',
+      pinnedAt: '2026-09-24T08:00:00.000Z',
+      fileCount: 1,
+    },
+    artifacts: [artifact],
+    evidence: [],
+    repository: {
+      async pin() {
+        throw new Error('never repin')
+      },
+      async read() {
+        return code
+      },
+    },
+  }
+  return {
+    pinned,
+    retrieval,
+    searches,
+    code,
+    artifact,
+    delete: () => {
+      live = false
+    },
+    setHit: (value: RetrievalHit) => {
+      hit = value
+    },
+  }
+}
+
+for (const strategy of ['lexical', 'dense', 'hybrid'] as const) {
+  test(`repositorySearch ${strategy} reaches scoped search and shares exact bounded context with both engines and IO`, async () => {
+    const fixture = ragFixture()
+    const { conductor, evaluator, asked, events } = await run({
+      rounds: ['code_walkthrough'],
+      turnsPerRound: 1,
+      pinned: fixture.pinned,
+      repositorySearch: { strategy, ownerId: 'owner_rag', retrieval: fixture.retrieval },
+      judge: () => ({
+        findings: [
+          {
+            ...knew('mechanism'),
+            sourceQuotes: [
+              {
+                artifactId: fixture.artifact.id,
+                contentHash: sourceHash(fixture.code),
+                quote: 'return acquire()',
+              },
+            ],
+          },
+        ],
+      }),
+    })
+    expect(fixture.searches).toHaveLength(1)
+    expect(fixture.searches[0]).toEqual({
+      owner: 'owner_rag',
+      snapshot: 'snapshot_rag',
+      query: 'src/lock.ts',
+      strategy,
+    })
+    const context = conductor.calls[0]?.artifact?.repositoryContext
+    expect(asked[0]?.meta.artifact?.repositoryContext).toBe(context)
+    expect(context?.sources[0]?.text).toBe(fixture.code)
+    expect(evaluator.requests[0]?.user).toContain(JSON.stringify(context!.sources))
+    expect(evaluator.requests[0]?.user).not.toContain('untrusted stale index excerpt')
+    const traces = payloads(events, 'observation').filter((event) =>
+      event.note.startsWith('repository_search:'),
+    )
+    expect(traces).toHaveLength(1)
+    expect(traces[0]?.note).not.toContain(fixture.code)
+    expect(
+      payloads(events, 'state_change').filter((change) => change.change === 'source_registered'),
+    ).toHaveLength(1)
+    expect(
+      payloads(events, 'evaluation')[0]?.evidence.some((link) => link.target.kind === 'artifact'),
+    ).toBe(true)
+  })
+}
+
+test('repositorySearch rejects a wrong hit snapshot before either model uses the source', async () => {
+  const fixture = ragFixture()
+  fixture.setHit({
+    artifact: { ...fixture.artifact, snapshotId: 'snapshot_wrong' },
+    rank: 1,
+    excerpt: fixture.code,
+  })
+  const conductor = new RecordingConductor()
+  const evaluator = new ScriptedEvaluator(conductor, () => ({ findings: [] }))
+  const { io, asked } = recordingIo()
+  await expect(
+    runSession({
+      claims: [],
+      mode: 'simulation',
+      level: 'junior',
+      personaId: 'collaborator',
+      pressureCeiling: 3,
+      rounds: ['code_walkthrough'],
+      turnsPerRound: 1,
+      drill: false,
+      ceilings: { sessionCostUsd: 5, sessionTokens: 1_000_000, modelCallsPerTurn: 3 },
+      pinned: fixture.pinned,
+      repositorySearch: { strategy: 'lexical', ownerId: 'owner_rag', retrieval: fixture.retrieval },
+      deps: {
+        store: new MemoryStore(),
+        clock: new TickingClock(),
+        ids: new CountingIds(),
+        conductor,
+        evaluator,
+        io,
+      },
+    }),
+  ).rejects.toThrow('repositorySearch returned a source outside the pinned artifacts')
+  expect(fixture.searches).toHaveLength(1)
+  expect(conductor.calls).toHaveLength(0)
+  expect(evaluator.requests).toHaveLength(0)
+  expect(asked).toHaveLength(0)
+})
+
+test('repositorySearch rejects a mismatched chunk hash rather than trusting stored excerpts', async () => {
+  const fixture = ragFixture()
+  fixture.setHit({
+    artifact: fixture.artifact,
+    rank: 1,
+    excerpt: fixture.code,
+    chunk: { id: 'bad', startLine: 1, endLine: 1, contentHash: 'wrong' },
+  })
+  await expect(
+    run({
+      rounds: ['code_walkthrough'],
+      pinned: fixture.pinned,
+      repositorySearch: { strategy: 'lexical', ownerId: 'owner_rag', retrieval: fixture.retrieval },
+    }),
+  ).rejects.toThrow('chunk hash')
+})
+
+test('repositorySearch refuses deletion during the answer before calling Evaluator', async () => {
+  const fixture = ragFixture()
+  let evaluations = 0
+  await expect(
+    run({
+      rounds: ['code_walkthrough'],
+      pinned: fixture.pinned,
+      repositorySearch: { strategy: 'hybrid', ownerId: 'owner_rag', retrieval: fixture.retrieval },
+      onAnswer: fixture.delete,
+      judge: () => {
+        evaluations++
+        return { findings: [] }
+      },
+    }),
+  ).rejects.toThrow('deleted during the answer')
+  expect(evaluations).toBe(0)
+})
+
+test('repositorySearch requires an authoritative published index, but omitted config stays non-RAG', async () => {
+  const fixture = ragFixture()
+  fixture.delete()
+  await expect(
+    run({
+      pinned: fixture.pinned,
+      repositorySearch: { strategy: 'lexical', ownerId: 'owner_rag', retrieval: fixture.retrieval },
+    }),
+  ).rejects.toThrow('not indexed')
+  await run({ rounds: ['code_walkthrough'], turnsPerRound: 1, pinned: fixture.pinned })
+  expect(fixture.searches).toHaveLength(0)
+})
+
+test('repositorySearch mode failures propagate without a lexical fallback', async () => {
+  const fixture = ragFixture()
+  fixture.retrieval.search = async () => {
+    throw new Error('dense embedding profile unavailable')
+  }
+  await expect(
+    run({
+      rounds: ['code_walkthrough'],
+      pinned: fixture.pinned,
+      repositorySearch: { strategy: 'dense', ownerId: 'owner_rag', retrieval: fixture.retrieval },
+    }),
+  ).rejects.toThrow('embedding profile unavailable')
+})
 
 function serialize(view: SessionView): string {
   return JSON.stringify(view, (_key, value: unknown) =>

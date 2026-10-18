@@ -1,5 +1,6 @@
 import {
   index,
+  customType,
   integer,
   jsonb,
   pgTable,
@@ -108,4 +109,60 @@ export const artifactIndex = pgTable(
     tokens: text('tokens').notNull(),
   },
   (table) => [index('artifact_index_scope_idx').on(table.ownerId, table.snapshotId)],
+)
+
+export const retrievalProfiles = pgTable('retrieval_profiles', {
+  id: text('id').primaryKey(),
+  dimensions: integer('dimensions').notNull(),
+  profile: jsonb('profile').notNull(),
+})
+
+export const retrievalPublications = pgTable('retrieval_publications', {
+  snapshotId: text('snapshot_id')
+    .primaryKey()
+    .references(() => snapshots.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id').notNull(),
+  profileId: text('profile_id').references(() => retrievalProfiles.id),
+})
+
+export const retrievalChunks = pgTable(
+  'retrieval_chunks',
+  {
+    ownerId: text('owner_id').notNull(),
+    snapshotId: text('snapshot_id')
+      .notNull()
+      .references(() => snapshots.id, { onDelete: 'cascade' }),
+    id: text('id').notNull(),
+    artifactId: text('artifact_id')
+      .notNull()
+      .references(() => artifactIndex.artifactId, { onDelete: 'cascade' }),
+    startLine: integer('start_line').notNull(),
+    endLine: integer('end_line').notNull(),
+    contentHash: text('content_hash').notNull(),
+    body: text('body').notNull(),
+    tokens: text('tokens').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.ownerId, table.snapshotId, table.id] })],
+)
+
+const nativeVector = customType<{ data: readonly number[]; driverData: string }>({
+  dataType: () => 'public.vector',
+  toDriver: (value) => JSON.stringify(value),
+  fromDriver: (value) => JSON.parse(value) as number[],
+})
+
+export const retrievalVectors = pgTable(
+  'retrieval_vectors',
+  {
+    ownerId: text('owner_id').notNull(),
+    snapshotId: text('snapshot_id').notNull(),
+    chunkId: text('chunk_id').notNull(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => retrievalProfiles.id),
+    embedding: nativeVector('embedding').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerId, table.snapshotId, table.chunkId, table.profileId] }),
+  ],
 )

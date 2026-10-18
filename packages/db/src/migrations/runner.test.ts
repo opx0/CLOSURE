@@ -35,8 +35,9 @@ test('the shipped migrations parse and are ordered', async () => {
     '003_jobs.sql',
     '004_retrieval.sql',
     '005_session_hygiene.sql',
+    '006_hybrid_retrieval.sql',
   ])
-  expect(migrations.map((m) => m.version)).toEqual([1, 2, 3, 4, 5])
+  expect(migrations.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6])
   expect(migrations[0]?.sql).toContain('CREATE TABLE events')
   expect(migrations[2]?.sql).toContain('CREATE TABLE jobs')
 })
@@ -117,6 +118,7 @@ integration('applies once and records what it applied', async () => {
     '003_jobs.sql',
     '004_retrieval.sql',
     '005_session_hygiene.sql',
+    '006_hybrid_retrieval.sql',
   ])
   expect((await runMigrations(database.pool)).applied).toEqual([])
 
@@ -129,5 +131,6 @@ integration('applies once and records what it applied', async () => {
     { version: 3, name: 'jobs' },
     { version: 4, name: 'retrieval' },
     { version: 5, name: 'session_hygiene' },
+    { version: 6, name: 'hybrid_retrieval' },
   ])
 })

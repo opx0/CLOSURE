@@ -8,6 +8,7 @@ import { outreachFrom } from './adapters/index.ts'
 import { loadWorkerConfig } from './config.ts'
 import { JobRunner } from './runner.ts'
 import type { HandlerContext } from './handlers/index.ts'
+import { retrievalOptions } from '../../cli/src/repository-search.ts'
 
 const config = loadWorkerConfig()
 const logger = createLogger({ level: config.LOG_LEVEL, service: 'levelhead-worker' })
@@ -20,7 +21,7 @@ const tracing = await startTracing({
 const pool = new Pool({ connectionString: config.DATABASE_URL })
 const ids = new RandomIds()
 const clock = new SystemClock()
-const retrieval = new PostgresRetrieval(pool)
+const retrieval = new PostgresRetrieval(pool, retrievalOptions(process.env))
 const queue = new PostgresJobQueue(pool, () => ids.next('job'))
 
 const context: HandlerContext = {

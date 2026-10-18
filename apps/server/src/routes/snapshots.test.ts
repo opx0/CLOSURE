@@ -3,9 +3,17 @@ import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { JobRecord } from '@levelhead/contracts'
+import { LOCAL_OWNER_ID, type JobRecord } from '@levelhead/contracts'
 import type { EnqueueInput, JobQueuePort } from '@levelhead/core'
 import { EXTRACTION, confirmedClaim, testApi } from '../testing/harness.ts'
+import {
+  MemoryEventStore,
+  ScriptedConductor,
+  ScriptedEvaluator,
+} from '../../../cli/src/testing/fakes.ts'
+import { PostgresRetrieval, runMigrations } from '@levelhead/db'
+import { openTestDatabase } from '../../../../packages/db/src/testing/postgres.ts'
+import { LocalEmbeddingAdapter } from '../../../cli/src/adapters/embedding-local.ts'
 
 const CLAIM_JOB = [
   'export function claimJob(worker: string, jobs: Job[]): Job | null {',
@@ -83,6 +91,243 @@ interface PinnedBody {
     deleted: boolean
   }
 }
+
+test.skipIf(process.env.RETRIEVAL_INTEGRATION !== '1')(
+  'native retrieval HTTP walkthrough rehydrates exact citations and shares bounded context with both scripted engines',
+  async () => {
+    const url = process.env.DATABASE_URL
+    if (!url)
+      throw new Error('Selected HTTP retrieval integration requires disposable DATABASE_URL')
+    const database = await openTestDatabase(url, `http_retrieval_${Date.now()}`)
+    if (!database) throw new Error('Required PostgreSQL unavailable')
+    try {
+      await runMigrations(database.pool)
+      const embedding = new LocalEmbeddingAdapter({
+        baseUrl: 'http://127.0.0.1:11434',
+        model: 'all-minilm:22m',
+        revision: '1b226e2802dbb772b5fc32a58f103ca1804ef7501331012de126ab22f67475ef',
+        dimensions: 384,
+        maxInputTokens: 256,
+      })
+      const retrieval = new PostgresRetrieval(database.pool, {
+        embedding,
+        chunkMaxTokens: 192,
+        chunkOverlapTokens: 32,
+      })
+      const conductor = new ScriptedConductor(['Explain the selected code.'])
+      const evaluator = new ScriptedEvaluator([{ findings: [] }])
+      const { app, store } = await testApi({
+        deps: { retrieval, embeddingProfileId: embedding.profile.id, conductor, evaluator },
+      })
+      try {
+        await withRepo(async (dir, commit) => {
+          const pin = await app.inject({
+            method: 'POST',
+            url: '/snapshots',
+            payload: { repoPath: dir },
+          })
+          expect(pin.statusCode).toBe(201)
+          const id = (pin.json() as PinnedBody).snapshot.id
+          const started = await app.inject({
+            method: 'POST',
+            url: '/sessions',
+            payload: {
+              rounds: ['code_walkthrough'],
+              turnsPerRound: 1,
+              drill: false,
+              snapshotId: id,
+              repositorySearch: 'hybrid',
+            },
+          })
+          expect(started.statusCode).toBe(201)
+          const body = started.json() as {
+            sessionId: string
+            question: {
+              artifact: { repositoryContext: import('@levelhead/core').RepositoryContext }
+            }
+          }
+          const context = body.question.artifact.repositoryContext
+          expect(context.sources.length).toBeGreaterThan(0)
+          expect(context.trace.tokenCount).toBeLessThanOrEqual(2048)
+          for (const source of context.sources) {
+            expect(source.commit).toBe(commit)
+            expect(source.text).toBe(
+              FILES[source.path as keyof typeof FILES]
+                .split('\n')
+                .slice(source.startLine - 1, source.endLine)
+                .join('\n') + (source.text.endsWith('\n') ? '\n' : ''),
+            )
+          }
+          expect(conductor.calls[0]?.artifact?.repositoryContext).toEqual(context)
+          const answered = await app.inject({
+            method: 'POST',
+            url: `/sessions/${body.sessionId}/answers`,
+            payload: { text: 'The job is leased for thirty seconds.' },
+          })
+          expect(answered.statusCode).toBe(200)
+          for (const source of context.sources)
+            expect(evaluator.prompts[0]?.user).toContain(source.contentHash)
+          const events = JSON.stringify(await store.read(body.sessionId))
+          expect(events).not.toContain(CLAIM_JOB)
+          // Simulate the crash window between authoritative deletion and its event mirror.
+          await retrieval.markDeleted(
+            LOCAL_OWNER_ID,
+            id,
+            'test_mirror_window',
+            new Date().toISOString(),
+          )
+          const read = await app.inject({
+            method: 'GET',
+            url: `/snapshots/${id}/artifacts/${context.sources[0]!.artifactId}`,
+          })
+          expect(read.statusCode).toBe(404)
+          const stale = await app.inject({
+            method: 'POST',
+            url: '/sessions',
+            payload: { rounds: ['code_walkthrough'], snapshotId: id },
+          })
+          expect(stale.statusCode).toBe(400)
+          expect((await app.inject({ method: 'DELETE', url: `/snapshots/${id}` })).statusCode).toBe(
+            200,
+          )
+          expect(
+            (await retrieval.search(LOCAL_OWNER_ID, id, 'claimJob', 3, { strategy: 'hybrid' }))
+              .length,
+          ).toBe(0)
+        })
+      } finally {
+        await app.close()
+      }
+    } finally {
+      await database.close()
+    }
+  },
+  60_000,
+)
+
+test('HTTP repositorySearch modes use the principal scope, index synchronous pins and return supporting sources', async () => {
+  await withRepo(async (dir) => {
+    const owners = new Map<string, MemoryEventStore>()
+    const indexed: string[] = []
+    const searched: string[] = []
+    const entries = new Map<string, import('@levelhead/core').IndexedArtifact[]>()
+    const deleted = new Set<string>()
+    const { app } = await testApi({
+      questions: [
+        'Explain the selected code.',
+        'Explain the selected code.',
+        'Explain the selected code.',
+      ],
+      config: { LEVELHEAD_API_TOKENS: 'alpha:alpha-token,beta:beta-token' },
+      deps: {
+        storeFor(owner) {
+          const id = typeof owner === 'string' ? owner : owner.ownerId
+          if (!owners.has(id)) owners.set(id, new MemoryEventStore())
+          return owners.get(id)!
+        },
+        embeddingProfileId: 'scripted-profile-not-real-model',
+        retrieval: {
+          async recordSnapshot(owner, snapshot) {
+            indexed.push(`${owner}:${snapshot.id}`)
+          },
+          async index(owner, snapshot, input) {
+            entries.set(`${owner}:${snapshot}`, [...input])
+          },
+          async isLive(owner, snapshot) {
+            return entries.has(`${owner}:${snapshot}`) && !deleted.has(`${owner}:${snapshot}`)
+          },
+          async forget(owner, snapshot) {
+            deleted.add(`${owner}:${snapshot}`)
+          },
+          async markDeleted(owner, snapshot) {
+            deleted.add(`${owner}:${snapshot}`)
+          },
+          async search(owner, snapshot, _query, _limit, options) {
+            searched.push(`${owner}:${snapshot}:${options?.strategy}`)
+            return (entries.get(`${owner}:${snapshot}`) ?? []).map(({ artifact }) => ({
+              artifact,
+              rank: 1,
+              excerpt: 'NEVER TRUST INDEX EXCERPT',
+            }))
+          },
+        },
+      },
+    })
+    try {
+      const headers = { authorization: 'Bearer alpha-token' }
+      const pin = await app.inject({
+        method: 'POST',
+        url: '/snapshots',
+        headers,
+        payload: { repoPath: dir },
+      })
+      expect(pin.statusCode).toBe(201)
+      const id = (pin.json() as PinnedBody).snapshot.id
+      expect(indexed).toEqual([`alpha:${id}`])
+      // An identical pin rehydrates the old artifact ids before indexing again.
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/snapshots',
+            headers,
+            payload: { repoPath: dir },
+          })
+        ).statusCode,
+      ).toBe(201)
+      for (const repositorySearch of ['lexical', 'dense', 'hybrid']) {
+        const started = await app.inject({
+          method: 'POST',
+          url: '/sessions',
+          headers,
+          payload: {
+            rounds: ['code_walkthrough'],
+            turnsPerRound: 1,
+            drill: false,
+            snapshotId: id,
+            repositorySearch,
+            ownerId: 'beta',
+          },
+        })
+        expect(started.statusCode).toBe(201)
+        const body = started.json() as {
+          findings: unknown[]
+          question: {
+            artifact: {
+              repositoryContext: {
+                sources: { commit: string; text: string; contentHash: string }[]
+              }
+            }
+          }
+        }
+        expect(body.findings).toHaveLength(0)
+        expect(body.question.artifact.repositoryContext.sources.length).toBeGreaterThan(0)
+        expect(JSON.stringify(body.question)).not.toContain('NEVER TRUST INDEX EXCERPT')
+        expect(searched.at(-1)).toBe(`alpha:${id}:${repositorySearch}`)
+      }
+      const cross = await app.inject({
+        method: 'POST',
+        url: '/sessions',
+        headers: { authorization: 'Bearer beta-token' },
+        payload: { rounds: ['code_walkthrough'], snapshotId: id, repositorySearch: 'hybrid' },
+      })
+      expect(cross.statusCode).toBe(400)
+      expect(searched.every((call) => call.startsWith('alpha:'))).toBe(true)
+      expect(
+        (await app.inject({ method: 'DELETE', url: `/snapshots/${id}`, headers })).statusCode,
+      ).toBe(200)
+      const retry = await app.inject({
+        method: 'POST',
+        url: '/sessions',
+        headers,
+        payload: { rounds: ['code_walkthrough'], snapshotId: id, repositorySearch: 'lexical' },
+      })
+      expect(retry.statusCode).toBe(400)
+    } finally {
+      await app.close()
+    }
+  })
+})
 
 test('with no queue, a pin is parsed in a child process and a walkthrough opens its code', async () => {
   const { app } = await testApi({

@@ -20,6 +20,7 @@ export interface OpenAiCompatibleConductorConfig {
   modelAlias: string
   apiKey?: string | undefined
   temperature?: number | undefined
+  maxOutputTokens?: number | undefined
   // Shared with the Evaluator when both are built together: the provider counts requests, not
   // which port made them.
   resilience?: ProviderResilience | undefined
@@ -30,6 +31,12 @@ export class OpenAiCompatibleConductor implements ConductorPort {
   readonly #price: ModelPrice
 
   constructor(private readonly config: OpenAiCompatibleConductorConfig) {
+    if (
+      !Number.isSafeInteger(config.maxOutputTokens ?? 512) ||
+      (config.maxOutputTokens ?? 512) < 1
+    ) {
+      throw new RangeError('maxOutputTokens must be a positive integer')
+    }
     this.#price = priceFor(config.modelAlias)
   }
 
@@ -55,6 +62,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
               startLine: input.artifact.startLine,
               endLine: input.artifact.endLine,
               code: input.artifact.code,
+              repositoryContext: input.artifact.repositoryContext,
             },
           }),
     })
@@ -65,6 +73,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       this.config.apiKey,
       {
         model: this.config.modelAlias,
+        max_tokens: this.config.maxOutputTokens ?? 512,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
@@ -121,6 +130,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       this.config.apiKey,
       {
         model: this.config.modelAlias,
+        max_tokens: this.config.maxOutputTokens ?? 512,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },

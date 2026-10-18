@@ -36,6 +36,9 @@ import { CLAIM_SET_SESSION } from './claims.ts'
 import { ROUND_LABEL, topicLabel } from './catalog.ts'
 import { titled } from './ledger.ts'
 import { askParagraph, dim, heading, line, quote } from '../terminal.ts'
+import { Pool } from 'pg'
+import { PostgresRetrieval } from '@levelhead/db'
+import { repositoryStrategy, retrievalOptions } from '../repository-search.ts'
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const at = argv.indexOf(`--${name}`)
@@ -108,6 +111,13 @@ export function terminalIo(): SessionIo {
       return answer === 'y' || answer === 'yes'
     },
     question(text, meta) {
+      for (const source of meta.artifact?.repositoryContext?.sources ?? []) {
+        heading(
+          `${source.path} · ${source.commit.slice(0, 12)} · lines ${source.startLine}–${source.endLine} · ${source.contentHash}`,
+        )
+        for (const [index, row] of source.text.split('\n').entries())
+          line(`${source.startLine + index} │ ${row}`)
+      }
       const subject = meta.topic?.id ?? meta.artifact?.artifactId
       if (subject !== thread) {
         thread = subject
@@ -138,6 +148,7 @@ export function terminalIo(): SessionIo {
 
 export async function session(argv: readonly string[]): Promise<number> {
   const config = loadCliConfig()
+  const requestedStrategy = repositoryStrategy(flag(argv, 'repository-search'))
   const { store } = openStore(config)
 
   const roleId = (flag(argv, 'role') ?? DEFAULT_ROLE_ID) as RoleId
@@ -261,6 +272,16 @@ export async function session(argv: readonly string[]): Promise<number> {
     dim(`  ${format.disclaimer}`)
   }
 
+  // Keep explicit opt-ins strict; a configured default does not make topic rounds require code.
+  const strategy = requestedStrategy ?? (pinned === undefined ? undefined : config.repositorySearch)
+  if (strategy !== undefined && (pinned === undefined || config.store !== 'postgres'))
+    throw new Error('repositorySearch requires a pinned repository and postgres index')
+  const pool = strategy === undefined ? null : new Pool({ connectionString: config.databaseUrl })
+  const options = pool === null ? undefined : retrievalOptions(process.env)
+  if (strategy !== undefined && strategy !== 'lexical' && options?.embedding === undefined) {
+    await pool?.end()
+    throw new Error('repositorySearch dense/hybrid requires a configured local embedder')
+  }
   const result = await runSession({
     claims,
     ...(topics === undefined ? {} : { topics }),
@@ -268,6 +289,18 @@ export async function session(argv: readonly string[]): Promise<number> {
     rounds,
     retrievals,
     ...(pinned === undefined ? {} : { pinned }),
+    ...(strategy === undefined
+      ? {}
+      : {
+          repositorySearch: {
+            strategy,
+            ownerId: config.ownerId,
+            retrieval: new PostgresRetrieval(pool!, options),
+            ...(options?.embedding === undefined
+              ? {}
+              : { embeddingProfileId: options.embedding.profile.id }),
+          },
+        }),
     mode: (flag(argv, 'mode') ?? 'simulation') as Mode,
     level,
     role: roleId,
@@ -292,7 +325,7 @@ export async function session(argv: readonly string[]): Promise<number> {
       evaluator,
       io: terminalIo(),
     },
-  })
+  }).finally(() => pool?.end())
 
   const gaps = [...result.view.gaps.values()]
   if (gaps.length > 0) {
