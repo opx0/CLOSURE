@@ -81,7 +81,7 @@ function generationPolicy(): Check {
       ok: true,
       detail:
         process.env.LEVELHEAD_LOCAL_ONLY === 'true'
-          ? 'local-only adapters; redirects rejected. Speech and asset downloads are separate.'
+          ? 'local-only adapters; redirects rejected. Speech requires preprovisioned Whisper and Piper assets; actual offline inference unverified.'
           : 'local-only guard disabled; provider key enables hosted evaluation',
     }
   } catch (error) {
