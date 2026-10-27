@@ -56,6 +56,7 @@ export async function postChatCompletion(
   return guarded(resilience, async () => {
     const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
+      redirect: 'error',
       headers,
       body: JSON.stringify(request),
     })

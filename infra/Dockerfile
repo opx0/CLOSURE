@@ -44,4 +44,4 @@ EXPOSE 3001
 CMD ["node", "--experimental-transform-types", "apps/server/src/index.ts"]
 
 FROM runtime AS worker
-CMD ["node", "apps/worker/src/index.ts"]
+CMD ["node", "--experimental-transform-types", "apps/worker/src/index.ts"]

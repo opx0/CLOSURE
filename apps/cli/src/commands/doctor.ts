@@ -1,9 +1,10 @@
 import { execFile } from 'node:child_process'
-import { mkdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Pool } from 'pg'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line } from '../terminal.ts'
+import { checkLocalGeneration } from '../adapters/local-only.ts'
 
 type Check = { name: string; ok: boolean; detail: string }
 
@@ -24,15 +25,71 @@ async function llamaReachable(baseUrl: string): Promise<Check> {
   }
 }
 
-async function eventDirWritable(dir: string): Promise<Check> {
-  const probe = join(dir, '.probe')
+export async function speechReadiness(port = process.env.VOICE_PORT ?? '8091'): Promise<Check> {
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    return { name: 'speech (optional)', ok: false, detail: 'VOICE_PORT must be 1–65535' }
+  }
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/health`, {
+      signal: AbortSignal.timeout(2000),
+      redirect: 'error',
+    })
+    const health: unknown = response.ok ? await response.json() : null
+    const ready =
+      health !== null &&
+      typeof health === 'object' &&
+      'status' in health &&
+      health.status === 'ok' &&
+      'whisperModel' in health &&
+      typeof health.whisperModel === 'string' &&
+      'piperVoice' in health &&
+      typeof health.piperVoice === 'string'
+    return {
+      name: 'speech (optional)',
+      ok: true,
+      detail: ready
+        ? 'batch ASR/full-WAV TTS reachable; live streaming and latency unverified'
+        : 'health response did not confirm batch ASR/TTS; text mode available',
+    }
+  } catch {
+    return {
+      name: 'speech (optional)',
+      ok: true,
+      detail: 'unavailable; text mode available. Run bun run voice:up after provisioning models.',
+    }
+  }
+}
+
+export async function eventDirWritable(dir: string): Promise<Check> {
+  let probe: string | undefined
   try {
     await mkdir(dir, { recursive: true })
-    await writeFile(probe, '')
-    await rm(probe)
+    probe = await mkdtemp(join(dir, '.doctor-'))
     return { name: 'event log directory', ok: true, detail: dir }
   } catch (error) {
     return { name: 'event log directory', ok: false, detail: `${dir}: ${String(error)}` }
+  } finally {
+    if (probe) await rm(probe, { recursive: true, force: true })
+  }
+}
+
+function generationPolicy(): Check {
+  try {
+    checkLocalGeneration(process.env)
+    return {
+      name: 'generation policy',
+      ok: true,
+      detail:
+        process.env.LEVELHEAD_LOCAL_ONLY === 'true'
+          ? 'local-only adapters; redirects rejected. Speech and asset downloads are separate.'
+          : 'local-only guard disabled; provider key enables hosted evaluation',
+    }
+  } catch (error) {
+    return {
+      name: 'generation policy',
+      ok: false,
+      detail: error instanceof Error ? error.message : 'Invalid generation policy',
+    }
   }
 }
 
@@ -95,12 +152,21 @@ async function webBuilt(): Promise<Check> {
 
 export async function doctor(): Promise<number> {
   const config = loadCliConfig()
+  const policy = generationPolicy()
   const checks: Check[] = [
+    policy,
     await eventDirWritable(config.eventDir),
     await gitPresent(),
     await databaseReachable(config.databaseUrl),
     await webBuilt(),
-    await llamaReachable(config.llamaBaseUrl),
+    await speechReadiness(),
+    policy.ok
+      ? await llamaReachable(config.llamaBaseUrl)
+      : {
+          name: 'local model (llama.cpp)',
+          ok: false,
+          detail: 'Probe skipped: generation policy failed',
+        },
     {
       name: 'evaluator provider',
       // Not a failure — the loop runs end to end on the local model with no key.
