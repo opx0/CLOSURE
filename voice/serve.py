@@ -37,16 +37,39 @@ PORT = int(os.environ.get("VOICE_PORT", "8091"))
 HOST = os.environ.get("VOICE_HOST", "127.0.0.1")
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base.en")
 PIPER_VOICE_NAME = os.environ.get("PIPER_VOICE", "en_US-lessac-medium")
+LOCAL_ONLY = os.environ.get("LEVELHEAD_LOCAL_ONLY", "").lower() == "true"
 SAMPLE_RATE = 16_000
 SENTENCE_END = (".", "?", "!")
 DATA_DIR = Path(os.environ.get("VOICE_DATA_DIR", ".levelhead/voice-models"))
+ALLOWED_ORIGINS = frozenset(
+    origin.strip()
+    for origin in os.environ.get(
+        "VOICE_ORIGINS",
+        "http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+)
+MAX_BODY_BYTES = 10 * 1024 * 1024
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 print(f"loading whisper {WHISPER_MODEL}...", file=sys.stderr)
-whisper = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+try:
+    whisper = WhisperModel(
+        WHISPER_MODEL, device="cpu", compute_type="int8", local_files_only=LOCAL_ONLY
+    )
+except Exception as exc:
+    if LOCAL_ONLY:
+        raise RuntimeError(
+            f"Whisper {WHISPER_MODEL} is not cached; provision it before starting local-only speech"
+        ) from exc
+    raise
 
 piper_model_path = DATA_DIR / f"{PIPER_VOICE_NAME}.onnx"
-if not piper_model_path.exists():
+if not piper_model_path.exists() or not Path(f"{piper_model_path}.json").exists():
+    if LOCAL_ONLY:
+        raise RuntimeError(
+            f"Piper {PIPER_VOICE_NAME} model/config missing in {DATA_DIR}; provision both before starting local-only speech"
+        )
     print(f"downloading piper voice {PIPER_VOICE_NAME}...", file=sys.stderr)
     download_voice(PIPER_VOICE_NAME, DATA_DIR)
 print(f"loading piper {PIPER_VOICE_NAME}...", file=sys.stderr)
@@ -123,7 +146,10 @@ def prosody(audio: bytes, suffix: str) -> dict:
 class Handler(http.server.BaseHTTPRequestHandler):
     def _headers(self, code: int, content_type: str, length: int) -> None:
         self.send_response(code)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        self.send_header("Vary", "Origin")
+        if origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "content-type")
         self.send_header("Content-Type", content_type)
@@ -141,6 +167,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return ".webm" if "webm" in content_type else ".ogg" if "ogg" in content_type else ".wav"
 
     def do_OPTIONS(self) -> None:
+        if self.headers.get("Origin") not in ALLOWED_ORIGINS:
+            self._json(403, {"error": "origin not allowed"})
+            return
         self._headers(204, "text/plain", 0)
 
     def do_GET(self) -> None:
@@ -150,7 +179,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
 
     def do_POST(self) -> None:
-        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        origin = self.headers.get("Origin")
+        if origin is not None and origin not in ALLOWED_ORIGINS:
+            self._json(403, {"error": "origin not allowed"})
+            return
+        length = self.headers.get("Content-Length", "")
+        if self.headers.get("Transfer-Encoding") or not length.isdecimal():
+            self._json(400, {"error": "Content-Length required; chunked requests unsupported"})
+            return
+        limit = 16_384 if self.path == "/speak" else MAX_BODY_BYTES
+        if int(length) > limit:
+            self._json(413, {"error": "request body too large"})
+            return
+        body = self.rfile.read(int(length))
+        if len(body) != int(length):
+            self._json(400, {"error": "incomplete request body"})
+            return
         try:
             if self.path == "/speak":
                 text = json.loads(body).get("text", "").strip()
