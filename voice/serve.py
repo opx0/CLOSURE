@@ -34,6 +34,7 @@ from piper.download_voices import download_voice
 from prosody import intensity_track, pitch_track, terminal_contours
 
 PORT = int(os.environ.get("VOICE_PORT", "8091"))
+HOST = os.environ.get("VOICE_HOST", "127.0.0.1")
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base.en")
 PIPER_VOICE_NAME = os.environ.get("PIPER_VOICE", "en_US-lessac-medium")
 SAMPLE_RATE = 16_000
@@ -177,6 +178,6 @@ class ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 if __name__ == "__main__":
-    server = ThreadingServer(("0.0.0.0", PORT), Handler)
-    print(f"voice service ready on :{PORT}", file=sys.stderr)
+    server = ThreadingServer((HOST, PORT), Handler)
+    print(f"voice service ready on {HOST}:{PORT}", file=sys.stderr)
     server.serve_forever()

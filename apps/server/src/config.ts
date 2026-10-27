@@ -19,6 +19,7 @@ const ConfigSchema = Type.Object({
     { default: 'development' },
   ),
   PORT: Type.Integer({ minimum: 1, maximum: 65535, default: 3001 }),
+  LEVELHEAD_HOST: Type.Optional(Type.String({ minLength: 1 })),
   LOG_LEVEL: LogLevel,
   // Same JSONL directory the CLI writes, so both callers read one event log.
   LEVELHEAD_EVENT_DIR: Type.String({ minLength: 1, default: '.levelhead/events' }),

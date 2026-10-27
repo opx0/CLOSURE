@@ -13,6 +13,8 @@
   },
   "trustedDependencies": [],
   "scripts": {
+    "data:backup": "bun run scripts/backup.ts",
+    "data:restore": "bun run scripts/restore.ts",
     "runtime:budget": "bun run scripts/runtime-budget.ts",
     "feedback:check": "bun run scripts/check-feedback.ts",
     "dev": "bun run --filter '*' dev",
