@@ -332,17 +332,23 @@ function StartFailed({ error }: { error: Error }) {
 }
 
 function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const catalog = useTopicCatalog()
   const snapshotId = params.get('snapshotId')
 
-  const [roleId, setRoleId] = useState(params.get('role'))
-  const [picked, setPicked] = useState<RoundKind[] | null>(null)
-  const [chosenLevel, setLevel] = useState<Level | null>(null)
+  const updateSetup = (key: string, value: string) =>
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set(key, value)
+      return next
+    })
+  const roleId = params.get('role')
+  const setRoleId = (value: string) => updateSetup('role', value)
+  const setPicked = (value: RoundKind[]) => updateSetup('rounds', value.join(','))
+  const setLevel = (value: Level) => updateSetup('level', value)
   const [persona, setPersona] = useState<Persona>('collaborator')
-  const [mode, setMode] = useState<Mode>(
-    MODES.find((entry) => entry.id === params.get('mode'))?.id ?? 'coach',
-  )
+  const mode = MODES.find((entry) => entry.id === params.get('mode'))?.id ?? 'coach'
+  const setMode = (value: Mode) => updateSetup('mode', value)
   const [ceiling, setCeiling] = useState(1)
   const [turns, setTurns] = useState(4)
 
@@ -376,18 +382,17 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       : interviewRounds
 
   const loop = role.defaultRounds.filter((round) => interviewRounds.includes(round))
-  const rounds = picked ?? (requested.length > 0 ? requested : loop.slice(0, 1))
-  const level =
-    chosenLevel ?? data.levels.find((entry) => entry === params.get('level')) ?? role.defaultLevel
+  const rounds = params.has('rounds') ? requested : loop.slice(0, 1)
+  const level = data.levels.find((entry) => entry === params.get('level')) ?? role.defaultLevel
   const asks = (subject: SubjectKind) => rounds.some((round) => subjectOf(data, round) === subject)
-  const project = snapshots.data?.snapshots.find((entry) =>
-    snapshotId === null ? !entry.deleted : entry.id === snapshotId && !entry.deleted,
+  const project = snapshots.data?.snapshots.find(
+    (entry) => entry.id === snapshotId && !entry.deleted,
   )
-  const noProject = asks('artifact') && snapshots.data !== undefined && project === undefined
+  const noProject = asks('artifact') && project === undefined
   const noClaims =
     asks('claim') &&
-    claimSet.data !== undefined &&
-    !claimSet.data.claims.some((claim) => claimSet.data.confirmed.has(claim.id))
+    (claimSet.data === undefined ||
+      !claimSet.data.claims.some((claim) => claimSet.data.confirmed.has(claim.id)))
 
   const toggle = (round: RoundKind) => {
     const next = rounds.includes(round)
@@ -406,7 +411,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       pressureCeiling: ceiling,
       turnsPerRound: turns,
       drill: true,
-      ...(snapshotId !== null && asks('artifact') ? { snapshotId } : {}),
+      ...(project !== undefined && asks('artifact') ? { snapshotId: project.id } : {}),
     })
   const preparation = new URLSearchParams(params)
   preparation.delete('id')
@@ -519,7 +524,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
                 </>
               ) : noProject ? (
                 <>
-                  No project pinned yet.{' '}
+                  Select an available pinned project from Prepare or Résumé &amp; projects.{' '}
                   <Link to="/resume" className={RESUME_LINK}>
                     Pin one under Résumé &amp; projects
                   </Link>
