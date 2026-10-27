@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p ../tsconfig.json"
   },
   "dependencies": {
+    "@sinclair/typebox": "0.34.52",
     "@levelhead/contracts": "workspace:*",
     "@levelhead/core": "workspace:*"
   }

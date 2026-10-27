@@ -13,6 +13,8 @@
   },
   "trustedDependencies": [],
   "scripts": {
+    "runtime:budget": "bun run scripts/runtime-budget.ts",
+    "feedback:check": "bun run scripts/check-feedback.ts",
     "dev": "bun run --filter '*' dev",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json",
     "lint": "eslint .",
