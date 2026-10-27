@@ -678,6 +678,7 @@ export interface paths {
                                     topicIds?: string[];
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
+                                    practiceGapId?: string;
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -704,6 +705,7 @@ export interface paths {
                         roleId?: string;
                         topicIds?: string[];
                         claimIds?: string[];
+                        gapId?: string;
                         snapshotId?: string;
                         mode?: "simulation" | "coach" | "drill" | "transfer" | "review";
                         level?: "junior" | "mid" | "senior" | "staff";
@@ -864,6 +866,63 @@ export interface paths {
                         "application/json": {
                             error: string;
                             detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        level: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            text: string;
                         };
                     };
                 };
@@ -1128,6 +1187,7 @@ export interface paths {
                                 topicIds?: string[];
                                 rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                 snapshotId?: string;
+                                practiceGapId?: string;
                                 /** Format: date-time */
                                 startedAt: string;
                             } | null;
@@ -1632,6 +1692,20 @@ export interface paths {
                             kind: "state_change";
                             payload: {
                                 /** @enum {string} */
+                                change: "practice_assistance";
+                                attemptId: string;
+                                level: number;
+                                hintId: string;
+                                text: string;
+                            } | {
+                                /** @enum {string} */
+                                change: "preparation_saved";
+                                selection: {
+                                    claimIds: string[];
+                                    snapshotId?: string;
+                                };
+                            } | {
+                                /** @enum {string} */
                                 change: "session_started";
                                 session: {
                                     id: string;
@@ -1649,6 +1723,7 @@ export interface paths {
                                     topicIds?: string[];
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
+                                    practiceGapId?: string;
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -3236,6 +3311,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preparation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            selection: {
+                                claimIds: string[];
+                                snapshotId?: string;
+                            } | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        claimIds: string[];
+                        snapshotId?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            selection: {
+                                claimIds: string[];
+                                snapshotId?: string;
+                            } | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mirror": {
         parameters: {
             query?: never;
@@ -3417,6 +3575,7 @@ export interface paths {
                                     topicIds?: string[];
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
+                                    practiceGapId?: string;
                                     /** Format: date-time */
                                     startedAt: string;
                                 } | null;
@@ -3680,6 +3839,20 @@ export interface paths {
                                     kind: "state_change";
                                     payload: {
                                         /** @enum {string} */
+                                        change: "practice_assistance";
+                                        attemptId: string;
+                                        level: number;
+                                        hintId: string;
+                                        text: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "preparation_saved";
+                                        selection: {
+                                            claimIds: string[];
+                                            snapshotId?: string;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
                                         change: "session_started";
                                         session: {
                                             id: string;
@@ -3697,6 +3870,7 @@ export interface paths {
                                             topicIds?: string[];
                                             rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                             snapshotId?: string;
+                                            practiceGapId?: string;
                                             /** Format: date-time */
                                             startedAt: string;
                                         };

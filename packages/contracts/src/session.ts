@@ -3,6 +3,15 @@ import { RoundKindSchema } from './round.ts'
 import { RoleIdSchema } from './role.ts'
 import { LevelSchema, RubricSetSchema } from './rubric.ts'
 
+export const PreparationSelectionSchema = Type.Object(
+  {
+    claimIds: Type.Array(Type.String({ minLength: 1 }), { maxItems: 100, uniqueItems: true }),
+    snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+)
+export type PreparationSelection = Static<typeof PreparationSelectionSchema>
+
 export const ModeSchema = Type.Union([
   Type.Literal('simulation'),
   Type.Literal('coach'),
@@ -52,6 +61,7 @@ export const SessionSchema = Type.Object({
   // One element is the ordinary case, not a special one — Simulation can chain rounds like a real loop.
   rounds: Type.Array(RoundKindSchema, { minItems: 1 }),
   snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+  practiceGapId: Type.Optional(Type.String({ minLength: 1 })),
   startedAt: Type.String({ format: 'date-time' }),
 })
 export type Session = Static<typeof SessionSchema>

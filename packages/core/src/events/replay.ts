@@ -168,6 +168,9 @@ export function replay(events: readonly AnyEvent[]): SessionView {
       case 'state_change': {
         const change = event.payload
         switch (change.change) {
+          case 'practice_assistance':
+          case 'preparation_saved':
+            break
           case 'session_started':
             session = change.session
             pressureLevel = change.session.pressureLevel

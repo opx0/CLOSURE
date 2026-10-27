@@ -102,3 +102,15 @@ test('an absent causedBy stays absent rather than serializing as null', async ()
   expect(JSON.parse(JSON.stringify(plain))).not.toHaveProperty('causedBy')
   expect(caused.causedBy).toBe('evt_0')
 })
+
+test('concurrent writes through one session log remain ordered and gapless', async () => {
+  const store = new MemoryStore()
+  const log = await SessionLog.open(deps(store), 's1')
+  const events = await Promise.all(
+    Array.from({ length: 5 }, (_, index) =>
+      log.append('observation', { attemptId: 'a1', note: String(index), spanIds: [] }),
+    ),
+  )
+  expect(events.map((event) => event.seq)).toEqual([0, 1, 2, 3, 4])
+  expect(log.events()).toEqual(events)
+})

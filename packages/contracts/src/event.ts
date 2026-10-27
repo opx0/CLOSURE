@@ -10,7 +10,12 @@ import { SnapshotSchema } from './snapshot.ts'
 import { FindingSchema } from './finding.ts'
 import { GapEntrySchema, GapStatusSchema, PracticeOutcomeSchema } from './gap.ts'
 import { InvocationRecordSchema } from './invocation.ts'
-import { PressureLevelSchema, SessionSchema, SessionStateSchema } from './session.ts'
+import {
+  PreparationSelectionSchema,
+  PressureLevelSchema,
+  SessionSchema,
+  SessionStateSchema,
+} from './session.ts'
 
 export const EventKindSchema = Type.Union([
   Type.Literal('plan'),
@@ -160,6 +165,17 @@ export const EvaluationProducedSchema = eventOf(
 export const StateChangeSchema = eventOf(
   'state_change',
   Type.Union([
+    Type.Object({
+      change: Type.Literal('practice_assistance'),
+      attemptId: Type.String({ minLength: 1 }),
+      level: Type.Integer({ minimum: 1, maximum: 3 }),
+      hintId: Type.String({ minLength: 1 }),
+      text: Type.String({ minLength: 1 }),
+    }),
+    Type.Object({
+      change: Type.Literal('preparation_saved'),
+      selection: PreparationSelectionSchema,
+    }),
     Type.Object({ change: Type.Literal('session_started'), session: SessionSchema }),
     Type.Object({
       change: Type.Literal('session_state'),

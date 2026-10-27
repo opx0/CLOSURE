@@ -168,7 +168,8 @@ test('a résumé claim is confirmed, cross-questioned, and judged with the candi
   ).toBeVisible()
   await expect(page.getByText(/span \d+–\d+ ·/)).toBeVisible()
 
-  await claim.check()
+  await claim.click()
+  await expect(claim).toBeChecked()
   await page.getByRole('link', { name: 'Cross-question my résumé' }).click()
 
   await expect(page.getByRole('button', { name: /^Project deep dive/ })).toHaveAttribute(
@@ -316,4 +317,47 @@ test('setup survives reload and history without silently replacing a missing pro
   await page.goto('/app/session?rounds=cs_fundamentals')
   await expect(page.getByRole('button', { name: 'Start the interview' })).toBeEnabled()
   expect(errors).toEqual([])
+})
+
+test('preparation keeps owner selections across reloads and blocks a deleted project without replacing it', async ({
+  page,
+}) => {
+  await page.goto('/app/prepare')
+  const claim = page.getByRole('checkbox').first()
+  await expect(claim).toBeChecked()
+  await claim.click()
+  await expect(claim).not.toBeChecked()
+  await expect(claim).toBeEnabled()
+  await page.reload()
+  await expect(claim).not.toBeChecked()
+  await claim.click()
+  await expect(claim).toBeChecked()
+  await expect(claim).toBeEnabled()
+  const repository = makeRepository()
+  try {
+    await page.goto('/app/resume')
+    await page.getByRole('textbox', { name: 'Path to a local git repository' }).fill(repository)
+    await page.getByRole('button', { name: 'Pin project' }).click()
+    await expect(page.getByText(repository, { exact: true })).toBeVisible()
+    await page.goto('/app/prepare')
+    const select = page.getByRole('combobox', { name: 'Pinned project' })
+    const option = select.locator('option').filter({ hasText: repository.split('/').at(-1)! })
+    const snapshotId = await option.getAttribute('value')
+    expect(snapshotId).toBeTruthy()
+    await select.selectOption(snapshotId!)
+    await expect(select).toBeEnabled()
+    await page.reload()
+    await expect(select).toHaveValue(snapshotId!)
+    const deleted = await page.request.delete(`/snapshots/${snapshotId}`)
+    expect(deleted.ok()).toBe(true)
+    await page.goto('/app/session?rounds=code_walkthrough')
+    await expect(page.getByRole('button', { name: 'Start the interview' })).toBeDisabled()
+    await expect(
+      page.getByText('Select an available pinned project', { exact: false }),
+    ).toBeVisible()
+    await page.goto('/app/session?rounds=cs_fundamentals')
+    await expect(page.getByRole('button', { name: 'Start the interview' })).toBeEnabled()
+  } finally {
+    rmSync(repository, { recursive: true, force: true })
+  }
 })

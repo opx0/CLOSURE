@@ -159,3 +159,31 @@ test('an export contains only the requesting owner’s sessions', async () => {
   expect(bundle.sessions).toEqual([])
   await app.close()
 })
+
+test('saved preparation is scoped to the authenticated owner', async () => {
+  const { app } = await twoOwnerApp()
+  try {
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/preparation',
+          headers: bearer('alice-token'),
+          payload: { claimIds: [] },
+        })
+      ).statusCode,
+    ).toBe(200)
+    expect(
+      (
+        await app.inject({ method: 'GET', url: '/preparation', headers: bearer('bob-token') })
+      ).json().selection,
+    ).toBeNull()
+    expect(
+      (
+        await app.inject({ method: 'GET', url: '/preparation', headers: bearer('alice-token') })
+      ).json().selection,
+    ).toEqual({ claimIds: [] })
+  } finally {
+    await app.close()
+  }
+})

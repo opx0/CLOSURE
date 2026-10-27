@@ -11,13 +11,14 @@ import {
   roundsAbout,
   useTopicCatalog,
 } from '../lib/catalog.ts'
-import { useClaimSet } from '../lib/claim-set.ts'
+import { useClaimSet, usePreparation } from '../lib/claim-set.ts'
 
 export function PreparePage() {
   const catalog = useTopicCatalog()
   const [params, setParams] = useSearchParams()
   const snapshots = useQuery({ queryKey: ['snapshots'], queryFn: api.snapshots })
   const claims = useClaimSet()
+  const preparation = usePreparation()
   const history = useQuery({ queryKey: ['sessions'], queryFn: api.sessions })
   if (catalog.isLoading) return <Loading what="your preparation options" />
   if (catalog.isError) return <Failed error={catalog.error} />
@@ -39,6 +40,7 @@ export function PreparePage() {
   configured.set('level', level)
   configured.set('rounds', rounds.join(','))
   configured.set('mode', mode)
+  configured.delete('snapshotId')
   const setup = `/session?${configured}`
   const returnTo = `/prepare?${configured}`
   const update = (changes: Record<string, string | undefined>) => {
@@ -258,13 +260,53 @@ export function PreparePage() {
                   {claims.data.confirmed.size === 1 ? '' : 's'}
                 </p>
               )}
+              {preparation.isError && <Failed error={preparation.error} />}
+              {preparation.save.isError && <Failed error={preparation.save.error} />}
+              {claims.data !== undefined && claims.data.confirmed.size > 0 && (
+                <fieldset className="mt-3 space-y-2">
+                  <legend className="text-xs text-quiet">Claims for this interview</legend>
+                  {claims.data.claims
+                    .filter((claim) => claims.data!.confirmed.has(claim.id))
+                    .map((claim) => {
+                      const selected = preparation.data?.selection?.claimIds ?? [
+                        ...claims.data!.confirmed,
+                      ]
+                      return (
+                        <label key={claim.id} className="flex gap-2 text-xs text-muted">
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(claim.id)}
+                            disabled={preparation.isPending || preparation.save.isPending}
+                            onChange={(event) =>
+                              preparation.save.mutate({
+                                ...preparation.data?.selection,
+                                claimIds: event.target.checked
+                                  ? [...selected, claim.id]
+                                  : selected.filter((id) => id !== claim.id),
+                              })
+                            }
+                          />
+                          {claim.assertion}
+                        </label>
+                      )
+                    })}
+                </fieldset>
+              )}
               {liveSnapshots.length > 0 && (
                 <label className="mt-3 block text-xs text-quiet">
                   Pinned project
                   <select
                     aria-label="Pinned project"
-                    value={params.get('snapshotId') ?? ''}
-                    onChange={(event) => update({ snapshotId: event.target.value || undefined })}
+                    value={preparation.data?.selection?.snapshotId ?? ''}
+                    disabled={preparation.isPending || preparation.save.isPending}
+                    onChange={(event) =>
+                      preparation.save.mutate({
+                        claimIds: preparation.data?.selection?.claimIds ?? [
+                          ...(claims.data?.confirmed ?? []),
+                        ],
+                        ...(event.target.value ? { snapshotId: event.target.value } : {}),
+                      })
+                    }
                     className="journey-select mt-2 text-xs"
                   >
                     <option value="">Choose when needed</option>

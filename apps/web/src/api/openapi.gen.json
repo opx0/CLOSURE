@@ -2520,6 +2520,10 @@
                                 "minLength": 1,
                                 "type": "string"
                               },
+                              "practiceGapId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
                               "startedAt": {
                                 "format": "date-time",
                                 "type": "string"
@@ -2600,6 +2604,10 @@
                       "minLength": 1,
                       "type": "string"
                     }
+                  },
+                  "gapId": {
+                    "minLength": 1,
+                    "type": "string"
                   },
                   "snapshotId": {
                     "minLength": 1,
@@ -4062,6 +4070,85 @@
                       "type": "string"
                     },
                     "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/hints": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "level"
+                ],
+                "properties": {
+                  "level": {
+                    "minimum": 1,
+                    "maximum": 3,
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "text"
+                  ],
+                  "properties": {
+                    "text": {
                       "type": "string"
                     }
                   }
@@ -5716,6 +5803,10 @@
                               }
                             },
                             "snapshotId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "practiceGapId": {
                               "minLength": 1,
                               "type": "string"
                             },
@@ -9291,6 +9382,78 @@
                                 "type": "object",
                                 "required": [
                                   "change",
+                                  "attemptId",
+                                  "level",
+                                  "hintId",
+                                  "text"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "practice_assistance"
+                                    ]
+                                  },
+                                  "attemptId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "level": {
+                                    "minimum": 1,
+                                    "maximum": 3,
+                                    "type": "integer"
+                                  },
+                                  "hintId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "selection"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "preparation_saved"
+                                    ]
+                                  },
+                                  "selection": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "claimIds"
+                                    ],
+                                    "properties": {
+                                      "claimIds": {
+                                        "maxItems": 100,
+                                        "uniqueItems": true,
+                                        "type": "array",
+                                        "items": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        }
+                                      },
+                                      "snapshotId": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
                                   "session"
                                 ],
                                 "properties": {
@@ -9516,6 +9679,10 @@
                                         }
                                       },
                                       "snapshotId": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "practiceGapId": {
                                         "minLength": 1,
                                         "type": "string"
                                       },
@@ -18419,6 +18586,160 @@
         }
       }
     },
+    "/preparation": {
+      "get": {
+        "tags": [
+          "preparation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "selection"
+                  ],
+                  "properties": {
+                    "selection": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "claimIds"
+                          ],
+                          "properties": {
+                            "claimIds": {
+                              "maxItems": 100,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "snapshotId": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "preparation"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "claimIds"
+                ],
+                "properties": {
+                  "claimIds": {
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "type": "array",
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "snapshotId": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "selection"
+                  ],
+                  "properties": {
+                    "selection": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "claimIds"
+                          ],
+                          "properties": {
+                            "claimIds": {
+                              "maxItems": 100,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "snapshotId": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/mirror": {
       "post": {
         "summary": "Simulate an external résumé screen against one job description — never a verdict",
@@ -19233,6 +19554,10 @@
                                     }
                                   },
                                   "snapshotId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "practiceGapId": {
                                     "minLength": 1,
                                     "type": "string"
                                   },
@@ -21215,6 +21540,78 @@
                                           "type": "object",
                                           "required": [
                                             "change",
+                                            "attemptId",
+                                            "level",
+                                            "hintId",
+                                            "text"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "practice_assistance"
+                                              ]
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "level": {
+                                              "minimum": 1,
+                                              "maximum": 3,
+                                              "type": "integer"
+                                            },
+                                            "hintId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "text": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "selection"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "preparation_saved"
+                                              ]
+                                            },
+                                            "selection": {
+                                              "additionalProperties": false,
+                                              "type": "object",
+                                              "required": [
+                                                "claimIds"
+                                              ],
+                                              "properties": {
+                                                "claimIds": {
+                                                  "maxItems": 100,
+                                                  "uniqueItems": true,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "snapshotId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
                                             "session"
                                           ],
                                           "properties": {
@@ -21440,6 +21837,10 @@
                                                   }
                                                 },
                                                 "snapshotId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "practiceGapId": {
                                                   "minLength": 1,
                                                   "type": "string"
                                                 },

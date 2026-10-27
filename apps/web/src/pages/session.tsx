@@ -9,7 +9,7 @@ import { ClaimChip, FilePanel, TopicChip } from '../components/question.tsx'
 import { Recorder } from '../components/recorder.tsx'
 import { Button, Empty, Failed, Loading, Panel, Quiet, Tag } from '../components/primitives.tsx'
 import { JourneyIcon, JourneyLink, PageIntro, PracticeFlow } from '../components/journey.tsx'
-import { useClaimSet } from '../lib/claim-set.ts'
+import { useClaimSet, usePreparation } from '../lib/claim-set.ts'
 import {
   LEVEL_LABEL,
   ROUND_BLURB,
@@ -334,7 +334,13 @@ function StartFailed({ error }: { error: Error }) {
 function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const [params, setParams] = useSearchParams()
   const catalog = useTopicCatalog()
-  const snapshotId = params.get('snapshotId')
+  const gapId = params.get('gapId')
+  const practice = useQuery({ queryKey: ['ledger'], queryFn: api.ledger, enabled: gapId !== null })
+  const practiceGap = practice.data?.gaps.find((gap) => gap.id === gapId)
+  const preparationState = usePreparation()
+  const snapshotId =
+    params.get('snapshotId') ?? preparationState.data?.selection?.snapshotId ?? null
+  const selectedClaimIds = preparationState.data?.selection?.claimIds
 
   const updateSetup = (key: string, value: string) =>
     setParams((current) => {
@@ -382,7 +388,13 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       : interviewRounds
 
   const loop = role.defaultRounds.filter((round) => interviewRounds.includes(round))
-  const rounds = params.has('rounds') ? requested : loop.slice(0, 1)
+  const targetTopic = data.topics.find((topic) => topic.id === practiceGap?.topicId)
+  const rounds =
+    gapId !== null && practiceGap !== undefined
+      ? [targetTopic?.round ?? 'project_deep_dive']
+      : params.has('rounds')
+        ? requested
+        : loop.slice(0, 1)
   const level = data.levels.find((entry) => entry === params.get('level')) ?? role.defaultLevel
   const asks = (subject: SubjectKind) => rounds.some((round) => subjectOf(data, round) === subject)
   const project = snapshots.data?.snapshots.find(
@@ -392,7 +404,13 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const noClaims =
     asks('claim') &&
     (claimSet.data === undefined ||
-      !claimSet.data.claims.some((claim) => claimSet.data.confirmed.has(claim.id)))
+      !claimSet.data.claims.some(
+        (claim) =>
+          claimSet.data.confirmed.has(claim.id) &&
+          (practiceGap?.claimId === undefined
+            ? selectedClaimIds === undefined || selectedClaimIds.includes(claim.id)
+            : claim.id === practiceGap.claimId),
+      ))
 
   const toggle = (round: RoundKind) => {
     const next = rounds.includes(round)
@@ -404,6 +422,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const begin = () =>
     start.mutate({
       roleId: role.id,
+      ...(gapId === null ? {} : { gapId }),
       rounds,
       level,
       personaId: persona,
@@ -411,6 +430,9 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       pressureCeiling: ceiling,
       turnsPerRound: turns,
       drill: true,
+      ...(asks('claim') && selectedClaimIds !== undefined && selectedClaimIds.length > 0
+        ? { claimIds: selectedClaimIds }
+        : {}),
       ...(project !== undefined && asks('artifact') ? { snapshotId: project.id } : {}),
     })
   const preparation = new URLSearchParams(params)
@@ -452,6 +474,25 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
         }
       />
 
+      {gapId !== null && (
+        <Panel title="Targeted practice">
+          {practice.isPending ? (
+            <Loading what="the practice target" />
+          ) : practice.isError ? (
+            <Failed error={practice.error} />
+          ) : practiceGap === undefined ? (
+            <Empty>This gap is unavailable for this owner.</Empty>
+          ) : (
+            <>
+              <p>{practiceGap.summary}</p>
+              <p className="mt-2 text-xs text-quiet">
+                The saved target and original assessment level determine this drill. Coaching does
+                not close a gap.
+              </p>
+            </>
+          )}
+        </Panel>
+      )}
       <section className="setup-form rise space-y-5">
         <Section label="Role" hint="Sets the role-knowledge round and the full loop.">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -536,7 +577,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
           )}
           {noClaims && (
             <p className="mt-3 rounded-lg border border-edge bg-ink-2 px-3 py-2 text-[13px] text-muted">
-              No résumé claim is confirmed yet, so there is nothing to cross-question.{' '}
+              No available résumé claim is selected. Choose confirmed material in Prepare.{' '}
               <Link to="/resume" className={RESUME_LINK}>
                 Confirm some under Résumé &amp; projects
               </Link>
@@ -636,7 +677,14 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
           <Button
             tone="primary"
             onClick={begin}
-            disabled={start.isPending || rounds.length === 0 || noProject || noClaims}
+            disabled={
+              (gapId !== null && (practiceGap === undefined || practiceGap.status !== 'open')) ||
+              start.isPending ||
+              rounds.length === 0 ||
+              noProject ||
+              noClaims ||
+              ((asks('artifact') || asks('claim')) && !preparationState.isSuccess)
+            }
           >
             {start.isPending ? 'starting…' : 'Start the interview'}
           </Button>
@@ -786,6 +834,11 @@ function InterviewRoom({
   const queryClient = useQueryClient()
   const [room, setRoom] = useState<Room | null>(opening === null ? null : opened(opening))
   const [answer, setAnswer] = useState('')
+  const [hintLevel, setHintLevel] = useState(0)
+  const hint = useMutation({
+    mutationFn: () => api.hint(sessionId, Math.min(3, hintLevel + 1)),
+    onSuccess: () => setHintLevel((level) => level + 1),
+  })
   const [spoken, setSpoken] = useState<SpokenAnswer | null>(null)
   const [voice, setVoice] = useState(false)
   const [delivery, setDelivery] = useState<Record<string, number | string> | null>(null)
@@ -945,6 +998,18 @@ function InterviewRoom({
 
               {live && !reply.isPending && (
                 <div className="mt-5">
+                  {room.mode === 'drill' && (
+                    <div className="mb-3">
+                      <Button
+                        disabled={hint.isPending || hintLevel >= 3}
+                        onClick={() => hint.mutate()}
+                      >
+                        Show coaching hint
+                      </Button>
+                      {hint.data !== undefined && <p className="mt-2 text-sm">{hint.data.text}</p>}
+                      {hint.isError && <Failed error={hint.error} />}
+                    </div>
+                  )}
                   <textarea
                     ref={answerBox}
                     aria-label="Your answer"

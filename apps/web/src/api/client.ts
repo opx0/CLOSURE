@@ -98,6 +98,17 @@ export type ScreenSimulation = Json<'/mirror', 'post'>
 export const api = {
   health: () => request<Json<'/health', 'get'>>('/health'),
 
+  hint: (id: string, level: number) =>
+    request<Json<'/sessions/{id}/hints', 'post'>>(`/sessions/${encodeURIComponent(id)}/hints`, {
+      method: 'POST',
+      body: JSON.stringify({ level }),
+    }),
+  preparation: () => request<Json<'/preparation', 'get'>>('/preparation'),
+  savePreparation: (selection: Body<'/preparation', 'post'>) =>
+    request<Json<'/preparation', 'post'>>('/preparation', {
+      method: 'POST',
+      body: JSON.stringify(selection),
+    }),
   claimSet: () => request<Json<'/claims', 'get'>>('/claims'),
 
   extractClaims: (resumeText: string) =>

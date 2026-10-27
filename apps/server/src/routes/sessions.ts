@@ -2,6 +2,7 @@ import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import {
   ClaimSchema,
+  type GapEntry,
   EventSchema,
   EvidenceSchema,
   FindingSchema,
@@ -21,6 +22,8 @@ import {
 } from '@levelhead/contracts'
 import {
   AREA_ROUND,
+  dueForRetrieval,
+  topicById,
   DEFAULT_ROLE_ID,
   openPinned,
   replay,
@@ -218,6 +221,7 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             roleId: Type.Optional(RoleIdSchema),
             topicIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             claimIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
+            gapId: Type.Optional(Type.String({ minLength: 1 })),
             snapshotId: Type.Optional(Type.String({ minLength: 1 })),
             mode: Type.Optional(ModeSchema),
             level: Type.Optional(LevelSchema),
@@ -232,13 +236,48 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
       },
       async (request, reply) => {
         const body = request.body
+        const store = deps.storeFor(request.principal)
+        const history = await Promise.all(
+          (await store.listSessions()).map(async (id) => replay(await store.read(id))),
+        )
+        const gaps = new Map<string, GapEntry>()
+        for (const view of history)
+          for (const gap of view.gaps.values()) {
+            const known = gaps.get(gap.id)
+            if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt)
+              gaps.set(gap.id, gap)
+          }
+        const target = body.gapId === undefined ? undefined : gaps.get(body.gapId)
+        if (body.mode === 'drill' || body.gapId !== undefined) {
+          if (body.mode !== 'drill' || target === undefined || target.status !== 'open')
+            return reply.code(400).send({
+              error: 'Select an open gap owned by this candidate for drill mode',
+              detail: body.gapId ?? 'gapId is required',
+            })
+          if (target.topicId === undefined && target.claimId === undefined)
+            return reply
+              .code(400)
+              .send({ error: 'This gap has no available topic or claim target', detail: target.id })
+          if (target.topicId !== undefined && topicById(target.topicId) === undefined)
+            return reply
+              .code(400)
+              .send({ error: 'The target topic is unavailable', detail: target.topicId })
+        }
+        const targetTopic = target?.topicId === undefined ? undefined : topicById(target.topicId)
         const roleId = body.roleId ?? DEFAULT_ROLE_ID
         const pack = rolePack(roleId)
         if (pack === undefined) {
           return reply.code(400).send({ error: 'no such role', detail: roleId })
         }
 
-        const resolved = resolveInterview({ roleId, rounds: body.rounds, topicIds: body.topicIds })
+        const resolved = resolveInterview({
+          roleId,
+          rounds:
+            target === undefined
+              ? body.rounds
+              : [targetTopic === undefined ? 'project_deep_dive' : AREA_ROUND[targetTopic.area]],
+          topicIds: targetTopic === undefined ? body.topicIds : [targetTopic.id],
+        })
         if (!resolved.ok) {
           return reply.code(400).send(
             resolved.problem === 'unknown_topics'
@@ -253,14 +292,13 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
         }
         const { rounds, topics } = resolved
 
-        const store = deps.storeFor(request.principal)
         const claimSet = replay(await store.read(CLAIM_SET_SESSION))
         const confirmed = [...claimSet.claims.values()].filter((claim) =>
           claimSet.confirmedClaimIds.has(claim.id),
         )
         if (resolved.needsClaims && confirmed.length === 0) return reply.code(409).send(NO_CLAIMS)
 
-        const wanted = body.claimIds
+        const wanted = target?.claimId === undefined ? body.claimIds : [target.claimId]
         const selected =
           wanted === undefined ? confirmed : confirmed.filter((claim) => wanted.includes(claim.id))
         if (wanted !== undefined && selected.length !== wanted.length) {
@@ -294,14 +332,44 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
           topicHistory: await askedTopics(store),
           ...(pinned === undefined ? {} : { pinned }),
           mode: body.mode ?? 'simulation',
-          level: body.level ?? pack.defaultLevel,
+          level:
+            target === undefined
+              ? (body.level ?? pack.defaultLevel)
+              : (history
+                  .flatMap((view) => view.findings)
+                  .find((finding) => target.findingIds.includes(finding.id))?.level ?? 'mid'),
           // Gentle by default, as in `levelhead session`: a skeptic at full pressure is opted into.
           personaId: body.personaId ?? 'collaborator',
           pressureCeiling: (body.pressureCeiling ?? 1) as PressureLevel,
-          turnsPerRound: body.turnsPerRound ?? 6,
-          drill: body.drill ?? true,
+          turnsPerRound: target === undefined ? (body.turnsPerRound ?? 6) : 1,
+          drill: target === undefined ? (body.drill ?? true) : false,
+          ...(target === undefined
+            ? { retrievals: dueForRetrieval([...gaps.values()], deps.clock.now(), 3) }
+            : { drillGap: target }),
         })
         return reply.code(201).send({ ...update, findings: wireFindings(update.findings) })
+      },
+    )
+
+    app.post(
+      '/sessions/:id/hints',
+      {
+        schema: {
+          tags: ['sessions'],
+          params: SessionIdParamsSchema,
+          body: Type.Object({ level: Type.Integer({ minimum: 1, maximum: 3 }) }),
+          response: { 200: Type.Object({ text: Type.String() }), 409: ErrorSchema },
+        },
+      },
+      async (request, reply) => {
+        const live = host.get(request.params.id, request.principal.ownerId)
+        const text = await live?.hint(request.body.level)
+        if (text === undefined || text === null)
+          return reply.code(409).send({
+            error: 'No authored hint is available for this active drill',
+            detail: 'Hints are only available for supported topic drills, never independent tests.',
+          })
+        return { text }
       },
     )
 
