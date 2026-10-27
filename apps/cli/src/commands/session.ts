@@ -1,3 +1,4 @@
+import { gapsAcrossViews } from '@levelhead/core'
 import {
   AREA_ROUND,
   DEFAULT_ROLE_ID,
@@ -16,7 +17,6 @@ import { LEVEL_ORDER, ROUND_ORDER } from '@levelhead/contracts'
 import type {
   Claim,
   Finding,
-  GapEntry,
   Level,
   Mode,
   PersonaId,
@@ -231,17 +231,14 @@ export async function session(argv: readonly string[]): Promise<number> {
   }
 
   // Gathered across every log, because a gap outlives the session that closed it.
-  const settled: GapEntry[] = []
+  const views: ReturnType<typeof replay>[] = []
   const topicHistory: string[] = []
   for (const sessionId of await store.listSessions()) {
     const view = replay(await store.read(sessionId))
     topicHistory.push(...(view.session?.topicIds ?? []))
-    for (const gap of view.gaps.values()) {
-      const known = settled.findIndex((other) => other.id === gap.id)
-      if (known === -1) settled.push(gap)
-      else if (gap.lastTouchedAt >= (settled[known]?.lastTouchedAt ?? '')) settled[known] = gap
-    }
+    views.push(view)
   }
+  const settled = [...gapsAcrossViews(views).values()]
   const retrievals = dueForRetrieval(settled, new Date().toISOString(), 3)
   if (retrievals.length > 0) {
     // Said to the operator, never to the candidate mid-session.

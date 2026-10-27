@@ -3,7 +3,7 @@ import { loadFeedbackCases, validateFeedbackCases } from './cases.ts'
 
 test('reference cases preserve final-answer evidence and hold families out of tuning', async () => {
   const fixtures = await loadFeedbackCases()
-  expect(fixtures.cases).toHaveLength(16)
+  expect(fixtures.cases).toHaveLength(17)
   expect(new Set(fixtures.cases.map((entry) => entry.kind)).size).toBe(3)
   const changed = structuredClone(fixtures)
   changed.cases[0]!.expected.quotes = ['words never said']

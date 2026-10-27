@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.ts'
 import { ROUND_LABEL, useTopicCatalog } from '../lib/catalog.ts'
 import { day, words } from '../lib/format.ts'
@@ -20,10 +20,7 @@ export type HistoryFilter = 'all' | 'active' | 'completed' | 'interrupted'
 
 type SavedInterview = Awaited<ReturnType<typeof api.sessions>>['sessions'][number]
 export function canViewDebrief({ session, availability }: SavedInterview): boolean {
-  return (
-    session.mode !== 'simulation' ||
-    (availability !== 'awaiting_answer' && availability !== 'processing')
-  )
+  return session.mode !== 'simulation' || availability === 'closed'
 }
 
 export function SessionHistory({
@@ -112,6 +109,9 @@ export function SessionHistory({
                     Replay interview
                   </Link>
                 )}
+                {availability === 'interrupted' && (
+                  <EndInterruptedInterview sessionId={session.id} />
+                )}
                 {debriefAvailable && (
                   <Link
                     to={`/debrief?id=${id}${filter === 'all' ? '' : `&historyFilter=${filter}`}`}
@@ -129,13 +129,37 @@ export function SessionHistory({
             )}
             {availability === 'interrupted' && (
               <p className="mt-2 text-xs text-quiet">
-                This interview cannot continue on this server. Its saved answers and partial
-                feedback remain available.
+                This interview cannot continue on this server. Saved answers are intact. End it to
+                open the available feedback; unfinished work is not graded.
               </p>
             )}
           </article>
         )
       })}
+    </div>
+  )
+}
+
+export function EndInterruptedInterview({ sessionId }: { sessionId: string }) {
+  const cache = useQueryClient()
+  const navigate = useNavigate()
+  const close = useMutation({
+    mutationFn: () => api.closeInterrupted(sessionId),
+    onSuccess: async () => {
+      await Promise.all(
+        [['sessions'], ['session', sessionId], ['debrief', sessionId], ['feedback', sessionId]].map(
+          (queryKey) => cache.invalidateQueries({ queryKey }),
+        ),
+      )
+      navigate(`/debrief?id=${encodeURIComponent(sessionId)}`)
+    },
+  })
+  return (
+    <div>
+      <button className={LINK} disabled={close.isPending} onClick={() => close.mutate()}>
+        {close.isPending ? 'Ending interrupted interview…' : 'End interrupted interview'}
+      </button>
+      {close.isError && <Failed error={close.error} />}
     </div>
   )
 }

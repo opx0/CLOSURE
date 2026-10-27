@@ -45,6 +45,7 @@ import type {
 import type {
   Artifact,
   Claim,
+  Story,
   Competency,
   EventOf,
   Evidence,
@@ -62,6 +63,7 @@ import type {
   SessionState,
   Snapshot,
   Topic,
+  TransferVariant,
 } from '@levelhead/contracts'
 
 // What one thread of questions is about. An artifact carries the confirmed claim it bears on, if any.
@@ -80,6 +82,7 @@ export interface SessionIo {
       action: PolicyAction
       pressureLevel: number
       round: RoundKind
+      hint?: (level: number) => Promise<string>
       topic?: Pick<Topic, 'id' | 'area' | 'title'>
       // The résumé line under question, or the one the opened code is linked to.
       claim?: Pick<Claim, 'id' | 'assertion'>
@@ -112,6 +115,7 @@ export interface PinnedContext {
 
 export interface RunSessionInput {
   claims: readonly Claim[]
+  story?: Story
   // Replaces planning: each topic round asks exactly the given topics whose area belongs to it.
   topics?: readonly Topic[]
   // Topic ids asked in earlier sessions, so planning reaches for ones not asked yet.
@@ -125,6 +129,8 @@ export interface RunSessionInput {
   turnsPerRound: number
   drill: boolean
   transferGap?: GapEntry
+  transferVariant?: TransferVariant
+  drillGap?: GapEntry
   // Gaps due for spaced retrieval; asked as ordinary questions, never announced as reviews (§4.5).
   retrievals?: readonly GapEntry[]
   pinned?: PinnedContext
@@ -288,6 +294,16 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     ...(asksTopics ? { topicIds: plannedTopics.flat().map((topic) => topic.id) } : {}),
     rounds: [...input.rounds],
     ...(input.pinned === undefined ? {} : { snapshotId: input.pinned.snapshot.id }),
+    ...(input.story === undefined ? {} : { story: input.story }),
+    ...((input.drillGap ?? input.transferGap) === undefined
+      ? {}
+      : { practiceGapId: (input.drillGap ?? input.transferGap)!.id }),
+    ...(input.transferVariant === undefined
+      ? {}
+      : {
+          practiceVariantId: input.transferVariant.id,
+          practiceVariantVersion: input.transferVariant.version,
+        }),
     startedAt: deps.clock.now(),
   }
   await log.append('state_change', { change: 'session_started', session })
@@ -306,10 +322,11 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     await log.append('state_change', { change: 'gap_opened', gap })
     gaps.set(gap.id, gap)
   }
-  if (input.transferGap !== undefined) {
+  const carriedGap = input.drillGap ?? input.transferGap
+  if (carriedGap !== undefined) {
     // Re-opened as a fresh event so this session's log replays standalone; the ledger merges by id.
-    await log.append('state_change', { change: 'gap_opened', gap: input.transferGap })
-    gaps.set(input.transferGap.id, input.transferGap)
+    await log.append('state_change', { change: 'gap_opened', gap: carriedGap })
+    gaps.set(carriedGap.id, carriedGap)
   }
 
   const transcript: { role: 'interviewer' | 'candidate'; text: string }[] = []
@@ -440,7 +457,10 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
 
     let text = reuseQuestion
     if (text === undefined) {
-      const scenario = seedFor(action, subject)
+      const scenario =
+        action === 'TRANSFER_TEST' && input.transferVariant !== undefined
+          ? input.transferVariant.scenario
+          : seedFor(action, subject)
       // A drill isolates the skill; without a fresh scenario it does that on the question alone.
       const seed = action === 'DRILL' && putBefore(subject, scenario) ? undefined : scenario
       if (seed !== undefined)
@@ -453,6 +473,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         level: input.level,
         personaId: input.personaId,
         claim,
+        ...(round === 'behavioral' && input.story !== undefined ? { story: input.story } : {}),
         ...(topic === undefined
           ? {}
           : { topic: { id: topic.id, area: topic.area, title: topic.title, ask: topic.ask } }),
@@ -462,21 +483,61 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       })
       ceilings.record(rendered.invocation)
       text = rendered.text
-      await log.append('question', { attemptId, text, invocation: rendered.invocation })
+      await log.append('question', {
+        attemptId,
+        text,
+        invocation: rendered.invocation,
+        ...(round === 'behavioral' && input.story !== undefined
+          ? { storyId: input.story.id, storyRevision: input.story.revision }
+          : {}),
+      })
     } else {
       // Re-asks the already-rendered question; re-rendering would change what the candidate is retrying.
       await log.append('question', {
         attemptId,
         text,
         invocation: { ...(await lastQuestionInvocation()), id: deps.ids.next('inv') },
+        ...(round === 'behavioral' && input.story !== undefined
+          ? { storyId: input.story.id, storyRevision: input.story.revision }
+          : {}),
       })
     }
     if (machine.state === 'asking') await goto('question_rendered')
 
+    let answered = false
+    const hint =
+      input.mode !== 'drill' ||
+      input.drillGap === undefined ||
+      topic === undefined ||
+      input.drillGap.competency === 'composure'
+        ? undefined
+        : async (level: number) => {
+            if (answered || !Number.isInteger(level) || level < 1 || level > 3)
+              throw new Error('Hint is unavailable for this attempt')
+            const concepts =
+              topic.expected[
+                input.drillGap!.competency as 'mechanism' | 'trade_offs' | 'failure_modes'
+              ]
+            const text =
+              level === 1
+                ? `Consider this scenario: ${topic.twist}. Explain the ${input.drillGap!.competency.replace(/_/g, ' ')}.`
+                : level === 2
+                  ? concepts[0]!
+                  : concepts.join('; ')
+            await log.append('state_change', {
+              change: 'practice_assistance',
+              attemptId,
+              level,
+              hintId: `${topic.id}.${input.drillGap!.competency}.v1.${level}`,
+              text,
+            })
+            return text
+          }
     deps.io.question(text, {
       attemptId,
       turn,
       action,
+      ...(hint === undefined ? {} : { hint }),
       pressureLevel: pressure.level,
       round,
       ...(topic === undefined
@@ -488,6 +549,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     transcript.push({ role: 'interviewer', text })
 
     const answerText = await deps.io.answer()
+    answered = true
     const sourceId = `answer:${attemptId}`
     await log.append('state_change', {
       change: 'source_registered',
@@ -782,6 +844,19 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         }
 
         let repeatedPractice = false
+        if (input.drillGap !== undefined && plan.chosen === 'DRILL') {
+          const settled = await recordPracticeOutcome(
+            input.drillGap.id,
+            turned.attemptId,
+            'drill',
+            turned.findings,
+          )
+          if (settled.kind === 'rejected') {
+            rejection = settled.failure
+            break
+          }
+          repeatedPractice = settled.kind === 'duplicate'
+        }
         if (input.transferGap !== undefined && plan.chosen === 'TRANSFER_TEST') {
           const settled = await recordPracticeOutcome(
             input.transferGap.id,

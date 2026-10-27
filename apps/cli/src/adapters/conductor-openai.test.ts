@@ -79,7 +79,7 @@ test('the invocation record is fully populated from the prompt and the response 
   expect(invocation.port).toBe('conductor')
   expect(invocation.modelAlias).toBe('local/llama.cpp')
   expect(invocation.promptId).toBe('question-render')
-  expect(invocation.promptVersion).toBe(2)
+  expect(invocation.promptVersion).toBe(3)
   expect(invocation.promptHash).toMatch(/^[0-9a-f]{16}$/)
   expect(invocation.inputTokens).toBe(900)
   expect(invocation.outputTokens).toBe(30)

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { Finding, GapEntry, Span } from '@levelhead/contracts'
 import type { AttemptRecord, SessionView } from '../events/replay.ts'
-import { competenceLane, quotesFrom, renderCompetenceLane } from './competence.ts'
+import { competenceLane, improvementPlan, quotesFrom, renderCompetenceLane } from './competence.ts'
 
 const citations = {
   transcriptSpanIds: ['span-1'] as [string],
@@ -240,4 +240,87 @@ test('an empty session says so rather than rendering a blank report', () => {
   expect(rendered).toContain('  No answer was evaluated in this session.')
   expect(rendered).toContain('  No gap opened or moved this session.')
   expect(rendered).toContain('  Abstentions      0')
+})
+
+test('improvement priorities keep exact evidence, separate strengths and uncertainty, and cap only the leading group', () => {
+  const quoted = 'The index uses disk space.'
+  const span: Span = {
+    id: 'proof',
+    sourceId: 'answer-proof',
+    startByte: 0,
+    endByte: Buffer.byteLength(quoted),
+    quoted,
+  }
+  const findings: Finding[] = Array.from({ length: 4 }, (_, index) => ({
+    ...claimFinding,
+    id: `priority-${index}`,
+    claimId: `claim-${index}`,
+    transcriptSpanIds: ['proof'],
+    evidenceIds: ['proof-link'],
+  }))
+  const gaps = new Map(
+    findings.map((finding, index) => [
+      `gap-${index}`,
+      { ...openGap, id: `gap-${index}`, claimId: `claim-${index}`, findingIds: [finding.id] },
+    ]),
+  )
+  const strength: Finding = {
+    ...claimFinding,
+    id: 'held',
+    verdict: 'supported',
+    transcriptSpanIds: ['proof'],
+    evidenceIds: ['proof-link'],
+  }
+  const view = viewOf({
+    findings: [...findings, strength, abstained],
+    gaps,
+    spans: new Map([[span.id, span]]),
+    sources: new Map([[span.sourceId, quoted]]),
+  })
+  const plan = improvementPlan(view)
+  expect(plan.leading).toHaveLength(3)
+  expect(plan.remaining).toHaveLength(1)
+  expect(plan.leading[0]?.quotes[0]?.quoted).toBe(quoted)
+  expect(plan.strengths.map((item) => item.findingIds)).toEqual([['held']])
+  expect(plan.uncertainty).toHaveLength(1)
+  expect(improvementPlan({ ...view, findings: [], gaps: new Map() }).leading).toEqual([])
+  expect(improvementPlan({ ...view, findings: [abstained], gaps: new Map() }).strengths).toEqual([])
+  const gap = [...gaps.values()][0]!
+  const current = new Map([
+    [gap.id, { ...gap, status: 'drilled' as const, topicId: 'dbms.indexes' }],
+  ])
+  expect(improvementPlan(view, { gaps: current }).leading[0]?.nextAction).toBe('transfer')
+  const exhausted = new Set([
+    'indexes.tenant_prefix@1',
+    'indexes.leading_wildcard@1',
+    'indexes.low_selectivity@1',
+  ])
+  expect(
+    improvementPlan(view, { gaps: current, exposedVariants: exhausted }).leading[0]?.nextAction,
+  ).toBe('unavailable')
+  expect(improvementPlan(view)).toEqual(plan)
+})
+
+test('confirmed claim practice guidance stays bounded to the candidate claim', () => {
+  const quote = "I don't think we handled that."
+  const view = viewOf({ sources: new Map([['src-1', quote]]) })
+  const claim = {
+    id: 'claim-1',
+    spanId: 'claim-span',
+    type: 'built' as const,
+    assertion: 'Built a job queue',
+    technologies: [],
+    metrics: [],
+    implied: false,
+    confirmedByCandidate: true,
+    extractorVersion: 'test',
+  }
+  const priority = improvementPlan(view, { confirmedClaims: new Map([[claim.id, claim]]) })
+    .leading[0]
+  expect(priority?.exercise).toContain('Built a job queue')
+  expect(priority?.explanation).toContain('not verification')
+  expect(priority?.nextAction).toBe('drill')
+  expect(improvementPlan(view, { confirmedClaims: new Map() }).leading[0]?.nextAction).toBe(
+    'unavailable',
+  )
 })

@@ -57,7 +57,9 @@ export function analyticsRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           // trend and no gap ledger of its own.
           if (sessionId === CLAIM_SET_SESSION) continue
           const view = replay(await store.read(sessionId))
-          const at = view.session?.startedAt ?? ''
+          if (view.session === null || (view.session.mode === 'simulation' && view.closed === null))
+            continue
+          const at = view.session.startedAt
 
           const attempts: SessionAttemptInput[] = view.prosody.map((report) => {
             const attempt = view.attempts.get(report.attemptId)

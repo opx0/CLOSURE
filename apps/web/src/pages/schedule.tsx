@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.ts'
 import { Empty, Failed, Loading, Panel, Tag } from '../components/primitives.tsx'
@@ -17,12 +17,23 @@ const REASON: Record<string, string> = {
 
 export function SchedulePage() {
   const [horizon, setHorizon] = useState(7)
+  const cache = useQueryClient()
+  const save = useMutation({
+    mutationFn: api.saveSchedule,
+    onSuccess: () => cache.invalidateQueries({ queryKey: ['schedule'] }),
+  })
   const plan = useQuery({
     queryKey: ['schedule', horizon],
     queryFn: () => api.schedule(horizon),
   })
   const topicById = useTopicById()
   const claimSet = useClaimSet()
+  const minutes = plan.data?.availableMinutes ?? null
+  const budgetTurns = (rounds: number) =>
+    minutes === null ? null : Math.min(20, Math.floor(minutes / (5 * rounds)))
+  const oneTurnFits = budgetTurns(1) === null || budgetTurns(1)! >= 1
+  const coverageTurns = budgetTurns(1)
+  const roundTurns = budgetTurns(Math.max(1, plan.data?.suggestedRounds.length ?? 1))
 
   return (
     <div className="space-y-4">
@@ -44,8 +55,35 @@ export function SchedulePage() {
           </label>
         }
       >
+        {plan.data?.availableMinutes != null && (
+          <p className="mb-3 text-xs text-quiet">
+            Your saved time: {plan.data.availableMinutes} minutes. Planning assumes five minutes per
+            question; this is an unmeasured estimate, not a timer. You can change the setup.
+          </p>
+        )}
+        {plan.data !== undefined &&
+          plan.data.retrievals.length > 0 &&
+          roundTurns !== null &&
+          roundTurns < 3 && (
+            <p className="mb-3 text-xs text-quiet">
+              The estimated budget is shorter than the three turns currently needed to interleave
+              recall. It may not be asked in this session.
+            </p>
+          )}
         {plan.isLoading && <Loading what="the schedule" />}
         {plan.isError && <Failed error={plan.error} />}
+        {save.isError && <Failed error={save.error} />}
+        {plan.data?.saved !== null && plan.data?.saved !== undefined && (
+          <p className="mb-3 text-xs text-quiet">
+            Saved choice: {plan.data.saved.mode} · {plan.data.saved.gapId}.
+            {plan.data.work.some(
+              (entry) =>
+                entry.gap.id === plan.data!.saved!.gapId && entry.action === plan.data!.saved!.mode,
+            )
+              ? ' Ready below.'
+              : ' This choice is no longer available; choose another.'}
+          </p>
+        )}
         {plan.data !== undefined && plan.data.work.length === 0 && (
           <Empty>Nothing is due in this horizon.</Empty>
         )}
@@ -64,12 +102,64 @@ export function SchedulePage() {
                     <Tag>due {day(entry.dueAt)}</Tag>
                   </div>
                   <p className="mt-1 text-sm">{entry.gap.summary}</p>
+                  {entry.action !== 'unavailable' && (
+                    <>
+                      {oneTurnFits && (
+                        <Link
+                          className="mt-2 inline-block text-xs text-accent-soft underline"
+                          to={`/session?mode=${entry.action}&gapId=${encodeURIComponent(entry.gap.id)}`}
+                        >
+                          {entry.action === 'drill'
+                            ? 'Practise this gap'
+                            : 'Try an unfamiliar variant'}
+                        </Link>
+                      )}
+                      {!oneTurnFits && (
+                        <span className="mt-2 inline-block text-xs text-quiet">
+                          A question exceeds the five-minute planning estimate.
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={save.isPending}
+                        className="ml-4 text-xs text-accent-soft underline"
+                        onClick={() => {
+                          if (entry.action !== 'unavailable')
+                            save.mutate({ gapId: entry.gap.id, mode: entry.action })
+                        }}
+                      >
+                        Save this choice
+                      </button>
+                    </>
+                  )}
                 </li>
               )
             })}
           </ul>
         )}
       </Panel>
+
+      {plan.data?.coverage !== null && plan.data?.coverage !== undefined && (
+        <Panel title="An untested topic">
+          <p className="text-sm">
+            {plan.data.coverage.title} has not appeared in your recorded attempts. This does not
+            imply mastery or weakness.
+          </p>
+          {(coverageTurns === null || coverageTurns > 0) && (
+            <Link
+              className="mt-2 inline-block text-xs text-accent-soft underline"
+              to={`/session?rounds=${plan.data.coverage.round}&topicId=${encodeURIComponent(plan.data.coverage.id)}&role=${encodeURIComponent(plan.data.coverage.roleId)}&level=${plan.data.coverage.level}${coverageTurns === null ? '' : `&turns=${coverageTurns}`}`}
+            >
+              Practise this topic
+            </Link>
+          )}
+          {coverageTurns === 0 && (
+            <p className="mt-2 text-xs text-quiet">
+              The saved time is shorter than the five-minute question estimate.
+            </p>
+          )}
+        </Panel>
+      )}
 
       {plan.data !== undefined && plan.data.suggestedRounds.length > 0 && (
         <Panel title="Rounds that would cover it">
@@ -79,12 +169,19 @@ export function SchedulePage() {
                 {ROUND_LABEL[round]}
               </Tag>
             ))}
-            <Link
-              to={`/session?rounds=${plan.data.suggestedRounds.join(',')}`}
-              className="ml-2 text-[13px] text-accent-soft underline underline-offset-2"
-            >
-              Practise these rounds
-            </Link>
+            {(roundTurns === null || roundTurns > 0) && (
+              <Link
+                to={`/session?rounds=${plan.data.suggestedRounds.join(',')}${roundTurns === null ? '' : `&turns=${roundTurns}`}`}
+                className="ml-2 text-[13px] text-accent-soft underline underline-offset-2"
+              >
+                Practise these rounds
+              </Link>
+            )}
+            {roundTurns === 0 && (
+              <span className="text-xs text-quiet">
+                The saved time is too short for one estimated question in every round.
+              </span>
+            )}
           </div>
         </Panel>
       )}

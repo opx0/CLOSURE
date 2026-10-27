@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.ts'
 import { JourneyIcon, JourneyLink, PreparationGrid } from '../components/journey.tsx'
@@ -11,21 +11,29 @@ import {
   roundsAbout,
   useTopicCatalog,
 } from '../lib/catalog.ts'
-import { useClaimSet } from '../lib/claim-set.ts'
+import { useClaimSet, usePreparation } from '../lib/claim-set.ts'
 
 export function PreparePage() {
   const catalog = useTopicCatalog()
   const [params, setParams] = useSearchParams()
   const snapshots = useQuery({ queryKey: ['snapshots'], queryFn: api.snapshots })
   const claims = useClaimSet()
+  const preparation = usePreparation()
+  const goals = useQuery({ queryKey: ['preparation-goals'], queryFn: api.preparationGoals })
   const history = useQuery({ queryKey: ['sessions'], queryFn: api.sessions })
   if (catalog.isLoading) return <Loading what="your preparation options" />
   if (catalog.isError) return <Failed error={catalog.error} />
   const data = catalog.data
   if (data === undefined) return null
-  const role = data.roles.find((entry) => entry.id === params.get('role')) ?? data.roles[0]
+  const role =
+    data.roles.find(
+      (entry) =>
+        entry.id === (params.get('role') ?? goals.data?.goals?.roleId ?? 'backend_services'),
+    ) ?? data.roles[0]
   if (role === undefined) return <Empty>No interview roles are configured.</Empty>
-  const level = data.levels.find((entry) => entry === params.get('level')) ?? role.defaultLevel
+  const level =
+    data.levels.find((entry) => entry === (params.get('level') ?? goals.data?.goals?.level)) ??
+    'junior'
   const rounds = params.has('rounds')
     ? inRoundOrder(
         data,
@@ -39,6 +47,7 @@ export function PreparePage() {
   configured.set('level', level)
   configured.set('rounds', rounds.join(','))
   configured.set('mode', mode)
+  configured.delete('snapshotId')
   const setup = `/session?${configured}`
   const returnTo = `/prepare?${configured}`
   const update = (changes: Record<string, string | undefined>) => {
@@ -202,9 +211,13 @@ export function PreparePage() {
               <Link to="/resume" className="text-xs font-medium text-accent-soft">
                 Cross-question my résumé
               </Link>
+              <Link to="/stories" className="text-xs font-medium text-accent-soft">
+                Prepare behavioral stories
+              </Link>
             </div>
           </section>
           <aside className="prepare-side">
+            <PreparationGoals roleId={role.id} level={level} />
             <section className="session-ticket">
               <p className="journey-eyebrow">Your interview brief</p>
               <h2 className="ticket-role">{role.label}</h2>
@@ -258,13 +271,53 @@ export function PreparePage() {
                   {claims.data.confirmed.size === 1 ? '' : 's'}
                 </p>
               )}
+              {preparation.isError && <Failed error={preparation.error} />}
+              {preparation.save.isError && <Failed error={preparation.save.error} />}
+              {claims.data !== undefined && claims.data.confirmed.size > 0 && (
+                <fieldset className="mt-3 space-y-2">
+                  <legend className="text-xs text-quiet">Claims for this interview</legend>
+                  {claims.data.claims
+                    .filter((claim) => claims.data!.confirmed.has(claim.id))
+                    .map((claim) => {
+                      const selected = preparation.data?.selection?.claimIds ?? [
+                        ...claims.data!.confirmed,
+                      ]
+                      return (
+                        <label key={claim.id} className="flex gap-2 text-xs text-muted">
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(claim.id)}
+                            disabled={preparation.isPending || preparation.save.isPending}
+                            onChange={(event) =>
+                              preparation.save.mutate({
+                                ...preparation.data?.selection,
+                                claimIds: event.target.checked
+                                  ? [...selected, claim.id]
+                                  : selected.filter((id) => id !== claim.id),
+                              })
+                            }
+                          />
+                          {claim.assertion}
+                        </label>
+                      )
+                    })}
+                </fieldset>
+              )}
               {liveSnapshots.length > 0 && (
                 <label className="mt-3 block text-xs text-quiet">
                   Pinned project
                   <select
                     aria-label="Pinned project"
-                    value={params.get('snapshotId') ?? ''}
-                    onChange={(event) => update({ snapshotId: event.target.value || undefined })}
+                    value={preparation.data?.selection?.snapshotId ?? ''}
+                    disabled={preparation.isPending || preparation.save.isPending}
+                    onChange={(event) =>
+                      preparation.save.mutate({
+                        claimIds: preparation.data?.selection?.claimIds ?? [
+                          ...(claims.data?.confirmed ?? []),
+                        ],
+                        ...(event.target.value ? { snapshotId: event.target.value } : {}),
+                      })
+                    }
                     className="journey-select mt-2 text-xs"
                   >
                     <option value="">Choose when needed</option>
@@ -302,5 +355,93 @@ export function PreparePage() {
         </p>
       </div>
     </div>
+  )
+}
+
+function PreparationGoals({
+  roleId,
+  level,
+}: {
+  roleId: string
+  level: 'junior' | 'mid' | 'senior' | 'staff'
+}) {
+  const cache = useQueryClient()
+  const saved = useQuery({ queryKey: ['preparation-goals'], queryFn: api.preparationGoals })
+  const save = useMutation({
+    mutationFn: api.savePreparationGoals,
+    onSuccess: (data) => cache.setQueryData(['preparation-goals'], data),
+  })
+  if (saved.isLoading) return <Loading what="your goals" />
+  if (saved.isError) return <Failed error={saved.error} />
+  const goals = saved.data?.goals
+  return (
+    <section className="preparation-material">
+      <h2 className="text-sm font-medium">Preparation goals</h2>
+      <form
+        key={JSON.stringify(goals)}
+        className="mt-3 space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const form = new FormData(event.currentTarget)
+          const minutes = String(form.get('minutes') ?? '').trim()
+          const jobDescription = String(form.get('jobDescription') ?? '').trim()
+          save.mutate({
+            roleId,
+            level,
+            goals: String(form.get('goals') ?? '').trim(),
+            ...(minutes ? { availableMinutes: Number(minutes) } : {}),
+            ...(jobDescription ? { jobDescription } : {}),
+          })
+        }}
+      >
+        <label className="block text-xs text-quiet">
+          What do you want to practise?
+          <textarea
+            name="goals"
+            maxLength={5000}
+            defaultValue={goals?.goals ?? ''}
+            className="journey-select mt-2 w-full"
+          />
+        </label>
+        <label className="block text-xs text-quiet">
+          Minutes for next practice (optional)
+          <input
+            name="minutes"
+            type="number"
+            min={1}
+            max={10080}
+            defaultValue={goals?.availableMinutes ?? ''}
+            className="journey-select mt-2 w-full"
+          />
+        </label>
+        <label className="block text-xs text-quiet">
+          Job description (optional)
+          <textarea
+            name="jobDescription"
+            maxLength={20000}
+            defaultValue={goals?.jobDescription ?? ''}
+            className="journey-select mt-2 w-full"
+          />
+        </label>
+        <p className="text-xs text-quiet">
+          Saved as your notes; the job description is not sent to the interviewer.
+        </p>
+        {saved.data !== undefined && saved.data.suggestedTerms.length > 0 && (
+          <p className="text-xs text-quiet">
+            Possible terms from your job description: {saved.data.suggestedTerms.join(', ')}. Review
+            these yourself; they are not verified requirements.
+          </p>
+        )}
+        <button className="journey-secondary" disabled={save.isPending} type="submit">
+          Save goals
+        </button>
+        {save.isSuccess && (
+          <p role="status" className="text-xs">
+            Goals saved.
+          </p>
+        )}
+        {save.isError && <Failed error={save.error} />}
+      </form>
+    </section>
   )
 }

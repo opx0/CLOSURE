@@ -34,6 +34,25 @@ test('every unclosed gap is work, and each one says why', () => {
   ])
 })
 
+test('due recall comes first, open work follows, and ties are deterministic', () => {
+  const input = {
+    gaps: [
+      gap('b'),
+      gap('z', { status: 'closed_under_transfer', lastTouchedAt: '2026-08-01T00:00:00.000Z' }),
+      gap('a'),
+    ],
+    now: NOW,
+    horizonDays: 7,
+    retrievalLimit: 3,
+  }
+  expect(planNextSession(input).work.map((entry) => entry.gap.id)).toEqual(['z', 'a', 'b'])
+  expect(
+    planNextSession({ ...input, gaps: [...input.gaps].reverse() }).work.map(
+      (entry) => entry.gap.id,
+    ),
+  ).toEqual(['z', 'a', 'b'])
+})
+
 // A closed gap is only work again once its interval has come round; pulling one in early would
 // turn spaced retrieval into ordinary repetition.
 test('a closed gap enters the plan only when its review falls inside the horizon', () => {

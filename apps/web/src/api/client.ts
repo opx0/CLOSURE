@@ -98,6 +98,43 @@ export type ScreenSimulation = Json<'/mirror', 'post'>
 export const api = {
   health: () => request<Json<'/health', 'get'>>('/health'),
 
+  hint: (id: string, level: number) =>
+    request<Json<'/sessions/{id}/hints', 'post'>>(`/sessions/${encodeURIComponent(id)}/hints`, {
+      method: 'POST',
+      body: JSON.stringify({ level }),
+    }),
+  closeInterrupted: (id: string) =>
+    request<Json<'/sessions/{id}/close-interrupted', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/close-interrupted`,
+      { method: 'POST' },
+    ),
+  feedback: (id: string) =>
+    request<Json<'/sessions/{id}/feedback', 'get'>>(`/sessions/${encodeURIComponent(id)}/feedback`),
+  correctAnswer: (id: string, body: Body<'/sessions/{id}/corrections', 'post'>) =>
+    request<Json<'/sessions/{id}/corrections', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/corrections`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  reviewFinding: (id: string, body: Body<'/sessions/{id}/feedback', 'post'>) =>
+    request<Json<'/sessions/{id}/feedback', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/feedback`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  preparation: () => request<Json<'/preparation', 'get'>>('/preparation'),
+  stories: () => request<Json<'/stories', 'get'>>('/stories'),
+  saveStory: (story: Body<'/stories', 'post'>) =>
+    request<Json<'/stories', 'post'>>('/stories', { method: 'POST', body: JSON.stringify(story) }),
+  preparationGoals: () => request<Json<'/preparation/goals', 'get'>>('/preparation/goals'),
+  savePreparationGoals: (goals: Body<'/preparation/goals', 'post'>) =>
+    request<Json<'/preparation/goals', 'post'>>('/preparation/goals', {
+      method: 'POST',
+      body: JSON.stringify(goals),
+    }),
+  savePreparation: (selection: Body<'/preparation', 'post'>) =>
+    request<Json<'/preparation', 'post'>>('/preparation', {
+      method: 'POST',
+      body: JSON.stringify(selection),
+    }),
   claimSet: () => request<Json<'/claims', 'get'>>('/claims'),
 
   extractClaims: (resumeText: string) =>
@@ -143,6 +180,11 @@ export const api = {
 
   schedule: (horizonDays: number) =>
     request<Json<'/schedule', 'get'>>(`/schedule?horizonDays=${horizonDays}`),
+  saveSchedule: (selection: Body<'/schedule/plan', 'post'>) =>
+    request<Json<'/schedule/plan', 'post'>>('/schedule/plan', {
+      method: 'POST',
+      body: JSON.stringify(selection),
+    }),
 
   review: (subject?: string) =>
     request<Json<'/review', 'get'>>(

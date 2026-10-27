@@ -1,6 +1,6 @@
+import { gapsAcrossViews } from '@levelhead/core'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import type { GapEntry } from '@levelhead/contracts'
 import { planNextSession, replay, type EventStore } from '@levelhead/core'
 import type { GateVerdict } from './gate.ts'
 
@@ -59,20 +59,18 @@ export function buildMcpServer(deps: McpDeps): Server {
 
     switch (request.params.name) {
       case 'levelhead_gap_ledger': {
-        const gaps = new Map<string, GapEntry>()
+        const views: ReturnType<typeof replay>[] = []
         const quotes = new Map<string, string>()
         for (const sessionId of await deps.store.listSessions()) {
           const view = replay(await deps.store.read(sessionId))
-          for (const [id, gap] of view.gaps) {
-            const known = gaps.get(id)
-            if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(id, gap)
-          }
+          views.push(view)
           for (const link of view.evidence.values()) {
             if (link.target.kind !== 'span') continue
             const span = view.spans.get(link.target.spanId)
             if (span !== undefined) quotes.set(link.id, span.quoted)
           }
         }
+        const gaps = gapsAcrossViews(views)
         return text({
           gaps: [...gaps.values()],
           quotes: [...quotes].map(([evidenceId, quoted]) => ({ evidenceId, quoted })),
@@ -81,15 +79,11 @@ export function buildMcpServer(deps: McpDeps): Server {
       }
 
       case 'levelhead_due': {
-        const gaps = new Map<string, GapEntry>()
-        for (const sessionId of await deps.store.listSessions()) {
-          for (const gap of replay(await deps.store.read(sessionId)).gaps.values()) {
-            const known = gaps.get(gap.id)
-            if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) {
-              gaps.set(gap.id, gap)
-            }
-          }
-        }
+        const views = await Promise.all(
+          (await deps.store.listSessions()).map(async (id) => replay(await deps.store.read(id))),
+        )
+        const gaps = gapsAcrossViews(views)
+
         return text(
           planNextSession({
             gaps: [...gaps.values()],

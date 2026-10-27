@@ -55,6 +55,9 @@ export function ReviewPage() {
                 <div key={index} className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Tag>{day(attempt.at)}</Tag>
+                    <Tag>{attempt.practice}</Tag>
+                    {attempt.superseded && <Tag>superseded</Tag>}
+                    {attempt.versionChanged && <Tag>evaluator or rubric changed</Tag>}
                     <button
                       onClick={() => setParams({ subject: entry.subject })}
                       className="text-[11px] text-quiet underline underline-offset-2"
@@ -62,6 +65,16 @@ export function ReviewPage() {
                       {attempt.sessionId}
                     </button>
                   </div>
+                  {attempt.evaluator === null && (
+                    <p className="text-xs text-quiet">
+                      Evaluator version unavailable; comparisons are uncertain.
+                    </p>
+                  )}
+                  {attempt.evaluator !== null && (
+                    <p className="text-xs text-quiet">
+                      Evaluator: {attempt.evaluator.model} · {attempt.evaluator.prompt}
+                    </p>
+                  )}
                   <FindingCard finding={attempt.finding} quotes={review.data?.quotes ?? []} />
                 </div>
               ))}

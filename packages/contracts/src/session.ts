@@ -2,6 +2,28 @@ import { Type, type Static } from '@sinclair/typebox'
 import { RoundKindSchema } from './round.ts'
 import { RoleIdSchema } from './role.ts'
 import { LevelSchema, RubricSetSchema } from './rubric.ts'
+import { StorySchema } from './story.ts'
+
+export const PreparationSelectionSchema = Type.Object(
+  {
+    claimIds: Type.Array(Type.String({ minLength: 1 }), { maxItems: 100, uniqueItems: true }),
+    snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+)
+export type PreparationSelection = Static<typeof PreparationSelectionSchema>
+
+export const PreparationGoalsSchema = Type.Object(
+  {
+    roleId: RoleIdSchema,
+    level: LevelSchema,
+    goals: Type.String({ maxLength: 5000 }),
+    availableMinutes: Type.Optional(Type.Integer({ minimum: 1, maximum: 10080 })),
+    jobDescription: Type.Optional(Type.String({ maxLength: 20000 })),
+  },
+  { additionalProperties: false },
+)
+export type PreparationGoals = Static<typeof PreparationGoalsSchema>
 
 export const ModeSchema = Type.Union([
   Type.Literal('simulation'),
@@ -52,6 +74,10 @@ export const SessionSchema = Type.Object({
   // One element is the ordinary case, not a special one — Simulation can chain rounds like a real loop.
   rounds: Type.Array(RoundKindSchema, { minItems: 1 }),
   snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+  practiceGapId: Type.Optional(Type.String({ minLength: 1 })),
+  practiceVariantId: Type.Optional(Type.String({ minLength: 1 })),
+  practiceVariantVersion: Type.Optional(Type.Integer({ minimum: 1 })),
+  story: Type.Optional(StorySchema),
   startedAt: Type.String({ format: 'date-time' }),
 })
 export type Session = Static<typeof SessionSchema>

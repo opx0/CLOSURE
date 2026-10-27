@@ -1,5 +1,7 @@
 import type {
   AnyEvent,
+  AnswerCorrection,
+  FindingReview,
   Artifact,
   Claim,
   DeliveryReport,
@@ -37,6 +39,11 @@ export interface TranscriptEntry {
 }
 
 export interface SessionView {
+  readonly answerCorrections?: readonly (AnswerCorrection & { at: string })[]
+  readonly findingReviews?: readonly (FindingReview & { at: string })[]
+  readonly supersededFindings?: ReadonlyMap<string, string>
+  readonly historicalFindings?: readonly Finding[]
+  readonly supersededAttempts?: ReadonlyMap<string, string>
   readonly sessionId: string
   readonly session: Session | null
   readonly state: SessionState
@@ -87,6 +94,11 @@ export function replay(events: readonly AnyEvent[]): SessionView {
   const attempts = new Map<string, AttemptRecord>()
   const handoffs: string[] = []
   const findings: Finding[] = []
+  const answerCorrections: (AnswerCorrection & { at: string })[] = []
+  const findingReviews: (FindingReview & { at: string })[] = []
+  const supersededFindings = new Map<string, string>()
+  const revisions = new Map<string, number>()
+  const requests = new Map<string, string>()
   const gaps = new Map<string, GapEntry>()
   const invocations: InvocationRecord[] = []
   let session: Session | null = null
@@ -145,6 +157,7 @@ export function replay(events: readonly AnyEvent[]): SessionView {
       }
 
       case 'answer':
+        revisions.set(event.payload.attemptId, 1)
         sources.set(event.payload.sourceId, event.payload.text)
         transcript.push({
           role: 'candidate',
@@ -168,6 +181,62 @@ export function replay(events: readonly AnyEvent[]): SessionView {
       case 'state_change': {
         const change = event.payload
         switch (change.change) {
+          case 'answer_corrected': {
+            const receipt = JSON.stringify(change)
+            if (requests.has(change.requestId)) {
+              if (requests.get(change.requestId) !== receipt)
+                throw new Error('Correction request collision')
+              break
+            }
+            if (
+              revisions.get(change.attemptId) !== change.previousRevision ||
+              change.revision !== change.previousRevision + 1
+            )
+              throw new Error('Correction revision conflict')
+            const index = transcript.findLastIndex(
+              (turn) => turn.role === 'candidate' && turn.attemptId === change.attemptId,
+            )
+            if (index < 0 || sources.has(change.sourceId))
+              throw new Error('Correction source is invalid')
+            requests.set(change.requestId, receipt)
+            revisions.set(change.attemptId, change.revision)
+            sources.set(change.sourceId, change.text)
+            transcript[index] = {
+              role: 'candidate',
+              attemptId: change.attemptId,
+              text: change.text,
+            }
+            for (const finding of findings)
+              if (finding.attemptId === change.attemptId)
+                supersededFindings.set(finding.id, event.occurredAt)
+            answerCorrections.push({ ...change, at: event.occurredAt })
+            break
+          }
+          case 'finding_reviewed': {
+            const receipt = JSON.stringify(change)
+            if (requests.has(change.requestId)) {
+              if (requests.get(change.requestId) !== receipt)
+                throw new Error('Feedback request collision')
+              break
+            }
+            if (!findings.some((finding) => finding.id === change.findingId))
+              throw new Error('Review finding is missing')
+            if (change.state === 'confirmed_error' && change.sourceRefs.length === 0)
+              throw new Error('Reviewed error requires a source reference')
+            if (supersededFindings.has(change.findingId) && change.state !== 'confirmed_error')
+              throw new Error('Superseded feedback cannot be reinstated by review')
+            requests.set(change.requestId, receipt)
+            findingReviews.push({ ...change, at: event.occurredAt })
+            if (change.state === 'confirmed_error')
+              supersededFindings.set(change.findingId, event.occurredAt)
+            break
+          }
+          case 'practice_assistance':
+          case 'preparation_saved':
+          case 'preparation_goals_saved':
+          case 'story_saved':
+          case 'practice_plan_saved':
+            break
           case 'session_started':
             session = change.session
             pressureLevel = change.session.pressureLevel
@@ -295,6 +364,13 @@ export function replay(events: readonly AnyEvent[]): SessionView {
     }
   }
 
+  const supersededAttempts = new Map(
+    findings.flatMap((finding) =>
+      supersededFindings.has(finding.id)
+        ? [[finding.attemptId, supersededFindings.get(finding.id)!] as const]
+        : [],
+    ),
+  )
   const totals = invocations.reduce(
     (running, invocation) => ({
       costUsd: running.costUsd + invocation.costUsd,
@@ -322,11 +398,66 @@ export function replay(events: readonly AnyEvent[]): SessionView {
     transcript,
     attempts,
     handoffs,
-    findings,
-    gaps,
+    findings: findings.filter((finding) => !supersededFindings.has(finding.id)),
+    historicalFindings: findings,
+    answerCorrections,
+    findingReviews,
+    supersededFindings,
+    supersededAttempts,
+    gaps: invalidateGaps(gaps, supersededFindings, supersededAttempts),
     pressureLevel,
     invocations,
     totals,
     closed,
   }
+}
+
+function invalidateGaps(
+  gaps: ReadonlyMap<string, GapEntry>,
+  superseded: ReadonlyMap<string, string>,
+  attempts: ReadonlyMap<string, string> = new Map(),
+): Map<string, GapEntry> {
+  return new Map(
+    [...gaps].map(([id, gap]) => {
+      const invalidated = gap.findingIds.flatMap((finding) =>
+        superseded.has(finding) ? [superseded.get(finding)!] : [],
+      )
+      for (const attemptId of [
+        ...gap.transferAttemptIds,
+        ...(gap.practiceReceipts ?? []).map((receipt) => receipt.attemptId),
+      ]) {
+        const at = attempts.get(attemptId)
+        if (at !== undefined) invalidated.push(at)
+      }
+      return [
+        id,
+        invalidated.length === 0
+          ? gap
+          : {
+              ...gap,
+              status: 'unverified' as const,
+              evidenceIds: [],
+              summary: 'Previous feedback was superseded; reassessment is required.',
+              lastTouchedAt: [gap.lastTouchedAt, ...invalidated].sort().at(-1)!,
+            },
+      ]
+    }),
+  )
+}
+
+export function gapsAcrossViews(views: readonly SessionView[]): Map<string, GapEntry> {
+  const gaps = new Map<string, GapEntry>()
+  const superseded = new Map<string, string>()
+  const attempts = new Map<string, string>()
+  for (const view of views) {
+    for (const [id, at] of view.supersededFindings ?? [])
+      if (at > (superseded.get(id) ?? '')) superseded.set(id, at)
+    for (const [id, at] of view.supersededAttempts ?? [])
+      if (at > (attempts.get(id) ?? '')) attempts.set(id, at)
+    for (const [id, gap] of view.gaps) {
+      const known = gaps.get(id)
+      if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(id, gap)
+    }
+  }
+  return invalidateGaps(gaps, superseded, attempts)
 }

@@ -21,6 +21,7 @@ export class SessionLog {
   readonly #sessionId: string
   readonly #events: AnyEvent[]
   #nextSeq: number
+  #pending: Promise<unknown> = Promise.resolve()
 
   private constructor(deps: SessionLogDeps, sessionId: string, existing: readonly AnyEvent[]) {
     this.#deps = deps
@@ -43,26 +44,32 @@ export class SessionLog {
     payload: EventOf<K>['payload'],
     causedBy?: string,
   ): Promise<EventOf<K>> {
-    const candidate: unknown = {
-      eventId: this.#deps.ids.next('evt'),
-      sessionId: this.#sessionId,
-      seq: this.#nextSeq,
-      occurredAt: this.#deps.clock.now(),
-      schemaVersion: EVENT_SCHEMA_VERSION,
-      kind,
-      payload,
-      // Spread, not `causedBy: causedBy` — under exactOptionalPropertyTypes an explicit undefined
-      // would survive into the JSON line.
-      ...(causedBy === undefined ? {} : { causedBy }),
-    }
-    assertValidEvent(candidate, `${this.#sessionId}#${this.#nextSeq} (${kind})`)
-    const event = candidate as EventOf<K>
+    const pending = this.#pending
+      .catch(() => {})
+      .then(async () => {
+        const candidate: unknown = {
+          eventId: this.#deps.ids.next('evt'),
+          sessionId: this.#sessionId,
+          seq: this.#nextSeq,
+          occurredAt: this.#deps.clock.now(),
+          schemaVersion: EVENT_SCHEMA_VERSION,
+          kind,
+          payload,
+          // Spread, not `causedBy: causedBy` — under exactOptionalPropertyTypes an explicit undefined
+          // would survive into the JSON line.
+          ...(causedBy === undefined ? {} : { causedBy }),
+        }
+        assertValidEvent(candidate, `${this.#sessionId}#${this.#nextSeq} (${kind})`)
+        const event = candidate as EventOf<K>
 
-    // Seq advances only after the store accepts the write, so a rejected append leaves no hole.
-    await this.#deps.store.append(event)
-    this.#events.push(event)
-    this.#nextSeq += 1
-    return event
+        // Seq advances only after the store accepts the write, so a rejected append leaves no hole.
+        await this.#deps.store.append(event)
+        this.#events.push(event)
+        this.#nextSeq += 1
+        return event
+      })
+    this.#pending = pending
+    return pending
   }
 
   events(): readonly AnyEvent[] {

@@ -1,8 +1,7 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { FindingSchema, GapEntrySchema } from '@levelhead/contracts'
-import type { GapEntry } from '@levelhead/contracts'
-import { replay, spanViolations } from '@levelhead/core'
+import { replay, gapsAcrossViews, spanViolations } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
 import {
   ErrorSchema,
@@ -37,7 +36,7 @@ export function ledgerRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
       },
       async (request) => {
         const store = deps.storeFor(request.principal)
-        const gaps = new Map<string, GapEntry>()
+        const views: ReturnType<typeof replay>[] = []
         const quotes = new Map<string, string>()
         let unresolvedCitations = 0
 
@@ -45,16 +44,13 @@ export function ledgerRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
         // recently touched row wins, not the last one read.
         for (const sessionId of await store.listSessions()) {
           const view = replay(await store.read(sessionId))
-          for (const [id, gap] of view.gaps) {
-            const known = gaps.get(id)
-            if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(id, gap)
-          }
+          views.push(view)
           for (const quote of quotesFrom(view)) quotes.set(quote.evidenceId, quote.quoted)
           unresolvedCitations += spanViolations(view.spans.values(), view.sources).length
         }
 
         return {
-          gaps: [...gaps.values()],
+          gaps: [...gapsAcrossViews(views).values()],
           quotes: [...quotes].map(([evidenceId, quoted]) => ({ evidenceId, quoted })),
           unresolvedCitations,
         }

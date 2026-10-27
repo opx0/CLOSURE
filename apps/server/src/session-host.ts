@@ -2,6 +2,7 @@ import type {
   Claim,
   DeliveryReport,
   Finding,
+  GapEntry,
   Level,
   Mode,
   PersonaId,
@@ -10,6 +11,8 @@ import type {
   RoleId,
   RoundKind,
   Topic,
+  TransferVariant,
+  Story,
 } from '@levelhead/contracts'
 import type { ArtifactContext, IdSource, PinnedContext, PressureLevel } from '@levelhead/core'
 import { runSession, type SessionIo, type SessionResult } from '@levelhead/core'
@@ -21,6 +24,7 @@ import type { ServerDeps } from './deps.ts'
 export interface StartSessionInput {
   principal: Principal
   claims: readonly Claim[]
+  story?: Story
   mode: Mode
   level: Level
   personaId: PersonaId
@@ -28,6 +32,10 @@ export interface StartSessionInput {
   rounds: readonly RoundKind[]
   turnsPerRound: number
   drill: boolean
+  drillGap?: GapEntry
+  transferGap?: GapEntry
+  transferVariant?: TransferVariant
+  retrievals?: readonly GapEntry[]
   role?: RoleId
   topics?: readonly Topic[]
   topicHistory: readonly string[]
@@ -129,6 +137,7 @@ export class LiveSession {
   #atRest = false
   #outcome: SessionResult | null = null
   #failure: unknown = null
+  #hint: ((level: number) => Promise<string>) | null = null
 
   constructor(deps: ServerDeps, input: StartSessionInput) {
     this.#deps = deps
@@ -151,6 +160,7 @@ export class LiveSession {
     const { role, topics, pinned } = this.#input
     const run = runSession({
       claims: this.#input.claims,
+      ...(this.#input.story === undefined ? {} : { story: this.#input.story }),
       mode: this.#input.mode,
       level: this.#input.level,
       personaId: this.#input.personaId,
@@ -158,6 +168,12 @@ export class LiveSession {
       rounds: this.#input.rounds,
       turnsPerRound: this.#input.turnsPerRound,
       drill: this.#input.drill,
+      ...(this.#input.transferGap === undefined ? {} : { transferGap: this.#input.transferGap }),
+      ...(this.#input.transferVariant === undefined
+        ? {}
+        : { transferVariant: this.#input.transferVariant }),
+      ...(this.#input.drillGap === undefined ? {} : { drillGap: this.#input.drillGap }),
+      ...(this.#input.retrievals === undefined ? {} : { retrievals: this.#input.retrievals }),
       topicHistory: this.#input.topicHistory,
       ...(role === undefined ? {} : { role }),
       ...(topics === undefined ? {} : { topics }),
@@ -194,10 +210,15 @@ export class LiveSession {
     const waiting = this.#waiting
     if (waiting === null) throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
     this.#waiting = null
+    this.#hint = null
     this.#atRest = false
     waiting(answer)
     await this.#rested()
     return this.#drain()
+  }
+
+  async hint(level: number): Promise<string | null> {
+    return this.awaitingAnswer && this.#hint !== null ? this.#hint(level) : null
   }
 
   #io(): SessionIo {
@@ -207,6 +228,7 @@ export class LiveSession {
         buffer().round = { kind, index, total, ...(brief === undefined ? {} : { brief }) }
       },
       question: (text, meta) => {
+        this.#hint = meta.hint ?? null
         const { topic, claim, artifact } = meta
         buffer().question = {
           attemptId: meta.attemptId,

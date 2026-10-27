@@ -82,3 +82,27 @@ test('with no session recorded, analytics is three empty series rather than a ze
   expect(analytics.ledger).toEqual([])
   expect(analytics.composure).toEqual([])
 })
+
+test('saved preparation is not treated as an interview in analytics', async () => {
+  const { app } = await testApi()
+  try {
+    expect(
+      (await app.inject({ method: 'POST', url: '/preparation', payload: { claimIds: [] } }))
+        .statusCode,
+    ).toBe(200)
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/preparation/goals',
+          payload: { roleId: 'backend_services', level: 'junior', goals: '' },
+        })
+      ).statusCode,
+    ).toBe(200)
+    const response = await app.inject('/analytics')
+    expect(response.statusCode).toBe(200)
+    expect(response.json().ledger).toEqual([])
+  } finally {
+    await app.close()
+  }
+})

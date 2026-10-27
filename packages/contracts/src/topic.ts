@@ -37,3 +37,12 @@ export const TopicSchema = Type.Object({
   twist: Type.String({ minLength: 1 }),
 })
 export type Topic = Static<typeof TopicSchema>
+
+export const TransferVariantSchema = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  version: Type.Integer({ minimum: 1 }),
+  topicId: Type.String({ minLength: 1 }),
+  scenario: Type.String({ minLength: 1 }),
+  reviewState: Type.Literal('agent_authored_unreviewed'),
+})
+export type TransferVariant = Static<typeof TransferVariantSchema>

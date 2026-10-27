@@ -1,3 +1,4 @@
+import { gapsAcrossViews } from '@levelhead/core'
 import { renderLedger, replay, spanViolations, topicById } from '@levelhead/core'
 import type { GapEntry } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
@@ -14,17 +15,13 @@ export function titled(gap: GapEntry): GapEntry {
 export async function ledger(): Promise<number> {
   const config = loadCliConfig()
   const { store } = openStore(config)
-  const gaps = new Map<string, GapEntry>()
+  const views: ReturnType<typeof replay>[] = []
   const quotes = new Map<string, string>()
   let violations = 0
 
   for (const sessionId of await store.listSessions()) {
     const view = replay(await store.read(sessionId))
-    for (const [id, gap] of view.gaps) {
-      // Session listing order isn't chronological, so the most recently touched row wins.
-      const known = gaps.get(id)
-      if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(id, gap)
-    }
+    views.push(view)
     for (const link of view.evidence.values()) {
       if (link.target.kind !== 'span') continue
       const span = view.spans.get(link.target.spanId)
@@ -33,6 +30,7 @@ export async function ledger(): Promise<number> {
     violations += spanViolations(view.spans.values(), view.sources).length
   }
 
+  const gaps = gapsAcrossViews(views)
   heading('gap ledger')
   if (gaps.size === 0) {
     dim('  no gaps yet — run a session.')

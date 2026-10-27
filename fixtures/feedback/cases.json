@@ -217,6 +217,20 @@
         "quotes": ["industry best practices"],
         "reason": "Confident language does not answer the transaction question and must not become competence evidence."
       }
+    },
+    {
+      "id": "reviewed-literal-error",
+      "family": "reviewed-constant-return",
+      "split": "heldout",
+      "kind": "artifact",
+      "question": "A prior finding said this function returns five. What does the displayed source establish?",
+      "source": "function capacity() { return 4; }",
+      "answer": "It returns four. The prior finding that it returns five contradicts this displayed function.",
+      "expected": {
+        "judgment": "supported",
+        "quotes": ["It returns four"],
+        "reason": "The literal return value is four. This authored regression represents a reviewable finding error; it does not claim independent human adjudication."
+      }
     }
   ]
 }

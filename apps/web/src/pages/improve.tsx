@@ -113,6 +113,23 @@ export function ImprovePage() {
                       <h3 className="mt-3 text-sm font-medium leading-relaxed text-body">
                         {gap.summary}
                       </h3>
+                      {gap.status === 'open' &&
+                        (gap.topicId !== undefined || gap.claimId !== undefined) && (
+                          <Link
+                            to={`/session?mode=drill&gapId=${encodeURIComponent(gap.id)}`}
+                            className="journey-secondary mt-3"
+                          >
+                            Practise this gap
+                          </Link>
+                        )}
+                      {gap.status === 'drilled' && gap.topicId === 'dbms.indexes' && (
+                        <Link
+                          to={`/session?mode=transfer&gapId=${encodeURIComponent(gap.id)}`}
+                          className="journey-secondary mt-3"
+                        >
+                          Check on an unfamiliar variant
+                        </Link>
+                      )}
                       {quotes.map((quote, index) => (
                         <blockquote
                           key={index}

@@ -16,6 +16,7 @@ import { MirrorPage } from './pages/mirror.tsx'
 import { HistoryPage } from './pages/history.tsx'
 import { PreparePage } from './pages/prepare.tsx'
 import { ImprovePage } from './pages/improve.tsx'
+import { StoriesPage } from './pages/stories.tsx'
 import { JourneyIcon } from './components/journey.tsx'
 
 const DESTINATIONS = [
@@ -23,7 +24,7 @@ const DESTINATIONS = [
     to: '/prepare',
     label: 'Prepare',
     icon: 'prepare',
-    paths: ['/', '/prepare', '/resume', '/claims'],
+    paths: ['/', '/prepare', '/resume', '/claims', '/stories'],
   },
   { to: '/session', label: 'Interview', icon: 'interview', paths: ['/session', '/studio'] },
   {
@@ -42,6 +43,7 @@ const DESTINATIONS = [
 
 const TOOLS = [
   { to: '/studio', label: 'Practice aloud' },
+  { to: '/stories', label: 'Behavioral stories' },
   { to: '/ledger', label: 'Gap ledger' },
   { to: '/schedule', label: 'What is due' },
   { to: '/review', label: 'Compare attempts' },
@@ -157,6 +159,7 @@ export function App() {
           <Route path="/prepare" element={<PreparePage />} />
           <Route path="/improve" element={<ImprovePage />} />
           <Route path="/resume" element={<ResumePage />} />
+          <Route path="/stories" element={<StoriesPage />} />
           <Route path="/claims" element={<Navigate to="/resume" replace />} />
           <Route path="/session" element={<SessionPage />} />
           <Route path="/studio" element={<StudioPage />} />
