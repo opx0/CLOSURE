@@ -40,6 +40,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       level: input.level,
       personaId: input.personaId,
       claim: input.claim,
+      ...(input.story === undefined ? {} : { story: input.story }),
       transcript: input.transcript,
       seed: input.seed,
       round: input.round,

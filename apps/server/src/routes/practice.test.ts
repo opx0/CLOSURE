@@ -28,6 +28,30 @@ test('an exact owner gap launches one drill at its original level, persists the 
   try {
     const original = await interviewed(app)
     const gap = (await app.inject('/ledger')).json().gaps[0]
+    expect(
+      (await app.inject('/schedule'))
+        .json()
+        .work.find((entry: { gap: { id: string } }) => entry.gap.id === gap.id).action,
+    ).toBe('drill')
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/schedule/plan',
+          payload: { gapId: gap.id, mode: 'drill' },
+        })
+      ).statusCode,
+    ).toBe(200)
+    expect((await app.inject('/schedule')).json().saved).toEqual({ gapId: gap.id, mode: 'drill' })
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/schedule/plan',
+          payload: { gapId: 'other-owner-gap', mode: 'drill' },
+        })
+      ).statusCode,
+    ).toBe(400)
     const response = await app.inject({
       method: 'POST',
       url: '/sessions',
@@ -136,6 +160,11 @@ test('authored hints persist before delivery and the resulting coached answer ca
     })
     expect(replay(await store.read(drill.sessionId)).gaps.get(gap.id)?.status).toBe('drilled')
     expect(
+      (await app.inject('/schedule'))
+        .json()
+        .work.find((entry: { gap: { id: string } }) => entry.gap.id === gap.id).action,
+    ).toBe('transfer')
+    expect(
       (
         await app.inject({
           method: 'POST',
@@ -181,6 +210,18 @@ test('authored hints persist before delivery and the resulting coached answer ca
     const failed = replay(await store.read(transfer.sessionId)).gaps.get(gap.id)
     expect(failed?.status).toBe('open')
     expect(failed?.practiceReceipts?.at(-1)?.kind).toBe('transfer')
+    const review = (await app.inject('/review')).json()
+    const attempts = review.subjects.flatMap(
+      (subject: { attempts: { sessionId: string; practice: string }[] }) => subject.attempts,
+    )
+    expect(
+      attempts.find((attempt: { sessionId: string }) => attempt.sessionId === drill.sessionId)
+        ?.practice,
+    ).toBe('coached')
+    expect(
+      attempts.find((attempt: { sessionId: string }) => attempt.sessionId === transfer.sessionId)
+        ?.practice,
+    ).toBe('transfer')
   } finally {
     await app.close()
   }
@@ -236,6 +277,17 @@ test('an overdue gap is interleaved as an ordinary question and its failed retri
     expect(view.gaps.get('gap_due')?.status).toBe('open')
     expect(view.gaps.get('gap_due')?.practiceReceipts?.at(-1)?.kind).toBe('retrieval')
     expect(view.gaps.get('gap_due')?.retrievals?.at(-1)?.passed).toBe(false)
+    const review = (await app.inject('/review')).json()
+    expect(
+      review.subjects
+        .flatMap(
+          (subject: { attempts: { sessionId: string; practice: string }[] }) => subject.attempts,
+        )
+        .some(
+          (attempt: { sessionId: string; practice: string }) =>
+            attempt.sessionId === start.sessionId && attempt.practice === 'retrieval',
+        ),
+    ).toBe(true)
   } finally {
     await app.close()
   }

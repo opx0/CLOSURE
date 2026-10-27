@@ -116,7 +116,7 @@ test('with no queue, a pin is parsed in a child process and a walkthrough opens 
     const started = await app.inject({
       method: 'POST',
       url: '/sessions',
-      payload: { rounds: ['code_walkthrough'] },
+      payload: { rounds: ['code_walkthrough'], mode: 'coach' },
     })
     expect(started.statusCode).toBe(201)
     const turn = started.json() as {
@@ -147,7 +147,11 @@ test('with no queue, a pin is parsed in a child process and a walkthrough opens 
     expect(read.statusCode).toBe(200)
     expect(read.json() as unknown).toEqual({ artifact: shown })
 
+    const beforeReview = (await app.inject('/review')).json().citations
+    expect(beforeReview.resolved).toBeGreaterThan(0)
     await app.inject({ method: 'DELETE', url: `/snapshots/${snapshot.id}` })
+    const afterReview = (await app.inject('/review')).json().citations
+    expect(afterReview.snapshotDeleted).toBeGreaterThan(0)
     const gone = await app.inject({ method: 'GET', url: excerpt })
     expect(gone.statusCode).toBe(404)
     expect((gone.json() as { error: string }).error).toBe('no such artifact')

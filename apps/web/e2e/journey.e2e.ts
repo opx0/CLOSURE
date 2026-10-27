@@ -443,6 +443,15 @@ test('an exact gap reaches a separate unfamiliar Transfer with coaching disabled
     entry.findingIds.includes(judged.findings[0].id),
   )
   expect(gap).toBeTruthy()
+  await page.goto('/app/schedule')
+  const scheduled = page.locator(`a[href*="gapId=${gap.id}"]`)
+  await expect(scheduled).toHaveText('Practise this gap')
+  await scheduled.locator('..').getByRole('button', { name: 'Save this choice' }).click()
+  await expect(page.getByText(`Saved choice: drill · ${gap.id}.`, { exact: false })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText(`Saved choice: drill · ${gap.id}.`, { exact: false })).toBeVisible()
+  await scheduled.click()
+  await expect(page).toHaveURL(new RegExp(`mode=drill&gapId=${gap.id}`))
   const drill = await (
     await page.request.post('/sessions', { data: { mode: 'drill', gapId: gap.id } })
   ).json()
@@ -479,4 +488,7 @@ test('an exact gap reaches a separate unfamiliar Transfer with coaching disabled
   expect((await accepted).ok()).toBe(true)
   const after = await (await page.request.get(`/sessions/${sessionId}`)).json()
   expect(after.gaps.find((entry: { id: string }) => entry.id === gap.id).status).toBe('open')
+  await page.goto('/app/review')
+  await expect(page.getByText('coached', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('transfer', { exact: true }).first()).toBeVisible()
 })

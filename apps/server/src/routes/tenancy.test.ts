@@ -58,6 +58,115 @@ async function twoOwnerApp() {
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` })
 
+test('confirmed stories and their versions remain owner scoped', async () => {
+  const { app } = await twoOwnerApp()
+  try {
+    const body = {
+      previousRevision: 0,
+      situation: 'A queue stalled',
+      action: 'I investigated',
+      result: 'We recovered',
+      confirmed: true,
+    }
+    const saved = await app.inject({
+      method: 'POST',
+      url: '/stories',
+      headers: bearer('alice-token'),
+      payload: body,
+    })
+    expect(saved.statusCode).toBe(200)
+    expect(
+      (await app.inject({ url: '/stories', headers: bearer('bob-token') })).json().stories,
+    ).toEqual([])
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/stories',
+          headers: bearer('bob-token'),
+          payload: { ...body, id: saved.json().id, previousRevision: 1 },
+        })
+      ).statusCode,
+    ).toBe(409)
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/sessions',
+          headers: bearer('bob-token'),
+          payload: { rounds: ['behavioral'], storyId: saved.json().id, storyRevision: 1 },
+        })
+      ).statusCode,
+    ).toBe(400)
+  } finally {
+    await app.close()
+  }
+})
+
+test('preparation goals are saved per owner and can be edited without a job description', async () => {
+  const { app } = await twoOwnerApp()
+  try {
+    const goals = {
+      roleId: 'backend_services',
+      level: 'junior',
+      goals: 'Explain databases',
+      availableMinutes: 30,
+    }
+    const save = (payload: object) =>
+      app.inject({
+        method: 'POST',
+        url: '/preparation/goals',
+        headers: bearer('alice-token'),
+        payload,
+      })
+    expect((await save(goals)).statusCode).toBe(200)
+    expect(
+      (await app.inject({ url: '/preparation/goals', headers: bearer('bob-token') })).json().goals,
+    ).toBeNull()
+    expect(
+      (await app.inject({ url: '/preparation/goals', headers: bearer('alice-token') })).json()
+        .goals,
+    ).toEqual(goals)
+    const started = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      headers: bearer('alice-token'),
+      payload: {
+        roleId: goals.roleId,
+        level: goals.level,
+        rounds: ['cs_fundamentals'],
+        mode: 'coach',
+      },
+    })
+    expect(started.statusCode).toBe(201)
+    const sessionId = started.json().sessionId
+    const edited = { roleId: 'backend_services', level: 'mid', goals: 'Practise queues' }
+    expect((await save(edited)).statusCode).toBe(200)
+    expect(
+      (await app.inject({ url: '/preparation/goals', headers: bearer('alice-token') })).json()
+        .goals,
+    ).toEqual(edited)
+    const session = (
+      await app.inject({ url: `/sessions/${sessionId}`, headers: bearer('alice-token') })
+    ).json().session
+    expect(session.roleId).toBe('backend_services')
+    expect(session.level).toBe('junior')
+    expect((await save({ ...edited, roleId: 'missing' })).statusCode).toBe(400)
+    expect((await save({ ...edited, availableMinutes: 0 })).statusCode).toBe(400)
+    const withJob = await save({
+      ...edited,
+      jobDescription: 'Requirements:\n- PostgreSQL and TypeScript',
+    })
+    expect(withJob.json().suggestedTerms.length).toBeGreaterThan(0)
+    expect(
+      (await app.inject({ url: '/preparation/goals', headers: bearer('bob-token') })).json()
+        .suggestedTerms,
+    ).toEqual([])
+  } finally {
+    await app.close()
+  }
+})
+
 test('a request with no token is refused once tokens are configured', async () => {
   const { app } = await twoOwnerApp()
 

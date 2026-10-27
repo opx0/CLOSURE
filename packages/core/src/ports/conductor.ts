@@ -6,6 +6,7 @@ import type {
   PolicyAction,
   RoundKind,
   Topic,
+  Story,
 } from '@levelhead/contracts'
 
 // §4.8: code travels with the request rather than being fetched by the renderer — the snapshot is
@@ -31,6 +32,7 @@ export interface RenderQuestionInput {
   level: Level
   personaId: PersonaId
   claim: Claim | null
+  story?: Story
   // Only what the question may be phrased from; the false premise and the twist arrive as a seed.
   topic?: Pick<Topic, 'id' | 'area' | 'title' | 'ask'>
   round: RoundKind

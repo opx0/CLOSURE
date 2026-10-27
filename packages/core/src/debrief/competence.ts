@@ -8,6 +8,7 @@ import {
   type ComposureSignal,
   type ImprovementPlan,
   type GapEntry,
+  type Claim,
   LEVEL_ORDER,
 } from '@levelhead/contracts'
 import type { SessionView } from '../events/replay.ts'
@@ -45,7 +46,11 @@ export function competenceLane(view: SessionView): CompetenceLane {
 
 export function improvementPlan(
   view: SessionView,
-  context: { gaps?: ReadonlyMap<string, GapEntry>; exposedVariants?: ReadonlySet<string> } = {},
+  context: {
+    gaps?: ReadonlyMap<string, GapEntry>
+    exposedVariants?: ReadonlySet<string>
+    confirmedClaims?: ReadonlyMap<string, Claim>
+  } = {},
 ): ImprovementPlan {
   const summary = (
     findings: readonly import('@levelhead/contracts').Finding[],
@@ -117,11 +122,26 @@ export function improvementPlan(
     if (evidence.quotes.length === 0) continue
     const topic = gap.topicId === undefined ? undefined : topicById(gap.topicId)
     const concepts = gap.competency === 'composure' ? undefined : topic?.expected[gap.competency]
+    const claim = gap.claimId === undefined ? undefined : context.confirmedClaims?.get(gap.claimId)
+    const guidance =
+      claim === undefined
+        ? undefined
+        : {
+            mechanism:
+              'Describe the sequence of actions, what you personally did, and evidence for the result.',
+            trade_offs: 'Explain the alternatives, the reason for your choice, and what it cost.',
+            failure_modes:
+              'Explain a concrete failure, how you would detect it, and what limits remain.',
+            composure: 'Distinguish what you know from what you cannot establish.',
+          }[gap.competency]
     priorities.push({
       ...evidence,
       gapId: gap.id,
       nextAction:
-        gap.status === 'open' && (gap.topicId !== undefined || gap.claimId !== undefined)
+        gap.status === 'open' &&
+        (topic !== undefined ||
+          (gap.claimId !== undefined &&
+            (context.confirmedClaims === undefined || claim !== undefined)))
           ? 'drill'
           : gap.status === 'drilled' &&
               gap.topicId !== undefined &&
@@ -131,7 +151,12 @@ export function improvementPlan(
       ...(gap.topicId === undefined ? {} : { topicId: gap.topicId }),
       ...(gap.claimId === undefined ? {} : { claimId: gap.claimId }),
       ...(concepts === undefined
-        ? {}
+        ? guidance === undefined || claim === undefined
+          ? {}
+          : {
+              explanation: `${guidance} This is general guidance, not verification of the claim.`,
+              exercise: `For your confirmed claim “${claim.assertion}”, revisit the cited answer and address the missing reasoning in your own words.`,
+            }
         : {
             explanation: concepts.join('; '),
             exercise: `Apply the reasoning to this scenario: ${topic!.twist}. Explain the mechanism and trade-offs in your own words.`,

@@ -233,6 +233,9 @@ export function replay(events: readonly AnyEvent[]): SessionView {
           }
           case 'practice_assistance':
           case 'preparation_saved':
+          case 'preparation_goals_saved':
+          case 'story_saved':
+          case 'practice_plan_saved':
             break
           case 'session_started':
             session = change.session

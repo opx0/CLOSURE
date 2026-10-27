@@ -340,6 +340,16 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const [params, setParams] = useSearchParams()
   const catalog = useTopicCatalog()
   const gapId = params.get('gapId')
+  const storyId = params.get('storyId')
+  const storyRevision = Number(params.get('storyRevision'))
+  const stories = useQuery({
+    queryKey: ['stories'],
+    queryFn: api.stories,
+    enabled: storyId !== null,
+  })
+  const story = stories.data?.stories.find(
+    (entry) => entry.id === storyId && entry.revision === storyRevision,
+  )
   const practice = useQuery({ queryKey: ['ledger'], queryFn: api.ledger, enabled: gapId !== null })
   const practiceGap = practice.data?.gaps.find((gap) => gap.id === gapId)
   const preparationState = usePreparation()
@@ -361,7 +371,12 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const mode = MODES.find((entry) => entry.id === params.get('mode'))?.id ?? 'coach'
   const setMode = (value: Mode) => updateSetup('mode', value)
   const [ceiling, setCeiling] = useState(1)
-  const [turns, setTurns] = useState(4)
+  const requestedTurns = Number(params.get('turns'))
+  const [turns, setTurns] = useState(
+    Number.isInteger(requestedTurns) && requestedTurns >= 1 && requestedTurns <= 20
+      ? requestedTurns
+      : 4,
+  )
 
   const snapshots = useQuery({ queryKey: ['snapshots'], queryFn: api.snapshots })
   const claimSet = useClaimSet()
@@ -394,6 +409,11 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
 
   const loop = role.defaultRounds.filter((round) => interviewRounds.includes(round))
   const targetTopic = data.topics.find((topic) => topic.id === practiceGap?.topicId)
+  const requestedTopicId = params.get('topicId')
+  const requestedTopic =
+    requestedTopicId === null
+      ? undefined
+      : data.topics.find((topic) => topic.id === requestedTopicId)
   const rounds =
     gapId !== null && practiceGap !== undefined
       ? [targetTopic?.round ?? 'project_deep_dive']
@@ -428,13 +448,17 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
     start.mutate({
       roleId: role.id,
       ...(gapId === null ? {} : { gapId }),
+      ...(story === undefined ? {} : { storyId: story.id, storyRevision: story.revision }),
+      ...(gapId === null && requestedTopic !== undefined && rounds.includes(requestedTopic.round)
+        ? { topicIds: [requestedTopic.id] }
+        : {}),
       rounds,
       level,
       personaId: persona,
       mode,
       pressureCeiling: ceiling,
       turnsPerRound: turns,
-      drill: true,
+      drill: !params.has('turns'),
       ...(asks('claim') && selectedClaimIds !== undefined && selectedClaimIds.length > 0
         ? { claimIds: selectedClaimIds }
         : {}),
@@ -493,6 +517,36 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
               <p className="mt-2 text-xs text-quiet">
                 The saved target and original assessment level determine this drill. Coaching does
                 not close a gap.
+              </p>
+            </>
+          )}
+        </Panel>
+      )}
+      {gapId === null && requestedTopicId !== null && (
+        <Panel title="Selected topic">
+          {requestedTopic === undefined ? (
+            <Empty>This topic is unavailable.</Empty>
+          ) : (
+            <p>
+              {requestedTopic.title}
+              {!rounds.includes(requestedTopic.round) && ' — select its round to continue.'}
+            </p>
+          )}
+        </Panel>
+      )}
+      {storyId !== null && (
+        <Panel title="Confirmed story">
+          {stories.isPending ? (
+            <Loading what="your story" />
+          ) : story === undefined ? (
+            <Empty>This story version is unavailable.</Empty>
+          ) : (
+            <>
+              <p>{story.situation}</p>
+              <p className="mt-2">{story.action}</p>
+              <p className="mt-2">{story.result}</p>
+              <p className="mt-2 text-xs text-quiet">
+                Version {story.revision} will be saved with this interview.
               </p>
             </>
           )}
@@ -686,6 +740,10 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
               (gapId !== null &&
                 (practiceGap === undefined ||
                   practiceGap.status !== (mode === 'transfer' ? 'drilled' : 'open'))) ||
+              (gapId === null &&
+                requestedTopicId !== null &&
+                (requestedTopic === undefined || !rounds.includes(requestedTopic.round))) ||
+              (storyId !== null && (story === undefined || !rounds.includes('behavioral'))) ||
               start.isPending ||
               rounds.length === 0 ||
               noProject ||
@@ -698,7 +756,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
           <Quiet>
             {rounds.length === 0
               ? 'Pick at least one round.'
-              : `${role.label} · ${LEVEL_LABEL[level]} · ${turns} questions per round, and one drill if an answer opens a gap`}
+              : `${role.label} · ${LEVEL_LABEL[level]} · ${turns} questions per round${params.has('turns') ? '' : ', and one drill if an answer opens a gap'}`}
           </Quiet>
         </div>
         {start.isError && <StartFailed error={start.error} />}

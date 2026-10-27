@@ -131,6 +131,25 @@ export function DebriefPage() {
         description="Review recorded gaps and the rounds your schedule suggests."
         icon="improve"
       />
+      {session.data?.session?.story !== undefined && (
+        <details className="card p-5">
+          <summary className="cursor-pointer text-sm font-medium">
+            Confirmed story · version {session.data.session.story.revision}
+          </summary>
+          <p className="mt-3 text-sm">
+            <strong>Situation:</strong> {session.data.session.story.situation}
+          </p>
+          <p className="mt-2 text-sm">
+            <strong>Action:</strong> {session.data.session.story.action}
+          </p>
+          <p className="mt-2 text-sm">
+            <strong>Result:</strong> {session.data.session.story.result}
+          </p>
+          <p className="mt-2 text-xs text-quiet">
+            This is your confirmed story, not an independently verified fact.
+          </p>
+        </details>
+      )}
       <div className="report-note">
         <h2 className="mb-2 text-sm font-medium">Read each lane on its own</h2>
         <p className="text-sm text-quiet">

@@ -15,6 +15,7 @@ import {
   type SessionAttemptInput,
 } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
+import { CLAIM_SET_SESSION } from '../../../cli/src/commands/claims.ts'
 import { ErrorSchema, SessionIdParamsSchema } from './shared.ts'
 
 // The one surface that shows both lanes. It is only allowed to put one after the other: the two
@@ -98,9 +99,14 @@ export function debriefRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
               : [`${entry.session.practiceVariantId}@${entry.session.practiceVariantVersion}`],
           ),
         )
+        const claimSet = replay(await store.read(CLAIM_SET_SESSION))
+        const confirmedClaims = new Map(
+          [...claimSet.claims].filter(([id]) => claimSet.confirmedClaimIds.has(id)),
+        )
         report.competence.plan = improvementPlan(view, {
           gaps: gapsAcrossViews(history),
           exposedVariants,
+          confirmedClaims,
         })
         return report
       },

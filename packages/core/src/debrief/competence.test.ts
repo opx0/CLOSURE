@@ -300,3 +300,27 @@ test('improvement priorities keep exact evidence, separate strengths and uncerta
   ).toBe('unavailable')
   expect(improvementPlan(view)).toEqual(plan)
 })
+
+test('confirmed claim practice guidance stays bounded to the candidate claim', () => {
+  const quote = "I don't think we handled that."
+  const view = viewOf({ sources: new Map([['src-1', quote]]) })
+  const claim = {
+    id: 'claim-1',
+    spanId: 'claim-span',
+    type: 'built' as const,
+    assertion: 'Built a job queue',
+    technologies: [],
+    metrics: [],
+    implied: false,
+    confirmedByCandidate: true,
+    extractorVersion: 'test',
+  }
+  const priority = improvementPlan(view, { confirmedClaims: new Map([[claim.id, claim]]) })
+    .leading[0]
+  expect(priority?.exercise).toContain('Built a job queue')
+  expect(priority?.explanation).toContain('not verification')
+  expect(priority?.nextAction).toBe('drill')
+  expect(improvementPlan(view, { confirmedClaims: new Map() }).leading[0]?.nextAction).toBe(
+    'unavailable',
+  )
+})

@@ -681,6 +681,15 @@ export interface paths {
                                     practiceGapId?: string;
                                     practiceVariantId?: string;
                                     practiceVariantVersion?: number;
+                                    story?: {
+                                        id: string;
+                                        revision: number;
+                                        situation: string;
+                                        action: string;
+                                        result: string;
+                                        /** @enum {boolean} */
+                                        confirmed: true;
+                                    };
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -709,6 +718,8 @@ export interface paths {
                         claimIds?: string[];
                         gapId?: string;
                         snapshotId?: string;
+                        storyId?: string;
+                        storyRevision?: number;
                         mode?: "simulation" | "coach" | "drill" | "transfer" | "review";
                         level?: "junior" | "mid" | "senior" | "staff";
                         personaId?: "collaborator" | "skeptic" | "bar_raiser" | "rusher";
@@ -1258,6 +1269,15 @@ export interface paths {
                                 practiceGapId?: string;
                                 practiceVariantId?: string;
                                 practiceVariantVersion?: number;
+                                story?: {
+                                    id: string;
+                                    revision: number;
+                                    situation: string;
+                                    action: string;
+                                    result: string;
+                                    /** @enum {boolean} */
+                                    confirmed: true;
+                                };
                                 /** Format: date-time */
                                 startedAt: string;
                             } | null;
@@ -1571,6 +1591,8 @@ export interface paths {
                                     /** Format: date-time */
                                     occurredAt: string;
                                 };
+                                storyId?: string;
+                                storyRevision?: number;
                             };
                         } | {
                             eventId: string;
@@ -1796,6 +1818,33 @@ export interface paths {
                                 };
                             } | {
                                 /** @enum {string} */
+                                change: "preparation_goals_saved";
+                                goals: {
+                                    roleId: string;
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    goals: string;
+                                    availableMinutes?: number;
+                                    jobDescription?: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                change: "story_saved";
+                                story: {
+                                    id: string;
+                                    revision: number;
+                                    situation: string;
+                                    action: string;
+                                    result: string;
+                                    /** @enum {boolean} */
+                                    confirmed: true;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                change: "practice_plan_saved";
+                                gapId: string;
+                                mode: "drill" | "transfer";
+                            } | {
+                                /** @enum {string} */
                                 change: "session_started";
                                 session: {
                                     id: string;
@@ -1816,6 +1865,15 @@ export interface paths {
                                     practiceGapId?: string;
                                     practiceVariantId?: string;
                                     practiceVariantVersion?: number;
+                                    story?: {
+                                        id: string;
+                                        revision: number;
+                                        situation: string;
+                                        action: string;
+                                        result: string;
+                                        /** @enum {boolean} */
+                                        confirmed: true;
+                                    };
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -2405,6 +2463,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/schedule/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        gapId: string;
+                        mode: "drill" | "transfer";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            gapId: string;
+                            mode: "drill" | "transfer";
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/schedule": {
         parameters: {
             query?: never;
@@ -2462,6 +2577,7 @@ export interface paths {
                                 reason: "drill_the_open_gap" | "transfer_the_drilled_gap" | "retrieve_the_closed_gap" | "restate_the_unverified";
                                 /** Format: date-time */
                                 dueAt: string;
+                                action: "drill" | "transfer" | "unavailable";
                             }[];
                             retrievals: {
                                 id: string;
@@ -2492,6 +2608,18 @@ export interface paths {
                             nothingDue: boolean;
                             /** Format: date-time */
                             horizonEndsAt: string;
+                            saved: {
+                                gapId: string;
+                                mode: "drill" | "transfer";
+                            } | null;
+                            coverage: {
+                                id: string;
+                                title: string;
+                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
+                                roleId: string;
+                                level: "junior" | "mid" | "senior" | "staff";
+                            } | null;
+                            availableMinutes: number | null;
                         };
                     };
                 };
@@ -2629,6 +2757,14 @@ export interface paths {
                                         abstention: "insufficient_evidence" | "not_verifiable";
                                     };
                                     quoted?: string;
+                                    practice: "coached" | "transfer" | "retrieval" | "unclassified";
+                                    superseded: boolean;
+                                    evaluator: {
+                                        model: string;
+                                        prompt: string;
+                                        rubric: string;
+                                    } | null;
+                                    versionChanged: boolean;
                                 }[];
                             }[];
                             citations: {
@@ -3796,6 +3932,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preparation/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            goals: {
+                                roleId: string;
+                                level: "junior" | "mid" | "senior" | "staff";
+                                goals: string;
+                                availableMinutes?: number;
+                                jobDescription?: string;
+                            } | null;
+                            suggestedTerms: string[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        roleId: string;
+                        level: "junior" | "mid" | "senior" | "staff";
+                        goals: string;
+                        availableMinutes?: number;
+                        jobDescription?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            goals: {
+                                roleId: string;
+                                level: "junior" | "mid" | "senior" | "staff";
+                                goals: string;
+                                availableMinutes?: number;
+                                jobDescription?: string;
+                            } | null;
+                            suggestedTerms: string[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preparation": {
         parameters: {
             query?: never;
@@ -3861,6 +4091,114 @@ export interface paths {
                 };
                 /** @description Default Response */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            stories: {
+                                id: string;
+                                revision: number;
+                                situation: string;
+                                action: string;
+                                result: string;
+                                /** @enum {boolean} */
+                                confirmed: true;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        id?: string;
+                        previousRevision: number;
+                        situation: string;
+                        action: string;
+                        result: string;
+                        /** @enum {boolean} */
+                        confirmed: true;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            revision: number;
+                            situation: string;
+                            action: string;
+                            result: string;
+                            /** @enum {boolean} */
+                            confirmed: true;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4063,6 +4401,15 @@ export interface paths {
                                     practiceGapId?: string;
                                     practiceVariantId?: string;
                                     practiceVariantVersion?: number;
+                                    story?: {
+                                        id: string;
+                                        revision: number;
+                                        situation: string;
+                                        action: string;
+                                        result: string;
+                                        /** @enum {boolean} */
+                                        confirmed: true;
+                                    };
                                     /** Format: date-time */
                                     startedAt: string;
                                 } | null;
@@ -4135,6 +4482,8 @@ export interface paths {
                                             /** Format: date-time */
                                             occurredAt: string;
                                         };
+                                        storyId?: string;
+                                        storyRevision?: number;
                                     };
                                 } | {
                                     eventId: string;
@@ -4360,6 +4709,33 @@ export interface paths {
                                         };
                                     } | {
                                         /** @enum {string} */
+                                        change: "preparation_goals_saved";
+                                        goals: {
+                                            roleId: string;
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            goals: string;
+                                            availableMinutes?: number;
+                                            jobDescription?: string;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "story_saved";
+                                        story: {
+                                            id: string;
+                                            revision: number;
+                                            situation: string;
+                                            action: string;
+                                            result: string;
+                                            /** @enum {boolean} */
+                                            confirmed: true;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "practice_plan_saved";
+                                        gapId: string;
+                                        mode: "drill" | "transfer";
+                                    } | {
+                                        /** @enum {string} */
                                         change: "session_started";
                                         session: {
                                             id: string;
@@ -4380,6 +4756,15 @@ export interface paths {
                                             practiceGapId?: string;
                                             practiceVariantId?: string;
                                             practiceVariantVersion?: number;
+                                            story?: {
+                                                id: string;
+                                                revision: number;
+                                                situation: string;
+                                                action: string;
+                                                result: string;
+                                                /** @enum {boolean} */
+                                                confirmed: true;
+                                            };
                                             /** Format: date-time */
                                             startedAt: string;
                                         };

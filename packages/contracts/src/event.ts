@@ -9,10 +9,12 @@ import { RoundKindSchema } from './round.ts'
 import { SnapshotSchema } from './snapshot.ts'
 import { FindingSchema } from './finding.ts'
 import { AnswerCorrectionSchema, FindingReviewSchema } from './feedback.ts'
+import { StorySchema } from './story.ts'
 import { GapEntrySchema, GapStatusSchema, PracticeOutcomeSchema } from './gap.ts'
 import { InvocationRecordSchema } from './invocation.ts'
 import {
   PreparationSelectionSchema,
+  PreparationGoalsSchema,
   PressureLevelSchema,
   SessionSchema,
   SessionStateSchema,
@@ -127,6 +129,8 @@ export const QuestionRenderedSchema = eventOf(
     attemptId: Type.String({ minLength: 1 }),
     text: Type.String({ minLength: 1 }),
     invocation: InvocationRecordSchema,
+    storyId: Type.Optional(Type.String({ minLength: 1 })),
+    storyRevision: Type.Optional(Type.Integer({ minimum: 1 })),
   }),
 )
 
@@ -178,6 +182,13 @@ export const StateChangeSchema = eventOf(
     Type.Object({
       change: Type.Literal('preparation_saved'),
       selection: PreparationSelectionSchema,
+    }),
+    Type.Object({ change: Type.Literal('preparation_goals_saved'), goals: PreparationGoalsSchema }),
+    Type.Object({ change: Type.Literal('story_saved'), story: StorySchema }),
+    Type.Object({
+      change: Type.Literal('practice_plan_saved'),
+      gapId: Type.String({ minLength: 1 }),
+      mode: Type.Union([Type.Literal('drill'), Type.Literal('transfer')]),
     }),
     Type.Object({ change: Type.Literal('session_started'), session: SessionSchema }),
     Type.Object({

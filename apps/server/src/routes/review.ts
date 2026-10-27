@@ -2,8 +2,9 @@ import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { FindingSchema } from '@levelhead/contracts'
 import type { Finding } from '@levelhead/contracts'
-import { availabilitySummary, replay, topicById } from '@levelhead/core'
+import { availabilitySummary, replay, topicById, spanViolations } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
+import { REPO_SESSION } from '../../../cli/src/commands/repo.ts'
 import { QuotedEvidenceSchema, wireFindings } from './shared.ts'
 
 interface Attempted {
@@ -11,6 +12,9 @@ interface Attempted {
   sessionId: string
   finding: Finding
   quoted?: string
+  practice: 'coached' | 'transfer' | 'retrieval' | 'unclassified'
+  superseded: boolean
+  evaluator: { model: string; prompt: string; rubric: string } | null
 }
 
 // §4.6's Review, over HTTP: attempts side by side, in evidence, with no aggregate over them.
@@ -39,6 +43,22 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
                       sessionId: Type.String({ minLength: 1 }),
                       finding: FindingSchema,
                       quoted: Type.Optional(Type.String()),
+                      practice: Type.Union([
+                        Type.Literal('coached'),
+                        Type.Literal('transfer'),
+                        Type.Literal('retrieval'),
+                        Type.Literal('unclassified'),
+                      ]),
+                      superseded: Type.Boolean(),
+                      evaluator: Type.Union([
+                        Type.Object({
+                          model: Type.String(),
+                          prompt: Type.String(),
+                          rubric: Type.String(),
+                        }),
+                        Type.Null(),
+                      ]),
+                      versionChanged: Type.Boolean(),
                     }),
                   ),
                 }),
@@ -56,6 +76,7 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
       },
       async (request) => {
         const store = deps.storeFor(request.principal)
+        const deletedSnapshots = replay(await store.read(REPO_SESSION)).tombstones
         const history = new Map<string, Attempted[]>()
         const labels = new Map<string, string>()
         const quotes = new Map<string, string>()
@@ -69,6 +90,8 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
         for (const sessionId of await store.listSessions()) {
           const events = await store.read(sessionId)
           const view = replay(events)
+          if (view.session === null || (view.session.mode === 'simulation' && view.closed === null))
+            continue
           for (const claim of view.claims.values()) labels.set(claim.id, claim.assertion)
           for (const artifact of view.artifacts.values()) {
             labels.set(
@@ -79,7 +102,25 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
             )
           }
           const askedAbout = new Map<string, string>()
+          const evaluations = new Map<string, { model: string; prompt: string; rubric: string }>()
+          const practices = new Map<string, 'coached' | 'transfer' | 'retrieval'>()
+          const assisted = new Set<string>()
           for (const event of events) {
+            if (event.kind === 'evaluation') {
+              for (const finding of event.payload.findings)
+                evaluations.set(finding.id, {
+                  model: event.payload.invocation.modelAlias,
+                  prompt: `${event.payload.invocation.promptId}@${event.payload.invocation.promptVersion}:${event.payload.invocation.promptHash}`,
+                  rubric: JSON.stringify(view.session?.rubricSet ?? null),
+                })
+            }
+            if (event.kind === 'state_change' && event.payload.change === 'practice_outcome')
+              practices.set(
+                event.payload.attemptId,
+                event.payload.kind === 'drill' ? 'coached' : event.payload.kind,
+              )
+            if (event.kind === 'state_change' && event.payload.change === 'practice_assistance')
+              assisted.add(event.payload.attemptId)
             if (event.kind !== 'policy_action') continue
             const { attemptId, topicId, artifactId, claimId } = event.payload
             const about = topicId ?? artifactId ?? claimId
@@ -87,7 +128,10 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
             if (topicId !== undefined) labels.set(topicId, topicById(topicId)?.title ?? topicId)
           }
           const startedAt = view.session?.startedAt ?? ''
-          const summary = availabilitySummary(view)
+          const summary = availabilitySummary({
+            ...view,
+            tombstones: [...view.tombstones, ...deletedSnapshots],
+          })
           citations.resolved += summary.resolved
           citations.unresolvable += summary.unresolvable
           citations.snapshotDeleted += summary.snapshotDeleted
@@ -96,12 +140,13 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           for (const link of view.evidence.values()) {
             if (link.target.kind !== 'span') continue
             const span = view.spans.get(link.target.spanId)
-            if (span !== undefined) quotes.set(link.id, span.quoted)
+            if (span !== undefined && spanViolations([span], view.sources).length === 0)
+              quotes.set(link.id, span.quoted)
           }
 
           // Grouped by what was asked, so two answers side by side are answers to the same thing.
           // Composure belongs to the candidate rather than to any one question.
-          for (const finding of view.findings) {
+          for (const finding of view.historicalFindings ?? view.findings) {
             const subject =
               finding.kind === 'claim' || finding.kind === 'claim_abstained'
                 ? finding.claimId
@@ -111,11 +156,24 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
             if (request.query.subject !== undefined && subject !== request.query.subject) continue
             const rows = history.get(subject) ?? []
             const spanId = finding.transcriptSpanIds[0]
-            const quoted = view.spans.get(spanId)?.quoted
+            const span = view.spans.get(spanId)
+            const quoted =
+              span !== undefined && spanViolations([span], view.sources).length === 0
+                ? span.quoted
+                : undefined
             rows.push({
               at: startedAt,
               sessionId,
               finding,
+              practice:
+                practices.get(finding.attemptId) ??
+                (assisted.has(finding.attemptId) || view.session?.mode === 'drill'
+                  ? 'coached'
+                  : view.session?.mode === 'transfer'
+                    ? 'transfer'
+                    : 'unclassified'),
+              superseded: view.supersededFindings?.has(finding.id) ?? false,
+              evaluator: evaluations.get(finding.id) ?? null,
               ...(quoted === undefined ? {} : { quoted }),
             })
             history.set(subject, rows)
@@ -127,11 +185,24 @@ export function reviewRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
             subject,
             label: labels.get(subject) ?? subject.replace(/_/g, ' '),
             attempts: rows
-              .sort((left, right) => left.at.localeCompare(right.at))
-              .map((row) => ({
+              .sort(
+                (left, right) =>
+                  left.at.localeCompare(right.at) ||
+                  left.sessionId.localeCompare(right.sessionId) ||
+                  left.finding.id.localeCompare(right.finding.id),
+              )
+              .map((row, index, sorted) => ({
                 at: row.at,
                 sessionId: row.sessionId,
                 finding: wireFindings([row.finding])[0] as never,
+                practice: row.practice,
+                superseded: row.superseded,
+                evaluator: row.evaluator,
+                versionChanged:
+                  index > 0 &&
+                  row.evaluator !== null &&
+                  sorted[index - 1]?.evaluator != null &&
+                  JSON.stringify(row.evaluator) !== JSON.stringify(sorted[index - 1]?.evaluator),
                 ...(row.quoted === undefined ? {} : { quoted: row.quoted }),
               })),
           })),

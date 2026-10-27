@@ -45,6 +45,7 @@ import type {
 import type {
   Artifact,
   Claim,
+  Story,
   Competency,
   EventOf,
   Evidence,
@@ -114,6 +115,7 @@ export interface PinnedContext {
 
 export interface RunSessionInput {
   claims: readonly Claim[]
+  story?: Story
   // Replaces planning: each topic round asks exactly the given topics whose area belongs to it.
   topics?: readonly Topic[]
   // Topic ids asked in earlier sessions, so planning reaches for ones not asked yet.
@@ -292,6 +294,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     ...(asksTopics ? { topicIds: plannedTopics.flat().map((topic) => topic.id) } : {}),
     rounds: [...input.rounds],
     ...(input.pinned === undefined ? {} : { snapshotId: input.pinned.snapshot.id }),
+    ...(input.story === undefined ? {} : { story: input.story }),
     ...((input.drillGap ?? input.transferGap) === undefined
       ? {}
       : { practiceGapId: (input.drillGap ?? input.transferGap)!.id }),
@@ -470,6 +473,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         level: input.level,
         personaId: input.personaId,
         claim,
+        ...(round === 'behavioral' && input.story !== undefined ? { story: input.story } : {}),
         ...(topic === undefined
           ? {}
           : { topic: { id: topic.id, area: topic.area, title: topic.title, ask: topic.ask } }),
@@ -479,13 +483,23 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       })
       ceilings.record(rendered.invocation)
       text = rendered.text
-      await log.append('question', { attemptId, text, invocation: rendered.invocation })
+      await log.append('question', {
+        attemptId,
+        text,
+        invocation: rendered.invocation,
+        ...(round === 'behavioral' && input.story !== undefined
+          ? { storyId: input.story.id, storyRevision: input.story.revision }
+          : {}),
+      })
     } else {
       // Re-asks the already-rendered question; re-rendering would change what the candidate is retrying.
       await log.append('question', {
         attemptId,
         text,
         invocation: { ...(await lastQuestionInvocation()), id: deps.ids.next('inv') },
+        ...(round === 'behavioral' && input.story !== undefined
+          ? { storyId: input.story.id, storyRevision: input.story.revision }
+          : {}),
       })
     }
     if (machine.state === 'asking') await goto('question_rendered')

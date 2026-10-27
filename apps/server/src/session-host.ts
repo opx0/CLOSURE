@@ -12,6 +12,7 @@ import type {
   RoundKind,
   Topic,
   TransferVariant,
+  Story,
 } from '@levelhead/contracts'
 import type { ArtifactContext, IdSource, PinnedContext, PressureLevel } from '@levelhead/core'
 import { runSession, type SessionIo, type SessionResult } from '@levelhead/core'
@@ -23,6 +24,7 @@ import type { ServerDeps } from './deps.ts'
 export interface StartSessionInput {
   principal: Principal
   claims: readonly Claim[]
+  story?: Story
   mode: Mode
   level: Level
   personaId: PersonaId
@@ -158,6 +160,7 @@ export class LiveSession {
     const { role, topics, pinned } = this.#input
     const run = runSession({
       claims: this.#input.claims,
+      ...(this.#input.story === undefined ? {} : { story: this.#input.story }),
       mode: this.#input.mode,
       level: this.#input.level,
       personaId: this.#input.personaId,

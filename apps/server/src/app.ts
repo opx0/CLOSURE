@@ -1,5 +1,6 @@
 import { feedbackRoutes } from './routes/feedback.ts'
 import { preparationRoutes } from './routes/preparation.ts'
+import { storiesRoutes } from './routes/stories.ts'
 import { join, resolve } from 'node:path'
 import { stat } from 'node:fs/promises'
 import Fastify, { type FastifyInstance } from 'fastify'
@@ -159,6 +160,7 @@ export async function buildApp(config: Config, deps: ServerDeps): Promise<Fastif
   await app.register(debriefRoutes(deps))
   await app.register(feedbackRoutes(deps))
   await app.register(preparationRoutes(deps))
+  await app.register(storiesRoutes(deps))
   await app.register(mirrorRoutes(deps))
   await app.register(analyticsRoutes(deps))
   await app.register(privacyRoutes(deps))

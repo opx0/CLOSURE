@@ -75,7 +75,17 @@ export function planNextSession(input: {
         Date.parse(reviewDueAt(gap)) <= Date.parse(horizonEndsAt),
     )
     .map((gap) => ({ gap, reason: reasonFor(gap), dueAt: dueAtFor(gap) }))
-    .sort((left, right) => Date.parse(left.dueAt) - Date.parse(right.dueAt))
+    .sort((left, right) => {
+      const leftDue = isDue(left.gap, input.now)
+      const rightDue = isDue(right.gap, input.now)
+      if (leftDue !== rightDue) return leftDue ? -1 : 1
+      const leftFuture = left.gap.status === 'closed_under_transfer'
+      const rightFuture = right.gap.status === 'closed_under_transfer'
+      if (leftFuture !== rightFuture) return leftFuture ? 1 : -1
+      return (
+        Date.parse(left.dueAt) - Date.parse(right.dueAt) || left.gap.id.localeCompare(right.gap.id)
+      )
+    })
 
   return {
     suggestedRounds: suggestRounds(work.map((entry) => entry.gap)),

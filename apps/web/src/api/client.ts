@@ -121,6 +121,15 @@ export const api = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
   preparation: () => request<Json<'/preparation', 'get'>>('/preparation'),
+  stories: () => request<Json<'/stories', 'get'>>('/stories'),
+  saveStory: (story: Body<'/stories', 'post'>) =>
+    request<Json<'/stories', 'post'>>('/stories', { method: 'POST', body: JSON.stringify(story) }),
+  preparationGoals: () => request<Json<'/preparation/goals', 'get'>>('/preparation/goals'),
+  savePreparationGoals: (goals: Body<'/preparation/goals', 'post'>) =>
+    request<Json<'/preparation/goals', 'post'>>('/preparation/goals', {
+      method: 'POST',
+      body: JSON.stringify(goals),
+    }),
   savePreparation: (selection: Body<'/preparation', 'post'>) =>
     request<Json<'/preparation', 'post'>>('/preparation', {
       method: 'POST',
@@ -171,6 +180,11 @@ export const api = {
 
   schedule: (horizonDays: number) =>
     request<Json<'/schedule', 'get'>>(`/schedule?horizonDays=${horizonDays}`),
+  saveSchedule: (selection: Body<'/schedule/plan', 'post'>) =>
+    request<Json<'/schedule/plan', 'post'>>('/schedule/plan', {
+      method: 'POST',
+      body: JSON.stringify(selection),
+    }),
 
   review: (subject?: string) =>
     request<Json<'/review', 'get'>>(

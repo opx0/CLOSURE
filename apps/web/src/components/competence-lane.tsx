@@ -105,7 +105,7 @@ function ImprovementPlanView({ plan }: { plan: NonNullable<CompetenceLane['plan'
       ))}
       {item.explanation !== undefined && (
         <details className="mt-3 text-xs">
-          <summary>Authored explanation and exercise</summary>
+          <summary>Practice guidance and exercise</summary>
           <p className="mt-2">{item.explanation}</p>
           <p className="mt-2">{item.exercise}</p>
         </details>

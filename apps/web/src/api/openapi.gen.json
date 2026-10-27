@@ -2532,6 +2532,49 @@
                                 "minimum": 1,
                                 "type": "integer"
                               },
+                              "story": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "revision",
+                                  "situation",
+                                  "action",
+                                  "result",
+                                  "confirmed"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "revision": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  },
+                                  "situation": {
+                                    "minLength": 1,
+                                    "maxLength": 4000,
+                                    "type": "string"
+                                  },
+                                  "action": {
+                                    "minLength": 1,
+                                    "maxLength": 4000,
+                                    "type": "string"
+                                  },
+                                  "result": {
+                                    "minLength": 1,
+                                    "maxLength": 4000,
+                                    "type": "string"
+                                  },
+                                  "confirmed": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                }
+                              },
                               "startedAt": {
                                 "format": "date-time",
                                 "type": "string"
@@ -2620,6 +2663,14 @@
                   "snapshotId": {
                     "minLength": 1,
                     "type": "string"
+                  },
+                  "storyId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "storyRevision": {
+                    "minimum": 1,
+                    "type": "integer"
                   },
                   "mode": {
                     "anyOf": [
@@ -5942,6 +5993,49 @@
                               "minimum": 1,
                               "type": "integer"
                             },
+                            "story": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "revision",
+                                "situation",
+                                "action",
+                                "result",
+                                "confirmed"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "revision": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                },
+                                "situation": {
+                                  "minLength": 1,
+                                  "maxLength": 4000,
+                                  "type": "string"
+                                },
+                                "action": {
+                                  "minLength": 1,
+                                  "maxLength": 4000,
+                                  "type": "string"
+                                },
+                                "result": {
+                                  "minLength": 1,
+                                  "maxLength": 4000,
+                                  "type": "string"
+                                },
+                                "confirmed": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              }
+                            },
                             "startedAt": {
                               "format": "date-time",
                               "type": "string"
@@ -8201,6 +8295,14 @@
                                     "type": "string"
                                   }
                                 }
+                              },
+                              "storyId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "storyRevision": {
+                                "minimum": 1,
+                                "type": "integer"
                               }
                             }
                           }
@@ -9707,6 +9809,172 @@
                                 "type": "object",
                                 "required": [
                                   "change",
+                                  "goals"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "preparation_goals_saved"
+                                    ]
+                                  },
+                                  "goals": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "roleId",
+                                      "level",
+                                      "goals"
+                                    ],
+                                    "properties": {
+                                      "roleId": {
+                                        "minLength": 1,
+                                        "pattern": "^[a-z][a-z0-9_]*$",
+                                        "type": "string"
+                                      },
+                                      "level": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "junior"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "mid"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "senior"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "staff"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "goals": {
+                                        "maxLength": 5000,
+                                        "type": "string"
+                                      },
+                                      "availableMinutes": {
+                                        "minimum": 1,
+                                        "maximum": 10080,
+                                        "type": "integer"
+                                      },
+                                      "jobDescription": {
+                                        "maxLength": 20000,
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "story"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story_saved"
+                                    ]
+                                  },
+                                  "story": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "revision",
+                                      "situation",
+                                      "action",
+                                      "result",
+                                      "confirmed"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "revision": {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      "situation": {
+                                        "minLength": 1,
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "action": {
+                                        "minLength": 1,
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "result": {
+                                        "minLength": 1,
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "confirmed": {
+                                        "type": "boolean",
+                                        "enum": [
+                                          true
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "gapId",
+                                  "mode"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "practice_plan_saved"
+                                    ]
+                                  },
+                                  "gapId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "mode": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "drill"
+                                        ]
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "transfer"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
                                   "session"
                                 ],
                                 "properties": {
@@ -9946,6 +10214,49 @@
                                       "practiceVariantVersion": {
                                         "minimum": 1,
                                         "type": "integer"
+                                      },
+                                      "story": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "revision",
+                                          "situation",
+                                          "action",
+                                          "result",
+                                          "confirmed"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
+                                          "revision": {
+                                            "minimum": 1,
+                                            "type": "integer"
+                                          },
+                                          "situation": {
+                                            "minLength": 1,
+                                            "maxLength": 4000,
+                                            "type": "string"
+                                          },
+                                          "action": {
+                                            "minLength": 1,
+                                            "maxLength": 4000,
+                                            "type": "string"
+                                          },
+                                          "result": {
+                                            "minLength": 1,
+                                            "maxLength": 4000,
+                                            "type": "string"
+                                          },
+                                          "confirmed": {
+                                            "type": "boolean",
+                                            "enum": [
+                                              true
+                                            ]
+                                          }
+                                        }
                                       },
                                       "startedAt": {
                                         "format": "date-time",
@@ -13067,6 +13378,105 @@
         }
       }
     },
+    "/schedule/plan": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "gapId",
+                  "mode"
+                ],
+                "properties": {
+                  "gapId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "mode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "drill"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "transfer"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "gapId",
+                    "mode"
+                  ],
+                  "properties": {
+                    "gapId": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "mode": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "drill"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "transfer"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/schedule": {
       "get": {
         "summary": "What is due across every session, and the rounds that would cover it",
@@ -13098,7 +13508,10 @@
                     "work",
                     "retrievals",
                     "nothingDue",
-                    "horizonEndsAt"
+                    "horizonEndsAt",
+                    "saved",
+                    "coverage",
+                    "availableMinutes"
                   ],
                   "properties": {
                     "suggestedRounds": {
@@ -13163,7 +13576,8 @@
                         "required": [
                           "gap",
                           "reason",
-                          "dueAt"
+                          "dueAt",
+                          "action"
                         ],
                         "properties": {
                           "gap": {
@@ -13381,6 +13795,28 @@
                           "dueAt": {
                             "format": "date-time",
                             "type": "string"
+                          },
+                          "action": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "drill"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "transfer"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "unavailable"
+                                ]
+                              }
+                            ]
                           }
                         }
                       }
@@ -13578,6 +14014,162 @@
                     "horizonEndsAt": {
                       "format": "date-time",
                       "type": "string"
+                    },
+                    "saved": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "gapId",
+                            "mode"
+                          ],
+                          "properties": {
+                            "gapId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "mode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "drill"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "transfer"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "coverage": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "title",
+                            "round",
+                            "roleId",
+                            "level"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "round": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "project_deep_dive"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "design_extension"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "behavioral"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "code_walkthrough"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "cs_fundamentals"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "problem_solving"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "role_knowledge"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "system_design"
+                                  ]
+                                }
+                              ]
+                            },
+                            "roleId": {
+                              "minLength": 1,
+                              "pattern": "^[a-z][a-z0-9_]*$",
+                              "type": "string"
+                            },
+                            "level": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "junior"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "mid"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "senior"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "staff"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "availableMinutes": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   }
                 }
@@ -13642,7 +14234,11 @@
                               "required": [
                                 "at",
                                 "sessionId",
-                                "finding"
+                                "finding",
+                                "practice",
+                                "superseded",
+                                "evaluator",
+                                "versionChanged"
                               ],
                               "properties": {
                                 "at": {
@@ -14449,6 +15045,66 @@
                                 },
                                 "quoted": {
                                   "type": "string"
+                                },
+                                "practice": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "coached"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "transfer"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "retrieval"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "unclassified"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "superseded": {
+                                  "type": "boolean"
+                                },
+                                "evaluator": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": [
+                                        "model",
+                                        "prompt",
+                                        "rubric"
+                                      ],
+                                      "properties": {
+                                        "model": {
+                                          "type": "string"
+                                        },
+                                        "prompt": {
+                                          "type": "string"
+                                        },
+                                        "rubric": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "versionChanged": {
+                                  "type": "boolean"
                                 }
                               }
                             }
@@ -20509,6 +21165,273 @@
         }
       }
     },
+    "/preparation/goals": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "goals",
+                    "suggestedTerms"
+                  ],
+                  "properties": {
+                    "goals": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "roleId",
+                            "level",
+                            "goals"
+                          ],
+                          "properties": {
+                            "roleId": {
+                              "minLength": 1,
+                              "pattern": "^[a-z][a-z0-9_]*$",
+                              "type": "string"
+                            },
+                            "level": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "junior"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "mid"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "senior"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "staff"
+                                  ]
+                                }
+                              ]
+                            },
+                            "goals": {
+                              "maxLength": 5000,
+                              "type": "string"
+                            },
+                            "availableMinutes": {
+                              "minimum": 1,
+                              "maximum": 10080,
+                              "type": "integer"
+                            },
+                            "jobDescription": {
+                              "maxLength": 20000,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "suggestedTerms": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "roleId",
+                  "level",
+                  "goals"
+                ],
+                "properties": {
+                  "roleId": {
+                    "minLength": 1,
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "level": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "junior"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "mid"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "senior"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "staff"
+                        ]
+                      }
+                    ]
+                  },
+                  "goals": {
+                    "maxLength": 5000,
+                    "type": "string"
+                  },
+                  "availableMinutes": {
+                    "minimum": 1,
+                    "maximum": 10080,
+                    "type": "integer"
+                  },
+                  "jobDescription": {
+                    "maxLength": 20000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "goals",
+                    "suggestedTerms"
+                  ],
+                  "properties": {
+                    "goals": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "roleId",
+                            "level",
+                            "goals"
+                          ],
+                          "properties": {
+                            "roleId": {
+                              "minLength": 1,
+                              "pattern": "^[a-z][a-z0-9_]*$",
+                              "type": "string"
+                            },
+                            "level": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "junior"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "mid"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "senior"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "staff"
+                                  ]
+                                }
+                              ]
+                            },
+                            "goals": {
+                              "maxLength": 5000,
+                              "type": "string"
+                            },
+                            "availableMinutes": {
+                              "minimum": 1,
+                              "maximum": 10080,
+                              "type": "integer"
+                            },
+                            "jobDescription": {
+                              "maxLength": 20000,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "suggestedTerms": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/preparation": {
       "get": {
         "tags": [
@@ -20640,6 +21563,224 @@
             }
           },
           "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stories": {
+      "get": {
+        "tags": [
+          "stories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "stories"
+                  ],
+                  "properties": {
+                    "stories": {
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "revision",
+                          "situation",
+                          "action",
+                          "result",
+                          "confirmed"
+                        ],
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "revision": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "situation": {
+                            "minLength": 1,
+                            "maxLength": 4000,
+                            "type": "string"
+                          },
+                          "action": {
+                            "minLength": 1,
+                            "maxLength": 4000,
+                            "type": "string"
+                          },
+                          "result": {
+                            "minLength": 1,
+                            "maxLength": 4000,
+                            "type": "string"
+                          },
+                          "confirmed": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "stories"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "previousRevision",
+                  "situation",
+                  "action",
+                  "result",
+                  "confirmed"
+                ],
+                "properties": {
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "previousRevision": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "situation": {
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "type": "string"
+                  },
+                  "action": {
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "type": "string"
+                  },
+                  "result": {
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "revision",
+                    "situation",
+                    "action",
+                    "result",
+                    "confirmed"
+                  ],
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "revision": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "situation": {
+                      "minLength": 1,
+                      "maxLength": 4000,
+                      "type": "string"
+                    },
+                    "action": {
+                      "minLength": 1,
+                      "maxLength": 4000,
+                      "type": "string"
+                    },
+                    "result": {
+                      "minLength": 1,
+                      "maxLength": 4000,
+                      "type": "string"
+                    },
+                    "confirmed": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -21492,6 +22633,49 @@
                                     "minimum": 1,
                                     "type": "integer"
                                   },
+                                  "story": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "revision",
+                                      "situation",
+                                      "action",
+                                      "result",
+                                      "confirmed"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "revision": {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      "situation": {
+                                        "minLength": 1,
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "action": {
+                                        "minLength": 1,
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "result": {
+                                        "minLength": 1,
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "confirmed": {
+                                        "type": "boolean",
+                                        "enum": [
+                                          true
+                                        ]
+                                      }
+                                    }
+                                  },
                                   "startedAt": {
                                     "format": "date-time",
                                     "type": "string"
@@ -22158,6 +23342,14 @@
                                               "type": "string"
                                             }
                                           }
+                                        },
+                                        "storyId": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        },
+                                        "storyRevision": {
+                                          "minimum": 1,
+                                          "type": "integer"
                                         }
                                       }
                                     }
@@ -23664,6 +24856,172 @@
                                           "type": "object",
                                           "required": [
                                             "change",
+                                            "goals"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "preparation_goals_saved"
+                                              ]
+                                            },
+                                            "goals": {
+                                              "additionalProperties": false,
+                                              "type": "object",
+                                              "required": [
+                                                "roleId",
+                                                "level",
+                                                "goals"
+                                              ],
+                                              "properties": {
+                                                "roleId": {
+                                                  "minLength": 1,
+                                                  "pattern": "^[a-z][a-z0-9_]*$",
+                                                  "type": "string"
+                                                },
+                                                "level": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "junior"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "mid"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "senior"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "staff"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "goals": {
+                                                  "maxLength": 5000,
+                                                  "type": "string"
+                                                },
+                                                "availableMinutes": {
+                                                  "minimum": 1,
+                                                  "maximum": 10080,
+                                                  "type": "integer"
+                                                },
+                                                "jobDescription": {
+                                                  "maxLength": 20000,
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "story"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "story_saved"
+                                              ]
+                                            },
+                                            "story": {
+                                              "additionalProperties": false,
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "revision",
+                                                "situation",
+                                                "action",
+                                                "result",
+                                                "confirmed"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "revision": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                },
+                                                "situation": {
+                                                  "minLength": 1,
+                                                  "maxLength": 4000,
+                                                  "type": "string"
+                                                },
+                                                "action": {
+                                                  "minLength": 1,
+                                                  "maxLength": 4000,
+                                                  "type": "string"
+                                                },
+                                                "result": {
+                                                  "minLength": 1,
+                                                  "maxLength": 4000,
+                                                  "type": "string"
+                                                },
+                                                "confirmed": {
+                                                  "type": "boolean",
+                                                  "enum": [
+                                                    true
+                                                  ]
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "gapId",
+                                            "mode"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "practice_plan_saved"
+                                              ]
+                                            },
+                                            "gapId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "mode": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "drill"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "transfer"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
                                             "session"
                                           ],
                                           "properties": {
@@ -23903,6 +25261,49 @@
                                                 "practiceVariantVersion": {
                                                   "minimum": 1,
                                                   "type": "integer"
+                                                },
+                                                "story": {
+                                                  "additionalProperties": false,
+                                                  "type": "object",
+                                                  "required": [
+                                                    "id",
+                                                    "revision",
+                                                    "situation",
+                                                    "action",
+                                                    "result",
+                                                    "confirmed"
+                                                  ],
+                                                  "properties": {
+                                                    "id": {
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    },
+                                                    "revision": {
+                                                      "minimum": 1,
+                                                      "type": "integer"
+                                                    },
+                                                    "situation": {
+                                                      "minLength": 1,
+                                                      "maxLength": 4000,
+                                                      "type": "string"
+                                                    },
+                                                    "action": {
+                                                      "minLength": 1,
+                                                      "maxLength": 4000,
+                                                      "type": "string"
+                                                    },
+                                                    "result": {
+                                                      "minLength": 1,
+                                                      "maxLength": 4000,
+                                                      "type": "string"
+                                                    },
+                                                    "confirmed": {
+                                                      "type": "boolean",
+                                                      "enum": [
+                                                        true
+                                                      ]
+                                                    }
+                                                  }
                                                 },
                                                 "startedAt": {
                                                   "format": "date-time",

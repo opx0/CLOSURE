@@ -232,6 +232,8 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             claimIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             gapId: Type.Optional(Type.String({ minLength: 1 })),
             snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+            storyId: Type.Optional(Type.String({ minLength: 1 })),
+            storyRevision: Type.Optional(Type.Integer({ minimum: 1 })),
             mode: Type.Optional(ModeSchema),
             level: Type.Optional(LevelSchema),
             personaId: Type.Optional(PersonaIdSchema),
@@ -250,6 +252,40 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
           .then(async () => {
             const body = request.body
             const store = deps.storeFor(request.principal)
+            if ((body.storyId === undefined) !== (body.storyRevision === undefined))
+              return reply.code(400).send({
+                error: 'Select an exact story version',
+                detail: 'Both story ID and revision are required.',
+              })
+            if (
+              body.storyId !== undefined &&
+              (body.gapId !== undefined || body.mode === 'drill' || body.mode === 'transfer')
+            )
+              return reply.code(400).send({
+                error: 'Story rehearsal cannot be combined with a gap retest',
+                detail: 'Start a separate behavioral interview.',
+              })
+            const story =
+              body.storyId === undefined
+                ? undefined
+                : (await store.read('_stories')).flatMap((event) =>
+                    event.kind === 'state_change' &&
+                    event.payload.change === 'story_saved' &&
+                    event.payload.story.id === body.storyId &&
+                    event.payload.story.revision === body.storyRevision
+                      ? [event.payload.story]
+                      : [],
+                  )[0]
+            if (body.storyId !== undefined && story === undefined)
+              return reply.code(400).send({
+                error: 'Story version unavailable',
+                detail: 'Choose a confirmed story owned by you.',
+              })
+            if (story !== undefined && !body.rounds?.includes('behavioral'))
+              return reply.code(400).send({
+                error: 'Story requires a behavioral round',
+                detail: 'Add a behavioral round before starting.',
+              })
             const history = await Promise.all(
               (await store.listSessions()).map(async (id) => replay(await store.read(id))),
             )
@@ -375,6 +411,7 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             const update = await host.start({
               principal: request.principal,
               claims: resolved.readsClaims ? selected : [],
+              ...(story === undefined ? {} : { story }),
               rounds,
               role: roleId,
               ...(topics === undefined ? {} : { topics }),
