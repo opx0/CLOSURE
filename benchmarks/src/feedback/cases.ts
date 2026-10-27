@@ -9,15 +9,16 @@ const CaseSchema = Type.Object(
     split: Type.Union([Type.Literal('tuning'), Type.Literal('heldout')]),
     kind: Type.Union([Type.Literal('topic'), Type.Literal('claim'), Type.Literal('artifact')]),
     question: Type.String({ minLength: 1 }),
-    answer: Type.String({ minLength: 1 }),
+    answer: Type.String(),
     originalAnswer: Type.Optional(Type.String({ minLength: 1 })),
     source: Type.Optional(Type.String({ minLength: 1 })),
+    sourceState: Type.Optional(Type.Union([Type.Literal('missing'), Type.Literal('deleted')])),
     expected: Type.Object(
       {
         judgment: Type.Union(
           ['supported', 'partial', 'incorrect', 'abstain'].map((value) => Type.Literal(value)),
         ),
-        quotes: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+        quotes: Type.Array(Type.String({ minLength: 1 })),
         reason: Type.String({ minLength: 1 }),
       },
       { additionalProperties: false },
@@ -47,8 +48,13 @@ export function validateFeedbackCases(input: unknown): FeedbackCaseSet {
     if (families.has(entry.family) && families.get(entry.family) !== entry.split)
       throw new Error(`feedback family crosses splits: ${entry.family}`)
     families.set(entry.family, entry.split)
-    if (entry.kind === 'artifact' && entry.source === undefined)
+    if (entry.kind === 'artifact' && entry.source === undefined && entry.sourceState === undefined)
       throw new Error(`artifact source missing: ${entry.id}`)
+    if (
+      entry.expected.quotes.length === 0 &&
+      (entry.answer !== '' || entry.expected.judgment !== 'abstain')
+    )
+      throw new Error(`missing reference quote: ${entry.id}`)
     if (entry.expected.quotes.some((quote) => !entry.answer.includes(quote)))
       throw new Error(`reference quote not in final answer: ${entry.id}`)
   }

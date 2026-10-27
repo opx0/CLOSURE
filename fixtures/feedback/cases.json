@@ -163,6 +163,60 @@
         "quotes": ["not who wrote it"],
         "reason": "Repository evidence must not become authorship inference."
       }
+    },
+    {
+      "id": "no-answer",
+      "family": "empty-answer",
+      "split": "tuning",
+      "kind": "topic",
+      "question": "What prevents a circular wait?",
+      "answer": "",
+      "expected": {
+        "judgment": "abstain",
+        "quotes": [],
+        "reason": "No answer exists to quote or judge; do not infer a technical misconception from silence."
+      }
+    },
+    {
+      "id": "conflicting-sources",
+      "family": "source-version-conflict",
+      "split": "tuning",
+      "kind": "artifact",
+      "question": "Which timeout is deployed?",
+      "source": "Snapshot A: timeout = 10; Snapshot B: timeout = 30; Neither identifies the deployed revision.",
+      "answer": "The snapshots disagree. I cannot identify the deployed timeout without the deployment revision.",
+      "expected": {
+        "judgment": "abstain",
+        "quotes": ["cannot identify the deployed timeout"],
+        "reason": "Conflicting versions do not establish deployment truth; cite the conflict and request the missing revision."
+      }
+    },
+    {
+      "id": "deleted-source",
+      "family": "unavailable-deleted-source",
+      "split": "heldout",
+      "kind": "artifact",
+      "sourceState": "deleted",
+      "question": "Does the previously pinned function retry failed requests?",
+      "answer": "That snapshot was deleted. I cannot check its retry behavior from the remaining reference.",
+      "expected": {
+        "judgment": "abstain",
+        "quotes": ["cannot check its retry behavior"],
+        "reason": "A retained reference is not available source content; never substitute a different snapshot."
+      }
+    },
+    {
+      "id": "fluent-evasion",
+      "family": "polished-nonanswer",
+      "split": "heldout",
+      "kind": "topic",
+      "question": "What does a database transaction isolate?",
+      "answer": "We follow industry best practices, keep stakeholders aligned, and build scalable solutions.",
+      "expected": {
+        "judgment": "abstain",
+        "quotes": ["industry best practices"],
+        "reason": "Confident language does not answer the transaction question and must not become competence evidence."
+      }
     }
   ]
 }
