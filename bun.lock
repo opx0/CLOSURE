@@ -101,6 +101,7 @@
       "dependencies": {
         "@levelhead/contracts": "workspace:*",
         "@levelhead/core": "workspace:*",
+        "@sinclair/typebox": "0.34.52",
       },
     },
     "packages/contracts": {

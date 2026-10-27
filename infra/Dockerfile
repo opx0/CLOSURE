@@ -32,6 +32,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /srv
 ENV NODE_ENV=production
+ENV LEVELHEAD_HOST=0.0.0.0
 # The whole built tree from the web stage: source, the built web dist, and every workspace's
 # node_modules. Bun installs into a `.bun` store with per-workspace symlinks (apps/server/node_modules
 # → the store), so copying only the root node_modules loses `pg` and every other workspace dependency.
@@ -44,4 +45,4 @@ EXPOSE 3001
 CMD ["node", "--experimental-transform-types", "apps/server/src/index.ts"]
 
 FROM runtime AS worker
-CMD ["node", "apps/worker/src/index.ts"]
+CMD ["node", "--experimental-transform-types", "apps/worker/src/index.ts"]

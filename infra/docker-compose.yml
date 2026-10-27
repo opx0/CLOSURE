@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: levelhead
       POSTGRES_DB: levelhead
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       # Postgres 18 images reject a mount at /var/lib/postgresql/data and ask for a single mount at
       # /var/lib/postgresql instead. With the old path the container refuses to start, so `db:up`
@@ -30,7 +30,7 @@ services:
       --ctx-size ${LLAMA_CONTEXT:-8192}
       --jinja
     ports:
-      - '${LLAMA_PORT:-8081}:8080'
+      - '127.0.0.1:${LLAMA_PORT:-8081}:8080'
     volumes:
       - llama-cache:/root/.cache/llama.cpp
 

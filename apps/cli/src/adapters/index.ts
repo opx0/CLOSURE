@@ -3,6 +3,7 @@ import { OpenAiCompatibleConductor } from './conductor-openai.ts'
 import { StructuredEvaluator } from './evaluator-structured.ts'
 import { LOCAL_MODEL_ALIAS } from './pricing.ts'
 import { defaultResilience, DEFAULT_IN_FLIGHT } from './resilience.ts'
+import { checkLocalGeneration } from './local-only.ts'
 
 export * from './pricing.ts'
 export * from './resilience.ts'
@@ -24,6 +25,7 @@ export interface Adapters {
 }
 
 export function fromEnv(env: AdapterEnv = process.env): Adapters {
+  checkLocalGeneration(env)
   const localBaseUrl = env.LLAMA_BASE_URL ?? 'http://localhost:8081/v1'
   const apiKey = env.MODEL_PROVIDER_API_KEY || undefined
   // One limiter across both ports: the provider counts requests, not which port made them

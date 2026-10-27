@@ -289,3 +289,31 @@ test('behind a durable queue, a pin is handed to a worker, polled, and listed on
     rmSync(repository, { recursive: true, force: true })
   }
 })
+
+test('setup survives reload and history without silently replacing a missing project', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/app/session?rounds=cs_fundamentals&mode=coach')
+  await page.getByRole('button', { name: /^Backend engineer/ }).click()
+  await page.getByRole('button', { name: 'mid' }).click()
+  await expect(page).toHaveURL(/level=mid/)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'mid' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'junior · new grad / intern' }).click()
+  await page.goBack()
+  await expect(page.getByRole('button', { name: 'mid' })).toHaveAttribute('aria-pressed', 'true')
+  await page.goto('/app/session?rounds=code_walkthrough&snapshotId=missing-snapshot')
+  await expect(page.getByRole('button', { name: 'Start the interview' })).toBeDisabled()
+  await expect(
+    page.getByText('Select an available pinned project from Prepare or Résumé & projects.', {
+      exact: false,
+    }),
+  ).toBeVisible()
+  await page.goto('/app/session?rounds=code_walkthrough')
+  await expect(page.getByRole('button', { name: 'Start the interview' })).toBeDisabled()
+  await page.goto('/app/session?rounds=cs_fundamentals')
+  await expect(page.getByRole('button', { name: 'Start the interview' })).toBeEnabled()
+  expect(errors).toEqual([])
+})

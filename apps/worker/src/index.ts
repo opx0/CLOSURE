@@ -56,7 +56,7 @@ const metricsServer =
         }
         response.writeHead(200, { 'content-type': 'text/plain; version=0.0.4' })
         response.end(metrics.render())
-      }).listen(config.WORKER_METRICS_PORT)
+      }).listen(config.WORKER_METRICS_PORT, '127.0.0.1')
 
 let shuttingDown = false
 async function shutdown(signal: string): Promise<void> {

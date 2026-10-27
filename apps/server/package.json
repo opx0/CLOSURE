@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "start": "node src/index.ts",
+    "start": "node --experimental-transform-types src/index.ts",
     "typecheck": "tsc --noEmit -p ../../tsconfig.json"
   },
   "dependencies": {
