@@ -1,6 +1,8 @@
 # Levelhead
 
-**An interview mentor for technical roles. It leads the interview, tells you the truth about your answers — with evidence — and trains you to stay composed when someone pushes back.**
+**A local-first technical interview practice workspace. It connects questions, your answers, cited feedback, and follow-up practice.**
+
+The [read-only hosted preview](https://levelhead-showcase-946486142611.us-central1.run.app/app/prepare) shows the interface. It cannot run a live interview or save your preparation. For actual use, run the application locally with a configured model.
 
 ---
 
@@ -55,9 +57,9 @@ Two engines behind clean interfaces. A **Conductor** runs the interview — it i
 
 Every question traces to what it is about: an authored topic, a line of your résumé, or the exact file, function, or commit in your repository. Every finding cites the exact words in your answer. The evaluator states its confidence and is allowed to abstain. Code decides what the next question is about and _what kind_ of question it is; the model only phrases it. Every plan, question, answer, and judgment is an append-only event, so any session replays exactly.
 
-TypeScript on the Node.js runtime, with Bun as package manager and dev/test runner. PostgreSQL for
-state, an append-only event table, full-text retrieval over pinned repository snapshots, and a
-leased job table for durable background work. A Fastify API whose TypeBox schemas generate both its
+TypeScript on the Node.js runtime, with Bun as package manager and dev/test runner. The CLI defaults
+to a local JSONL event log without a database; PostgreSQL supplies durable server storage, full-text
+retrieval over pinned repository snapshots, and a leased job table for background work. A Fastify API whose TypeBox schemas generate both its
 OpenAPI document and the browser client, a React evidence UI where hovering a finding highlights the
 exact words that produced it, and a separate worker process that parses repositories in isolation
 under hard limits. Résumés and repositories are treated as untrusted input — never executed, never
@@ -73,8 +75,8 @@ broken.
 
 ```sh
 bun install
-bun run smoke             # proves the loop runs end to end, with no provider and no container
-bun run llama:up          # optional: a local model, so the loop costs nothing to try
+bun run smoke             # scripted wiring check; no real-model quality result
+bun run llama:up          # optional local model; may download an artifact and use resources
 bun run levelhead doctor
 
 bun run levelhead session     # an interview: the default role's first round, no résumé needed
@@ -91,7 +93,9 @@ bun run levelhead session --rounds code_walkthrough
 bun run levelhead resume      # per résumé line: what held, what is vague, what no code backs
 ```
 
-Set `MODEL_PROVIDER_API_KEY` to put the Evaluator — the honesty-critical half — on a stronger model.
+With `LEVELHEAD_LOCAL_ONLY=true`, generation rejects a hosted provider key and requires a local
+loopback model. Otherwise, `MODEL_PROVIDER_API_KEY` can configure a hosted Evaluator; that sends
+answer content to the provider. Neither path has a published quality benchmark.
 `levelhead repo <path>` pins a repository so a round can interrogate the actual code; `levelhead transfer`
 retests a drilled gap; `levelhead replay <id>` re-checks every citation byte-for-byte;
 `levelhead export` hands you everything it holds about you; `levelhead forget` deletes a pinned snapshot;
@@ -104,10 +108,13 @@ bun run db:up && bun run db:migrate
 bun run web:build
 LEVELHEAD_STORE=postgres bun run serve     # API on :3001, evidence UI at /app/
 bun run worker                          # repository ingestion, exports, retention sweeps
-bun run voice:up                        # optional: local speech, both models offline
+bun run voice:up                        # optional local speech; provision assets before offline use
 ```
 
-Voice is an I/O layer over the same text engine. Pace, pauses and filler words are recorded beside
+Voice is an I/O layer over the same text engine. The current batch sidecar needs Whisper and Piper
+assets and may download them on first use; provision them before offline use. The local-only generation
+guard on `main` does not cover speech asset loading. Native streaming speech
+and real microphone validation remain open work. Pace, pauses and filler words are recorded beside
 the interview and never enter a finding, the rubric, or the gap ledger — scoring delivery is the
 saturated half of this market and it cannot tell whether an answer was any good.
 
@@ -119,27 +126,24 @@ saturated half of this market and it cannot tell whether an answer was any good.
 
 Levelhead's whole point is honesty, so here is the unvarnished state:
 
-- **The mentor is built and runs; the benchmark has never been run.** You can pick an interview and
-  be questioned across rounds, or paste a résumé and be cross-questioned on your own claims and
-  code; take pressure up to the false-premise level; get findings that quote your exact words or
-  abstain; and watch a gap close only after it holds under transfer and survives retrieval later.
-  What does not exist is a single measured number about how well it does any of that.
+- **The workflow has scripted coverage, not a validated interview outcome.** You can choose rounds,
+  supply a résumé or pinned repository, and inspect cited findings and practice history. The smoke
+  run uses scripted adapters; real-model answer quality, live speech, and delayed retention have not
+  been established by that check.
 - **The interview rounds are not in the benchmark.** Its fixtures and the labelling tool are built on
   résumé claims. Topic questions, now the front door, have no fixture and no label, so nothing can
   be said yet about how well a topic answer is judged.
-- **The honest evaluator is a goal to be measured, not a claim.** A benchmark exists precisely to prove or disprove it. Until it runs there are no numbers, and none go on a résumé.
-- **Results will be auditable, not regenerable.** Hosted models offer no seed and cannot be version-pinned, so Levelhead publishes full transcripts, prompt hashes, and repeated-run variance rather than pretending a single number reproduces.
+- **The evaluator is a goal to be measured, not a quality claim.** Benchmark tooling and dry-run
+  checks exist; no independently reviewed comparative result is published here.
+- **Event history and citations are inspectable.** Hosted-model behavior can vary, so a single
+  generated answer should not be presented as a reproducible measurement.
 - **It cannot detect lying, authorship, personality, or emotion**, and it will never output a "readiness score." Repository evidence shows what deserves a question; it does not prove who wrote the code.
 - **The labelled dataset is empty.** The tool that builds it exists; nobody has labelled anything.
   The agreement gate is pre-declared not to fire below 100 labelled claims — below that the number
   ships with its interval and no pass or fail is asserted.
-- **Every honesty rule is a build failure, not a promise.** Seven of them — a citation must resolve
-  byte-for-byte, a finding with no evidence must not typecheck, no schema may contain an aggregate
-  score, the model may never choose the next question type, abstention must be reachable, a
-  compromised model must change nothing, and a session must replay byte-identically — run in CI, and
-  the build fails if one breaks. Three more now run beside them: no delivery signal may reach a
-  finding, a rubric or the gap ledger; nothing may read an emotion or an inner state from a face or
-  a voice; and no raw biometric may leave the browser.
+- **Tests enforce important boundaries.** They cover citation resolution, abstention, replay,
+  owner isolation, and separation of delivery signals from evaluation. A passing scripted check is
+  evidence about those paths, not proof of safe or accurate behavior for every real interview.
 - **No role has been validated, and each one says so.** Role packs shape what a round expects; the
   tool prints "no agreement has been measured for this role" every time one is used, because a role
   pack is data, and data is not evidence.
