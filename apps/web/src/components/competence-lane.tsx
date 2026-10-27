@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { Debrief } from '../api/client.ts'
 import { useTopicById } from '../lib/catalog.ts'
 import { confidenceWord, day, words } from '../lib/format.ts'
@@ -45,6 +46,7 @@ export function CompetenceLaneView({ lane }: { lane: CompetenceLane }) {
   const topicById = useTopicById()
   return (
     <div className="space-y-4">
+      {lane.plan !== undefined && <ImprovementPlanView plan={lane.plan} />}
       <div className="flex flex-wrap gap-2">
         <Tag tone="quiet">pressure reached {lane.pressureReached}</Tag>
         <Tag tone={lane.abstentions > 0 ? 'quiet' : 'held'}>
@@ -55,7 +57,7 @@ export function CompetenceLaneView({ lane }: { lane: CompetenceLane }) {
       <div>
         <h3 className="mb-2 text-sm text-accent">Findings</h3>
         {lane.findings.length === 0 ? (
-          <Empty>No findings — the evaluator judged nothing in this session.</Empty>
+          <Empty>No current findings. Check uncertainty and the feedback audit below.</Empty>
         ) : (
           <div className="space-y-2">
             {lane.findings.map((finding) => (
@@ -89,5 +91,95 @@ export function CompetenceLaneView({ lane }: { lane: CompetenceLane }) {
         )}
       </div>
     </div>
+  )
+}
+
+function ImprovementPlanView({ plan }: { plan: NonNullable<CompetenceLane['plan']> }) {
+  const priority = (item: (typeof plan.leading)[number]) => (
+    <article key={item.gapId} className="rounded border border-edge p-4">
+      <p className="text-sm font-medium">{item.summary}</p>
+      {item.quotes.map((quote) => (
+        <blockquote key={quote.id} className="mt-2 border-l-2 border-accent/40 pl-3 text-xs">
+          “{quote.quoted}” <span className="text-quiet">· {quote.id}</span>
+        </blockquote>
+      ))}
+      {item.explanation !== undefined && (
+        <details className="mt-3 text-xs">
+          <summary>Authored explanation and exercise</summary>
+          <p className="mt-2">{item.explanation}</p>
+          <p className="mt-2">{item.exercise}</p>
+        </details>
+      )}
+      {item.explanation === undefined && (
+        <p className="mt-2 text-xs text-quiet">
+          No authored reference is linked for this source-specific gap.
+        </p>
+      )}
+      {item.nextAction === 'drill' && (
+        <Link
+          className="journey-secondary mt-3"
+          to={`/session?mode=drill&gapId=${encodeURIComponent(item.gapId)}`}
+        >
+          Practise this priority
+        </Link>
+      )}
+      {item.nextAction === 'transfer' && (
+        <Link
+          className="journey-secondary mt-3 ml-2"
+          to={`/session?mode=transfer&gapId=${encodeURIComponent(item.gapId)}`}
+        >
+          Check on an unfamiliar variant
+        </Link>
+      )}
+      {item.nextAction === 'unavailable' && (
+        <p className="mt-2 text-xs text-quiet">
+          No eligible practice target or unfamiliar retest is available. Previously exposed variants
+          are not reused as new tests.
+        </p>
+      )}
+      <p className="mt-2 text-xs text-quiet">
+        A separate unfamiliar variant is required to verify transfer. This plan does not claim that
+        retest happened.
+      </p>
+    </article>
+  )
+  return (
+    <section className="space-y-3" aria-label="Improvement plan">
+      <h3 className="text-sm text-accent">Leading practice priorities</h3>
+      {plan.leading.length === 0 ? (
+        <Empty>No supported practice priority is available from this session.</Empty>
+      ) : (
+        plan.leading.map(priority)
+      )}
+      {plan.remaining.length > 0 && (
+        <details>
+          <summary className="text-sm">Other distinct priorities</summary>
+          <div className="mt-3 space-y-3">{plan.remaining.map(priority)}</div>
+        </details>
+      )}
+      <h3 className="pt-3 text-sm text-accent">What held up</h3>
+      {plan.strengths.length === 0 && (
+        <p className="text-xs text-quiet">No supported strength is recorded.</p>
+      )}
+      {plan.strengths.map((item, index) => (
+        <div key={index} className="text-xs">
+          <p>{item.summary}</p>
+          {item.quotes.map((quote) => (
+            <blockquote key={quote.id} className="mt-2 pl-3">
+              “{quote.quoted}”
+            </blockquote>
+          ))}
+        </div>
+      ))}
+      <h3 className="pt-3 text-sm text-accent">Uncertainty and review</h3>
+      {plan.uncertainty.length === 0 && (
+        <p className="text-xs text-quiet">No abstention or pending review is recorded.</p>
+      )}
+      {plan.uncertainty.map((item, index) => (
+        <p key={index} className="text-xs">
+          {item.summary}
+        </p>
+      ))}
+    </section>
   )
 }

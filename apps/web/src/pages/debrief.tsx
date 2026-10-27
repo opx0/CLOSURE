@@ -1,3 +1,4 @@
+import { FeedbackAudit } from '../components/feedback-audit.tsx'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.ts'
@@ -5,7 +6,11 @@ import { CompetenceLaneView } from '../components/competence-lane.tsx'
 import { PerformanceLaneView } from '../components/performance-lane.tsx'
 import { Lane } from '../components/lane.tsx'
 import { Failed, Loading } from '../components/primitives.tsx'
-import { canViewDebrief, SessionHistory } from '../components/session-history.tsx'
+import {
+  canViewDebrief,
+  SessionHistory,
+  EndInterruptedInterview,
+} from '../components/session-history.tsx'
 import { day } from '../lib/format.ts'
 import { JourneyIcon, JourneyLink, PageIntro } from '../components/journey.tsx'
 
@@ -59,16 +64,28 @@ export function DebriefPage() {
     return (
       <div className="journey-page">
         <PageIntro
-          eyebrow="Simulation in progress"
+          eyebrow={
+            selected.availability === 'interrupted'
+              ? 'Simulation interrupted'
+              : 'Simulation in progress'
+          }
           title="Debrief"
-          description="Feedback is held until the round ends. Finish this interview to open its full saved report."
+          description={
+            selected.availability === 'interrupted'
+              ? 'End the interrupted interview to review saved work. Unfinished answers will not be graded.'
+              : 'Feedback is held until the round ends. Finish this interview to open its full saved report.'
+          }
         />
-        <Link
-          to={`/session?id=${encodeURIComponent(selected.session.id)}`}
-          className="journey-primary self-start"
-        >
-          Return to simulation
-        </Link>
+        {selected.availability === 'interrupted' ? (
+          <EndInterruptedInterview sessionId={selected.session.id} />
+        ) : (
+          <Link
+            to={`/session?id=${encodeURIComponent(selected.session.id)}`}
+            className="journey-primary self-start"
+          >
+            Return to simulation
+          </Link>
+        )}
       </div>
     )
   if (debrief.isPending) return <Loading what="the debrief" />
@@ -143,6 +160,7 @@ export function DebriefPage() {
           <Lane kind="competence">
             <CompetenceLaneView lane={data.competence} />
           </Lane>
+          <FeedbackAudit sessionId={sessionId} />
           <details className="card p-5">
             <summary className="cursor-pointer text-sm font-medium">
               Words cited in this interview

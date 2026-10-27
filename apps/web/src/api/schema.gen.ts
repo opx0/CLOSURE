@@ -679,6 +679,8 @@ export interface paths {
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
                                     practiceGapId?: string;
+                                    practiceVariantId?: string;
+                                    practiceVariantVersion?: number;
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -1144,6 +1146,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{id}/close-interrupted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "closed";
+                            reason: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{id}": {
         parameters: {
             query?: never;
@@ -1170,6 +1237,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            availability: "awaiting_answer" | "processing" | "closed" | "interrupted";
                             sessionId: string;
                             session: {
                                 id: string;
@@ -1188,6 +1256,8 @@ export interface paths {
                                 rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                 snapshotId?: string;
                                 practiceGapId?: string;
+                                practiceVariantId?: string;
+                                practiceVariantVersion?: number;
                                 /** Format: date-time */
                                 startedAt: string;
                             } | null;
@@ -1692,6 +1762,26 @@ export interface paths {
                             kind: "state_change";
                             payload: {
                                 /** @enum {string} */
+                                change: "answer_corrected";
+                                requestId: string;
+                                attemptId: string;
+                                previousRevision: number;
+                                revision: number;
+                                sourceId: string;
+                                text: string;
+                                reason: string;
+                            } | {
+                                /** @enum {string} */
+                                change: "finding_reviewed";
+                                requestId: string;
+                                findingId: string;
+                                state: "pending" | "upheld" | "confirmed_error";
+                                reason: string;
+                                sourceRefs: string[];
+                                /** @enum {string} */
+                                reviewer: "candidate_self_review";
+                            } | {
+                                /** @enum {string} */
                                 change: "practice_assistance";
                                 attemptId: string;
                                 level: number;
@@ -1724,6 +1814,8 @@ export interface paths {
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
                                     practiceGapId?: string;
+                                    practiceVariantId?: string;
+                                    practiceVariantVersion?: number;
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -3093,6 +3185,68 @@ export interface paths {
                             /** Format: date-time */
                             generatedAt: string;
                             competence: {
+                                plan?: {
+                                    leading: {
+                                        findingIds: string[];
+                                        summary: string;
+                                        quotes: {
+                                            id: string;
+                                            sourceId: string;
+                                            startByte: number;
+                                            endByte: number;
+                                            quoted: string;
+                                        }[];
+                                        gapId: string;
+                                        nextAction: "drill" | "transfer" | "unavailable";
+                                        topicId?: string;
+                                        claimId?: string;
+                                        explanation?: string;
+                                        exercise?: string;
+                                        /** @enum {string} */
+                                        retest: "separate_unfamiliar_variant_required";
+                                    }[];
+                                    remaining: {
+                                        findingIds: string[];
+                                        summary: string;
+                                        quotes: {
+                                            id: string;
+                                            sourceId: string;
+                                            startByte: number;
+                                            endByte: number;
+                                            quoted: string;
+                                        }[];
+                                        gapId: string;
+                                        nextAction: "drill" | "transfer" | "unavailable";
+                                        topicId?: string;
+                                        claimId?: string;
+                                        explanation?: string;
+                                        exercise?: string;
+                                        /** @enum {string} */
+                                        retest: "separate_unfamiliar_variant_required";
+                                    }[];
+                                    strengths: {
+                                        findingIds: string[];
+                                        summary: string;
+                                        quotes: {
+                                            id: string;
+                                            sourceId: string;
+                                            startByte: number;
+                                            endByte: number;
+                                            quoted: string;
+                                        }[];
+                                    }[];
+                                    uncertainty: {
+                                        findingIds: string[];
+                                        summary: string;
+                                        quotes: {
+                                            id: string;
+                                            sourceId: string;
+                                            startByte: number;
+                                            endByte: number;
+                                            quoted: string;
+                                        }[];
+                                    }[];
+                                };
                                 findings: ({
                                     id: string;
                                     attemptId: string;
@@ -3301,10 +3455,341 @@ export interface paths {
                         };
                     };
                 };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
             };
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            corrections: {
+                                requestId: string;
+                                attemptId: string;
+                                previousRevision: number;
+                                revision: number;
+                                sourceId: string;
+                                text: string;
+                                reason: string;
+                                at: string;
+                            }[];
+                            reviews: {
+                                requestId: string;
+                                findingId: string;
+                                state: "pending" | "upheld" | "confirmed_error";
+                                reason: string;
+                                sourceRefs: string[];
+                                /** @enum {string} */
+                                reviewer: "candidate_self_review";
+                                at: string;
+                            }[];
+                            historicalFindings: ({
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "claim";
+                                claimId: string;
+                                verdict: "supported" | "partially_supported" | "unsupported_by_available_evidence" | "contradicted";
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "claim_abstained";
+                                claimId: string;
+                                abstention: "insufficient_evidence" | "not_verifiable";
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "composure";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                signals: ("folding" | "fabricating" | "holding_ground" | "honest_yielding" | "coherence_after_interruption" | "escalation")[];
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency_abstained";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                abstention: "insufficient_evidence" | "not_verifiable";
+                            })[];
+                            supersededFindingIds: string[];
+                            pendingReassessment: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        requestId: string;
+                        findingId: string;
+                        state: "pending" | "upheld" | "confirmed_error";
+                        reason: string;
+                        sourceRefs: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            state: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        requestId: string;
+                        attemptId: string;
+                        previousRevision: number;
+                        text: string;
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            revision: number;
+                            /** @enum {boolean} */
+                            pendingReassessment: true;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3576,6 +4061,8 @@ export interface paths {
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                     snapshotId?: string;
                                     practiceGapId?: string;
+                                    practiceVariantId?: string;
+                                    practiceVariantVersion?: number;
                                     /** Format: date-time */
                                     startedAt: string;
                                 } | null;
@@ -3839,6 +4326,26 @@ export interface paths {
                                     kind: "state_change";
                                     payload: {
                                         /** @enum {string} */
+                                        change: "answer_corrected";
+                                        requestId: string;
+                                        attemptId: string;
+                                        previousRevision: number;
+                                        revision: number;
+                                        sourceId: string;
+                                        text: string;
+                                        reason: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "finding_reviewed";
+                                        requestId: string;
+                                        findingId: string;
+                                        state: "pending" | "upheld" | "confirmed_error";
+                                        reason: string;
+                                        sourceRefs: string[];
+                                        /** @enum {string} */
+                                        reviewer: "candidate_self_review";
+                                    } | {
+                                        /** @enum {string} */
                                         change: "practice_assistance";
                                         attemptId: string;
                                         level: number;
@@ -3871,6 +4378,8 @@ export interface paths {
                                             rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                                             snapshotId?: string;
                                             practiceGapId?: string;
+                                            practiceVariantId?: string;
+                                            practiceVariantVersion?: number;
                                             /** Format: date-time */
                                             startedAt: string;
                                         };

@@ -150,6 +150,7 @@ test('no number in the debrief lives outside one of the two lanes', () => {
     'abstentions',
     'findings',
     'gaps',
+    'plan',
     'pressureReached',
   ])
   expect(Object.keys(debrief.performance).sort()).toEqual([

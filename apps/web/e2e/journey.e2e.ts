@@ -361,3 +361,122 @@ test('preparation keeps owner selections across reloads and blocks a deleted pro
     rmSync(repository, { recursive: true, force: true })
   }
 })
+
+test('saved feedback supports disputes and transcript corrections without retaining superseded weaknesses', async ({
+  page,
+}) => {
+  const started = await page.request.post('/sessions', {
+    data: {
+      topicIds: ['dbms.indexes'],
+      mode: 'coach',
+      level: 'junior',
+      turnsPerRound: 1,
+      drill: false,
+    },
+  })
+  expect(started.status()).toBe(201)
+  const start = await started.json()
+  const answered = await page.request.post(`/sessions/${start.sessionId}/answers`, {
+    data: { text: TOPIC_ANSWER },
+  })
+  expect(answered.ok()).toBe(true)
+  await page.goto(`/app/debrief?id=${start.sessionId}`)
+  await expect(page.getByRole('region', { name: 'Improvement plan' })).toBeVisible()
+  await page.getByText('Correct a transcript or review feedback', { exact: true }).click()
+  await page.getByLabel('Finding to review').selectOption({ index: 1 })
+  await page
+    .getByLabel('Review reason', { exact: true })
+    .fill('This interpretation needs review against my complete answer.')
+  await page.getByRole('button', { name: 'Flag for review', exact: true }).click()
+  await expect(
+    page
+      .locator('p')
+      .filter({ hasText: 'This interpretation needs review against my complete answer.' }),
+  ).toBeVisible()
+  await page.reload()
+  await page.getByText('Correct a transcript or review feedback', { exact: true }).click()
+  await expect(page.getByText('pending', { exact: true })).toBeVisible()
+  const corrected =
+    'The B-tree is maintained on every insert; the earlier transcript omitted that sentence.'
+  await page.getByLabel('Corrected transcript', { exact: true }).fill(corrected)
+  await page
+    .getByLabel('Correction reason', { exact: true })
+    .fill('Missing sentence in the transcript.')
+  await page.getByRole('button', { name: 'Save transcript correction', exact: true }).click()
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Previous feedback was superseded' }),
+  ).toBeVisible()
+  await expect(page.getByText('Superseded feedback', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('No supported practice priority is available from this session.', {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await page.reload()
+  await page.getByText('Correct a transcript or review feedback', { exact: true }).click()
+  await expect(page.getByLabel('Corrected transcript', { exact: true })).toHaveValue(corrected)
+  const events = await (await page.request.get(`/sessions/${start.sessionId}/events`)).json()
+  expect(JSON.stringify(events)).toContain(TOPIC_ANSWER)
+  await shot(page, 'feedback-correction')
+})
+
+test('an exact gap reaches a separate unfamiliar Transfer with coaching disabled', async ({
+  page,
+}) => {
+  const created = await page.request.post('/sessions', {
+    data: {
+      topicIds: ['dbms.indexes'],
+      mode: 'coach',
+      level: 'junior',
+      turnsPerRound: 1,
+      drill: false,
+    },
+  })
+  const original = await created.json()
+  const judged = await (
+    await page.request.post(`/sessions/${original.sessionId}/answers`, {
+      data: { text: TOPIC_ANSWER },
+    })
+  ).json()
+  const ledger = await (await page.request.get('/ledger')).json()
+  const gap = ledger.gaps.find((entry: { findingIds: string[] }) =>
+    entry.findingIds.includes(judged.findings[0].id),
+  )
+  expect(gap).toBeTruthy()
+  const drill = await (
+    await page.request.post('/sessions', { data: { mode: 'drill', gapId: gap.id } })
+  ).json()
+  await page.request.post(`/sessions/${drill.sessionId}/hints`, { data: { level: 1 } })
+  const complete =
+    'A B-tree stores sorted keys and row references; every insert updates the index and adds write work.'
+  const drilled = await page.request.post(`/sessions/${drill.sessionId}/answers`, {
+    data: { text: complete },
+  })
+  expect(drilled.ok()).toBe(true)
+  await page.goto(`/app/debrief?id=${original.sessionId}`)
+  const plan = page.getByRole('region', { name: 'Improvement plan' })
+  await expect(plan.getByRole('link', { name: 'Practise this priority', exact: true })).toHaveCount(
+    0,
+  )
+  await plan.getByRole('link', { name: 'Check on an unfamiliar variant', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`mode=transfer&gapId=${gap.id}`))
+  await page.getByRole('button', { name: 'Start the interview', exact: true }).click()
+  await expect(page.getByText('An orders table has a B-tree index', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Show coaching hint' })).toHaveCount(0)
+  const sessionId = new URL(page.url()).searchParams.get('id')!
+  const saved = await (await page.request.get(`/sessions/${sessionId}`)).json()
+  expect(saved.session.practiceGapId).toBe(gap.id)
+  expect(saved.session.practiceVariantId).toBe('indexes.tenant_prefix')
+  await page
+    .getByPlaceholder('Answer in your own words')
+    .fill('I do not know how the leftmost prefix affects this report.')
+  const accepted = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/sessions/${sessionId}/answers`) &&
+      response.request().method() === 'POST',
+  )
+  await page.getByRole('button', { name: 'Send answer', exact: true }).click()
+  expect((await accepted).ok()).toBe(true)
+  const after = await (await page.request.get(`/sessions/${sessionId}`)).json()
+  expect(after.gaps.find((entry: { id: string }) => entry.id === gap.id).status).toBe('open')
+})

@@ -187,3 +187,44 @@ test('saved preparation is scoped to the authenticated owner', async () => {
     await app.close()
   }
 })
+
+test('feedback and correction routes do not expose another owner session', async () => {
+  const { app } = await twoOwnerApp()
+  try {
+    const started = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      headers: bearer('alice-token'),
+      payload: { topicIds: ['dbms.indexes'] },
+    })
+    expect(started.statusCode).toBe(201)
+    const id = started.json().sessionId
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/sessions/${id}/feedback`,
+          headers: bearer('bob-token'),
+        })
+      ).statusCode,
+    ).toBe(404)
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/sessions/${id}/corrections`,
+          headers: bearer('bob-token'),
+          payload: {
+            requestId: 'correction',
+            attemptId: started.json().question.attemptId,
+            previousRevision: 1,
+            text: 'changed',
+            reason: 'edit',
+          },
+        })
+      ).statusCode,
+    ).toBe(404)
+  } finally {
+    await app.close()
+  }
+})

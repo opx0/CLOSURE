@@ -62,6 +62,7 @@ import type {
   SessionState,
   Snapshot,
   Topic,
+  TransferVariant,
 } from '@levelhead/contracts'
 
 // What one thread of questions is about. An artifact carries the confirmed claim it bears on, if any.
@@ -126,6 +127,7 @@ export interface RunSessionInput {
   turnsPerRound: number
   drill: boolean
   transferGap?: GapEntry
+  transferVariant?: TransferVariant
   drillGap?: GapEntry
   // Gaps due for spaced retrieval; asked as ordinary questions, never announced as reviews (§4.5).
   retrievals?: readonly GapEntry[]
@@ -293,6 +295,12 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     ...((input.drillGap ?? input.transferGap) === undefined
       ? {}
       : { practiceGapId: (input.drillGap ?? input.transferGap)!.id }),
+    ...(input.transferVariant === undefined
+      ? {}
+      : {
+          practiceVariantId: input.transferVariant.id,
+          practiceVariantVersion: input.transferVariant.version,
+        }),
     startedAt: deps.clock.now(),
   }
   await log.append('state_change', { change: 'session_started', session })
@@ -446,7 +454,10 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
 
     let text = reuseQuestion
     if (text === undefined) {
-      const scenario = seedFor(action, subject)
+      const scenario =
+        action === 'TRANSFER_TEST' && input.transferVariant !== undefined
+          ? input.transferVariant.scenario
+          : seedFor(action, subject)
       // A drill isolates the skill; without a fresh scenario it does that on the question alone.
       const seed = action === 'DRILL' && putBefore(subject, scenario) ? undefined : scenario
       if (seed !== undefined)

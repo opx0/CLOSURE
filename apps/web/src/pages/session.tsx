@@ -1,3 +1,4 @@
+import { EndInterruptedInterview } from '../components/session-history.tsx'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -50,6 +51,8 @@ const MODES: readonly { id: Mode; label: string }[] = [
 ]
 
 const STOPPED: Record<string, string> = {
+  interrupted:
+    'the server lost its continuation; saved work was preserved without grading unfinished answers',
   turns: 'every planned question was asked',
   end_topic: 'the interviewer ran out of new ground to cover',
   ceiling: 'a cost or model-call ceiling was reached, so it stopped rather than degrade',
@@ -66,6 +69,7 @@ interface Exchange {
 }
 
 interface Room {
+  interrupted?: boolean
   mode: Mode
   exchanges: Exchange[]
   findings: Finding[]
@@ -204,6 +208,7 @@ async function restore(sessionId: string, topics: readonly TopicSummary[]): Prom
 
   return {
     exchanges,
+    interrupted: view.availability === 'interrupted',
     mode: view.session?.mode ?? 'coach',
     findings:
       view.session?.mode === 'simulation' && view.state !== 'closed'
@@ -678,7 +683,9 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
             tone="primary"
             onClick={begin}
             disabled={
-              (gapId !== null && (practiceGap === undefined || practiceGap.status !== 'open')) ||
+              (gapId !== null &&
+                (practiceGap === undefined ||
+                  practiceGap.status !== (mode === 'transfer' ? 'drilled' : 'open'))) ||
               start.isPending ||
               rounds.length === 0 ||
               noProject ||
@@ -896,7 +903,13 @@ function InterviewRoom({
         setSpoken(null)
         answerBox.current?.focus()
       },
-      onError: () => setRoom(room),
+      onError: async (error) => {
+        setRoom(room)
+        if (error instanceof ApiError && error.status === 409) {
+          const saved = await api.session(sessionId).catch(() => null)
+          if (saved?.availability === 'interrupted') setRoom({ ...room, interrupted: true })
+        }
+      },
     })
   }
 
@@ -906,8 +919,8 @@ function InterviewRoom({
     return <Loading what="the interview" />
   }
 
-  const live = room.closedBy === null
-  const feedbackAvailable = room.mode !== 'simulation' || !live
+  const live = room.closedBy === null && !room.interrupted
+  const feedbackAvailable = room.mode !== 'simulation' || room.closedBy !== null
 
   return (
     <EvidenceProvider>
@@ -941,6 +954,28 @@ function InterviewRoom({
             </Link>
           }
         />
+        {room.interrupted && (
+          <Panel title="This interview was interrupted">
+            <p className="text-sm">
+              The server lost the live session. Saved answers remain intact; this interview cannot
+              accept another answer.
+            </p>
+            {answer.trim() !== '' && (
+              <label className="mt-3 block text-xs">
+                Unsent answer draft — copy it before leaving
+                <textarea
+                  aria-label="Unsent answer draft"
+                  readOnly
+                  value={answer}
+                  className="mt-2 w-full rounded border border-edge bg-ink-2 p-3"
+                />
+              </label>
+            )}
+            <div className="mt-3">
+              <EndInterruptedInterview sessionId={sessionId} />
+            </div>
+          </Panel>
+        )}
         <div className="interview-status">
           <span className="journey-icon">
             <JourneyIcon name="interview" />

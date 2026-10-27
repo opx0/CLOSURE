@@ -1,20 +1,18 @@
+import { gapsAcrossViews } from '@levelhead/core'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { planNextSession, replay } from '@levelhead/core'
-import type { GapEntry, JobRecord } from '@levelhead/contracts'
+import type { JobRecord } from '@levelhead/contracts'
 import type { HandlerContext } from './context.ts'
 
 export async function planRetrieval(job: JobRecord, context: HandlerContext): Promise<void> {
   if (job.payload.kind !== 'plan_retrieval') throw new Error('wrong payload for retrieval plan')
 
   const store = context.storeFor(job.ownerId)
-  const gaps = new Map<string, GapEntry>()
-  for (const sessionId of await store.listSessions()) {
-    for (const gap of replay(await store.read(sessionId)).gaps.values()) {
-      const known = gaps.get(gap.id)
-      if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(gap.id, gap)
-    }
-  }
+  const views = await Promise.all(
+    (await store.listSessions()).map(async (id) => replay(await store.read(id))),
+  )
+  const gaps = gapsAcrossViews(views)
 
   const plan = planNextSession({
     gaps: [...gaps.values()],

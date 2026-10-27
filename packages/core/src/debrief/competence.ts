@@ -6,9 +6,14 @@ import {
   type CompetenceLane,
   type Competency,
   type ComposureSignal,
+  type ImprovementPlan,
+  type GapEntry,
+  LEVEL_ORDER,
 } from '@levelhead/contracts'
 import type { SessionView } from '../events/replay.ts'
 import { renderLedger } from '../gaps/ledger.ts'
+import { topicById, nextTransferVariant } from '../topics/index.ts'
+import { spanViolations } from '../events/sources.ts'
 
 // One of the debrief's two halves. This file may name findings, gaps, rubrics and competencies and
 // may not name a single measured signal; `performance.ts` has the mirrored restriction, and the
@@ -24,6 +29,7 @@ export function competenceLane(view: SessionView): CompetenceLane {
   ].reduce((highest, level) => Math.max(highest, level), 0)
 
   return {
+    plan: improvementPlan(view),
     // The contract carries the schema's own array type; `widenFindings` is the helper it exports for
     // dropping the compile-time non-empty tuples that mean the same thing as its `minItems: 1`.
     findings: widenFindings(view.findings),
@@ -35,6 +41,105 @@ export function competenceLane(view: SessionView): CompetenceLane {
     ).length,
     pressureReached,
   }
+}
+
+export function improvementPlan(
+  view: SessionView,
+  context: { gaps?: ReadonlyMap<string, GapEntry>; exposedVariants?: ReadonlySet<string> } = {},
+): ImprovementPlan {
+  const summary = (
+    findings: readonly import('@levelhead/contracts').Finding[],
+    reason?: string,
+  ) => ({
+    findingIds: findings.map((finding) => finding.id),
+    summary: reason ?? findings.map((finding) => finding.rationale).join(' '),
+    quotes: [...new Set(findings.flatMap((finding) => [...finding.transcriptSpanIds]))].flatMap(
+      (id) => {
+        const span = view.spans.get(id)
+        return span !== undefined && spanViolations([span], view.sources).length === 0 ? [span] : []
+      },
+    ),
+  })
+  const uncertainty: ImprovementPlan['uncertainty'] = []
+  const strengths: ImprovementPlan['strengths'] = []
+  for (const finding of view.findings) {
+    const cited = summary([finding])
+    if (finding.kind === 'claim_abstained' || finding.kind === 'competency_abstained')
+      uncertainty.push(cited)
+    else if (cited.quotes.length === 0)
+      uncertainty.push(
+        summary(
+          [finding],
+          'The answer citation is unavailable; no priority or strength is inferred.',
+        ),
+      )
+    else if (
+      (finding.kind === 'claim' && finding.verdict === 'supported') ||
+      (finding.kind === 'competency' &&
+        finding.levelMet !== null &&
+        LEVEL_ORDER.indexOf(finding.levelMet) >= LEVEL_ORDER.indexOf(finding.level))
+    )
+      strengths.push(cited)
+    const review = view.findingReviews?.filter((review) => review.findingId === finding.id).at(-1)
+    if (review?.state === 'pending')
+      uncertainty.push(
+        summary(
+          [finding],
+          'Candidate disagreement is pending review; the finding has not been retracted.',
+        ),
+      )
+  }
+  const historical = view.historicalFindings ?? view.findings
+  for (const [id] of view.supersededFindings ?? []) {
+    const finding = historical.find((finding) => finding.id === id)
+    if (finding !== undefined)
+      uncertainty.push(
+        summary(
+          [finding],
+          'Previous feedback was superseded. The corrected evidence has not been reassessed.',
+        ),
+      )
+  }
+  const priorities: ImprovementPlan['leading'] = []
+  for (const gap of [...(context.gaps ?? view.gaps).values()].sort(
+    (a, b) => a.openedAt.localeCompare(b.openedAt) || a.id.localeCompare(b.id),
+  )) {
+    if (gap.status !== 'open' && gap.status !== 'drilled') continue
+    const findings = view.findings.filter(
+      (finding) =>
+        gap.findingIds.includes(finding.id) &&
+        finding.kind !== 'claim_abstained' &&
+        finding.kind !== 'competency_abstained' &&
+        finding.kind !== 'composure',
+    )
+    if (findings.length === 0) continue
+    const evidence = summary(findings)
+    if (evidence.quotes.length === 0) continue
+    const topic = gap.topicId === undefined ? undefined : topicById(gap.topicId)
+    const concepts = gap.competency === 'composure' ? undefined : topic?.expected[gap.competency]
+    priorities.push({
+      ...evidence,
+      gapId: gap.id,
+      nextAction:
+        gap.status === 'open' && (gap.topicId !== undefined || gap.claimId !== undefined)
+          ? 'drill'
+          : gap.status === 'drilled' &&
+              gap.topicId !== undefined &&
+              nextTransferVariant(gap.topicId, context.exposedVariants ?? new Set()) !== undefined
+            ? 'transfer'
+            : 'unavailable',
+      ...(gap.topicId === undefined ? {} : { topicId: gap.topicId }),
+      ...(gap.claimId === undefined ? {} : { claimId: gap.claimId }),
+      ...(concepts === undefined
+        ? {}
+        : {
+            explanation: concepts.join('; '),
+            exercise: `Apply the reasoning to this scenario: ${topic!.twist}. Explain the mechanism and trade-offs in your own words.`,
+          }),
+      retest: 'separate_unfamiliar_variant_required',
+    })
+  }
+  return { leading: priorities.slice(0, 3), remaining: priorities.slice(3), strengths, uncertainty }
 }
 
 // A finding cites span ids and a ledger row cites evidence ids. Both resolve to the same quoted text
@@ -125,7 +230,13 @@ export function renderCompetenceLane(
 ): string[] {
   const out = [COMPETENCE_HEADING, '-'.repeat(COMPETENCE_HEADING.length)]
 
-  if (lane.findings.length === 0) out.push('  No answer was evaluated in this session.', '')
+  if (lane.findings.length === 0)
+    out.push(
+      lane.plan?.uncertainty.length
+        ? '  No current evaluation remains; reassessment is required.'
+        : '  No answer was evaluated in this session.',
+      '',
+    )
   for (const finding of lane.findings) {
     const confidence = finding.confidence.toFixed(2)
     out.push(

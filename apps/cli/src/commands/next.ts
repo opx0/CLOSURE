@@ -1,5 +1,5 @@
+import { gapsAcrossViews } from '@levelhead/core'
 import { planNextSession, replay, topicById } from '@levelhead/core'
-import type { GapEntry } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { SystemClock } from '../runtime.ts'
@@ -23,13 +23,10 @@ export async function next(argv: readonly string[]): Promise<number> {
   const { store, close } = openStore(config)
 
   try {
-    const gaps = new Map<string, GapEntry>()
-    for (const sessionId of await store.listSessions()) {
-      for (const gap of replay(await store.read(sessionId)).gaps.values()) {
-        const known = gaps.get(gap.id)
-        if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(gap.id, gap)
-      }
-    }
+    const views = await Promise.all(
+      (await store.listSessions()).map(async (id) => replay(await store.read(id))),
+    )
+    const gaps = gapsAcrossViews(views)
 
     const plan = planNextSession({
       gaps: [...gaps.values()],

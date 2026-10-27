@@ -1,8 +1,7 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { GapEntrySchema, RoundKindSchema } from '@levelhead/contracts'
-import type { GapEntry } from '@levelhead/contracts'
-import { planNextSession, replay } from '@levelhead/core'
+import { planNextSession, replay, gapsAcrossViews } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
 
 const PlannedWorkSchema = Type.Object({
@@ -44,15 +43,10 @@ export function scheduleRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
       },
       async (request) => {
         const store = deps.storeFor(request.principal)
-        const gaps = new Map<string, GapEntry>()
-        for (const sessionId of await store.listSessions()) {
-          for (const gap of replay(await store.read(sessionId)).gaps.values()) {
-            const known = gaps.get(gap.id)
-            if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) {
-              gaps.set(gap.id, gap)
-            }
-          }
-        }
+        const views = await Promise.all(
+          (await store.listSessions()).map(async (id) => replay(await store.read(id))),
+        )
+        const gaps = gapsAcrossViews(views)
 
         return planNextSession({
           gaps: [...gaps.values()],

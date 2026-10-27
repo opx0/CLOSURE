@@ -84,8 +84,8 @@ test('authored hints persist before delivery and the resulting coached answer ca
     ],
   })
   const { app, store } = await testApi({
-    questions: ['Explain indexes.', 'Practise indexes.'],
-    scripted: [finding(null), finding('junior')],
+    questions: ['Explain indexes.', 'Practise indexes.', 'An unfamiliar index scenario.'],
+    scripted: [finding(null), finding('junior'), finding(null)],
   })
   try {
     const start = (
@@ -144,6 +144,43 @@ test('authored hints persist before delivery and the resulting coached answer ca
         })
       ).statusCode,
     ).toBe(409)
+    const updatedPlan = (await app.inject(`/sessions/${start.sessionId}/debrief`)).json().competence
+      .plan
+    expect(
+      updatedPlan.leading.find((priority: { gapId: string }) => priority.gapId === gap.id)
+        ?.nextAction,
+    ).toBe('transfer')
+    const launches = await Promise.all(
+      [0, 1].map(() =>
+        app.inject({
+          method: 'POST',
+          url: '/sessions',
+          payload: { mode: 'transfer', gapId: gap.id },
+        }),
+      ),
+    )
+    expect(launches.map((response) => response.statusCode).sort()).toEqual([201, 409])
+    const transfer = launches.find((response) => response.statusCode === 201)!.json()
+    const transferred = replay(await store.read(transfer.sessionId))
+    expect(transferred.session?.practiceVariantId).toBe('indexes.tenant_prefix')
+    expect(transfer.question.action).toBe('TRANSFER_TEST')
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/sessions/${transfer.sessionId}/hints`,
+          payload: { level: 1 },
+        })
+      ).statusCode,
+    ).toBe(409)
+    await app.inject({
+      method: 'POST',
+      url: `/sessions/${transfer.sessionId}/answers`,
+      payload: { text: answer },
+    })
+    const failed = replay(await store.read(transfer.sessionId)).gaps.get(gap.id)
+    expect(failed?.status).toBe('open')
+    expect(failed?.practiceReceipts?.at(-1)?.kind).toBe('transfer')
   } finally {
     await app.close()
   }

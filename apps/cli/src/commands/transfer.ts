@@ -1,5 +1,6 @@
-import { AREA_ROUND, replay, topicById } from '@levelhead/core'
-import type { GapEntry, Level } from '@levelhead/contracts'
+import { gapsAcrossViews } from '@levelhead/core'
+import { AREA_ROUND, replay, topicById, nextTransferVariant } from '@levelhead/core'
+import type { Level } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line } from '../terminal.ts'
@@ -15,17 +16,15 @@ export async function transfer(argv: readonly string[]): Promise<number> {
   const config = loadCliConfig()
   const { store } = openStore(config)
 
-  const drilled = new Map<string, GapEntry>()
+  const views: ReturnType<typeof replay>[] = []
   const judgedAt = new Map<string, Level>()
   for (const sessionId of await store.listSessions()) {
     const view = replay(await store.read(sessionId))
-    for (const gap of view.gaps.values()) {
-      const known = drilled.get(gap.id)
-      if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) drilled.set(gap.id, gap)
-    }
+    views.push(view)
     for (const finding of view.findings) judgedAt.set(finding.id, finding.level)
   }
 
+  const drilled = gapsAcrossViews(views)
   const at = argv.indexOf('--gap')
   const wanted = at === -1 ? undefined : argv[at + 1]
   const waiting = [...drilled.values()].filter((gap) => gap.status === 'drilled')
@@ -45,6 +44,18 @@ export async function transfer(argv: readonly string[]): Promise<number> {
     return 1
   }
 
+  const exposed = new Set(
+    views.flatMap((view) =>
+      view.session?.practiceVariantId === undefined
+        ? []
+        : [`${view.session.practiceVariantId}@${view.session.practiceVariantVersion}`],
+    ),
+  )
+  const variant = topic === undefined ? undefined : nextTransferVariant(topic.id, exposed)
+  if (variant === undefined) {
+    line('No unfamiliar authored Transfer variant is available for this gap.')
+    return 1
+  }
   const { conductor, evaluator } = fromEnv(process.env)
   heading('transfer test')
   line(target.summary)
@@ -63,6 +74,7 @@ export async function transfer(argv: readonly string[]): Promise<number> {
     turnsPerRound: 1,
     drill: false,
     transferGap: target,
+    transferVariant: variant,
     ceilings: {
       sessionCostUsd: config.sessionCostCeilingUsd,
       sessionTokens: config.sessionTokenCeiling,

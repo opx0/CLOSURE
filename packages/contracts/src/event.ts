@@ -8,6 +8,7 @@ import { ArtifactSchema, EvidenceSchema, SpanSchema } from './provenance.ts'
 import { RoundKindSchema } from './round.ts'
 import { SnapshotSchema } from './snapshot.ts'
 import { FindingSchema } from './finding.ts'
+import { AnswerCorrectionSchema, FindingReviewSchema } from './feedback.ts'
 import { GapEntrySchema, GapStatusSchema, PracticeOutcomeSchema } from './gap.ts'
 import { InvocationRecordSchema } from './invocation.ts'
 import {
@@ -165,6 +166,8 @@ export const EvaluationProducedSchema = eventOf(
 export const StateChangeSchema = eventOf(
   'state_change',
   Type.Union([
+    Type.Object({ change: Type.Literal('answer_corrected'), ...AnswerCorrectionSchema.properties }),
+    Type.Object({ change: Type.Literal('finding_reviewed'), ...FindingReviewSchema.properties }),
     Type.Object({
       change: Type.Literal('practice_assistance'),
       attemptId: Type.String({ minLength: 1 }),

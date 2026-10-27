@@ -62,6 +62,8 @@ export const SessionSchema = Type.Object({
   rounds: Type.Array(RoundKindSchema, { minItems: 1 }),
   snapshotId: Type.Optional(Type.String({ minLength: 1 })),
   practiceGapId: Type.Optional(Type.String({ minLength: 1 })),
+  practiceVariantId: Type.Optional(Type.String({ minLength: 1 })),
+  practiceVariantVersion: Type.Optional(Type.Integer({ minimum: 1 })),
   startedAt: Type.String({ format: 'date-time' }),
 })
 export type Session = Static<typeof SessionSchema>

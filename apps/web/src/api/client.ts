@@ -103,6 +103,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ level }),
     }),
+  closeInterrupted: (id: string) =>
+    request<Json<'/sessions/{id}/close-interrupted', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/close-interrupted`,
+      { method: 'POST' },
+    ),
+  feedback: (id: string) =>
+    request<Json<'/sessions/{id}/feedback', 'get'>>(`/sessions/${encodeURIComponent(id)}/feedback`),
+  correctAnswer: (id: string, body: Body<'/sessions/{id}/corrections', 'post'>) =>
+    request<Json<'/sessions/{id}/corrections', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/corrections`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  reviewFinding: (id: string, body: Body<'/sessions/{id}/feedback', 'post'>) =>
+    request<Json<'/sessions/{id}/feedback', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/feedback`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   preparation: () => request<Json<'/preparation', 'get'>>('/preparation'),
   savePreparation: (selection: Body<'/preparation', 'post'>) =>
     request<Json<'/preparation', 'post'>>('/preparation', {

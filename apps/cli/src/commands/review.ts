@@ -1,5 +1,5 @@
 import { replay, topicById } from '@levelhead/core'
-import type { Finding, GapEntry } from '@levelhead/contracts'
+import type { Finding } from '@levelhead/contracts'
 import { openStore } from '../store.ts'
 import { loadCliConfig } from '../config.ts'
 import { dim, heading, line, quote } from '../terminal.ts'
@@ -21,15 +21,11 @@ export async function review(argv: readonly string[]): Promise<number> {
   const wanted = at === -1 ? undefined : argv[at + 1]
 
   const history = new Map<string, Attempted[]>()
-  const gaps = new Map<string, GapEntry>()
 
   for (const sessionId of await store.listSessions()) {
     const view = replay(await store.read(sessionId))
     const startedAt = view.session?.startedAt ?? ''
-    for (const gap of view.gaps.values()) {
-      const known = gaps.get(gap.id)
-      if (known === undefined || gap.lastTouchedAt >= known.lastTouchedAt) gaps.set(gap.id, gap)
-    }
+
     for (const finding of view.findings) {
       const key =
         finding.kind === 'claim' || finding.kind === 'claim_abstained'

@@ -1,3 +1,4 @@
+import { feedbackRoutes } from './routes/feedback.ts'
 import { preparationRoutes } from './routes/preparation.ts'
 import { join, resolve } from 'node:path'
 import { stat } from 'node:fs/promises'
@@ -156,6 +157,7 @@ export async function buildApp(config: Config, deps: ServerDeps): Promise<Fastif
   await app.register(deliveryRoutes(deps))
   await app.register(performanceRoutes(deps))
   await app.register(debriefRoutes(deps))
+  await app.register(feedbackRoutes(deps))
   await app.register(preparationRoutes(deps))
   await app.register(mirrorRoutes(deps))
   await app.register(analyticsRoutes(deps))

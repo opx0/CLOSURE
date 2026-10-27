@@ -11,6 +11,7 @@ import type {
   RoleId,
   RoundKind,
   Topic,
+  TransferVariant,
 } from '@levelhead/contracts'
 import type { ArtifactContext, IdSource, PinnedContext, PressureLevel } from '@levelhead/core'
 import { runSession, type SessionIo, type SessionResult } from '@levelhead/core'
@@ -30,6 +31,8 @@ export interface StartSessionInput {
   turnsPerRound: number
   drill: boolean
   drillGap?: GapEntry
+  transferGap?: GapEntry
+  transferVariant?: TransferVariant
   retrievals?: readonly GapEntry[]
   role?: RoleId
   topics?: readonly Topic[]
@@ -162,6 +165,10 @@ export class LiveSession {
       rounds: this.#input.rounds,
       turnsPerRound: this.#input.turnsPerRound,
       drill: this.#input.drill,
+      ...(this.#input.transferGap === undefined ? {} : { transferGap: this.#input.transferGap }),
+      ...(this.#input.transferVariant === undefined
+        ? {}
+        : { transferVariant: this.#input.transferVariant }),
       ...(this.#input.drillGap === undefined ? {} : { drillGap: this.#input.drillGap }),
       ...(this.#input.retrievals === undefined ? {} : { retrievals: this.#input.retrievals }),
       topicHistory: this.#input.topicHistory,

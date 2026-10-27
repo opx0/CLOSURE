@@ -3,6 +3,8 @@ import { DebriefSchema } from '@levelhead/contracts'
 import type { PerformanceBaseline, PerformanceObservation } from '@levelhead/contracts'
 import {
   buildDebrief,
+  improvementPlan,
+  gapsAcrossViews,
   contrastsAcrossSession,
   drillsFor,
   notesFrom,
@@ -31,15 +33,22 @@ export function debriefRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           response: {
             200: DebriefSchema,
             404: ErrorSchema,
+            409: ErrorSchema,
           },
         },
       },
       async (request, reply) => {
-        const events = await deps.storeFor(request.principal).read(request.params.id)
+        const store = deps.storeFor(request.principal)
+        const events = await store.read(request.params.id)
         if (events.length === 0) {
           return reply.code(404).send({ error: 'no such session', detail: request.params.id })
         }
         const view = replay(events)
+        if (view.session?.mode === 'simulation' && view.closed === null)
+          return reply.code(409).send({
+            error: 'Finish the simulation before opening its debrief',
+            detail: 'Feedback remains withheld.',
+          })
 
         // Pressure level and whether the answer followed an interruption are read from the session's
         // own attempts rather than inferred here: an attempt whose selected policy action was
@@ -72,11 +81,28 @@ export function debriefRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
         const notes = notesFrom({ observations, baselines, contrasts })
         const drills = drillsFor(notes)
 
-        return buildDebrief({
+        const report = buildDebrief({
           view,
           generatedAt: deps.clock.now(),
           performance: { observations, notes, drills, baselines },
         })
+        const history = await Promise.all(
+          (await store.listSessions()).map(async (id) =>
+            id === request.params.id ? view : replay(await store.read(id)),
+          ),
+        )
+        const exposedVariants = new Set(
+          history.flatMap((entry) =>
+            entry.session?.practiceVariantId === undefined
+              ? []
+              : [`${entry.session.practiceVariantId}@${entry.session.practiceVariantVersion}`],
+          ),
+        )
+        report.competence.plan = improvementPlan(view, {
+          gaps: gapsAcrossViews(history),
+          exposedVariants,
+        })
+        return report
       },
     )
   }

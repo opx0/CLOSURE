@@ -96,11 +96,19 @@ export function PrivacyPage() {
             placeholder="bearer token"
             className="rounded border border-edge bg-[#0f141b] px-2 py-1 text-sm"
           />
-          <Button onClick={() => setApiToken(token)}>Save</Button>
+          <Button
+            onClick={() => {
+              setApiToken(token)
+              window.location.reload()
+            }}
+          >
+            Save
+          </Button>
           <Button
             tone="danger"
             onClick={() => {
               setApiToken(null)
+              window.location.reload()
               setToken('')
             }}
           >
