@@ -462,6 +462,12 @@ test('an exact gap reaches a separate unfamiliar Transfer with coaching disabled
     data: { text: complete },
   })
   expect(drilled.ok()).toBe(true)
+  await page.goto('/app/improve')
+  await expect(
+    page.locator(`a[href*="mode=transfer&gapId=${gap.id}"]`).filter({
+      hasText: 'Check on an unfamiliar variant',
+    }),
+  ).toBeVisible()
   await page.goto(`/app/debrief?id=${original.sessionId}`)
   const plan = page.getByRole('region', { name: 'Improvement plan' })
   await expect(plan.getByRole('link', { name: 'Practise this priority', exact: true })).toHaveCount(

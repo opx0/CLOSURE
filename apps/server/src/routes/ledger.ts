@@ -1,8 +1,9 @@
 import { Type } from '@sinclair/typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { FindingSchema, GapEntrySchema } from '@levelhead/contracts'
-import { replay, gapsAcrossViews, spanViolations } from '@levelhead/core'
+import { replay, gapsAcrossViews, practiceActionForGap, spanViolations } from '@levelhead/core'
 import type { ServerDeps } from '../deps.ts'
+import { CLAIM_SET_SESSION } from '../../../cli/src/commands/claims.ts'
 import {
   ErrorSchema,
   QuotedEvidenceSchema,
@@ -27,6 +28,16 @@ export function ledgerRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           response: {
             200: Type.Object({
               gaps: Type.Array(GapEntrySchema),
+              practice: Type.Array(
+                Type.Object({
+                  gapId: Type.String({ minLength: 1 }),
+                  nextAction: Type.Union([
+                    Type.Literal('drill'),
+                    Type.Literal('transfer'),
+                    Type.Literal('unavailable'),
+                  ]),
+                }),
+              ),
               quotes: Type.Array(QuotedEvidenceSchema),
               // §4.6's four columns plus a broken-build count of unresolved citations — not a score.
               unresolvedCitations: Type.Integer({ minimum: 0 }),
@@ -49,8 +60,24 @@ export function ledgerRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           unresolvedCitations += spanViolations(view.spans.values(), view.sources).length
         }
 
+        const gaps = [...gapsAcrossViews(views).values()]
+        const exposedVariants = new Set(
+          views.flatMap((view) =>
+            view.session?.practiceVariantId === undefined
+              ? []
+              : [`${view.session.practiceVariantId}@${view.session.practiceVariantVersion}`],
+          ),
+        )
+        const claimSet = replay(await store.read(CLAIM_SET_SESSION))
+        const confirmedClaims = new Map(
+          [...claimSet.claims].filter(([id]) => claimSet.confirmedClaimIds.has(id)),
+        )
         return {
-          gaps: [...gapsAcrossViews(views).values()],
+          gaps,
+          practice: gaps.map((gap) => ({
+            gapId: gap.id,
+            nextAction: practiceActionForGap(gap, { exposedVariants, confirmedClaims }),
+          })),
           quotes: [...quotes].map(([evidenceId, quoted]) => ({ evidenceId, quoted })),
           unresolvedCitations,
         }

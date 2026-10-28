@@ -92,6 +92,9 @@ export function ImprovePage() {
               <div className="divide-y divide-edge">
                 {gaps.map((gap) => {
                   const topic = topicById(gap.topicId)
+                  const nextAction = ledger.data?.practice.find(
+                    (item) => item.gapId === gap.id,
+                  )?.nextAction
                   const quotes = gap.evidenceIds.flatMap((id) => {
                     const quote = ledger.data?.quotes.find((entry) => entry.evidenceId === id)
                     return quote === undefined ? [] : [quote.quoted]
@@ -113,22 +116,27 @@ export function ImprovePage() {
                       <h3 className="mt-3 text-sm font-medium leading-relaxed text-body">
                         {gap.summary}
                       </h3>
-                      {gap.status === 'open' &&
-                        (gap.topicId !== undefined || gap.claimId !== undefined) && (
-                          <Link
-                            to={`/session?mode=drill&gapId=${encodeURIComponent(gap.id)}`}
-                            className="journey-secondary mt-3"
-                          >
-                            Practise this gap
-                          </Link>
-                        )}
-                      {gap.status === 'drilled' && gap.topicId === 'dbms.indexes' && (
+                      {nextAction === 'drill' && (
+                        <Link
+                          to={`/session?mode=drill&gapId=${encodeURIComponent(gap.id)}`}
+                          className="journey-secondary mt-3"
+                        >
+                          Practise this gap
+                        </Link>
+                      )}
+                      {nextAction === 'transfer' && (
                         <Link
                           to={`/session?mode=transfer&gapId=${encodeURIComponent(gap.id)}`}
                           className="journey-secondary mt-3"
                         >
                           Check on an unfamiliar variant
                         </Link>
+                      )}
+                      {gap.status === 'drilled' && nextAction === 'unavailable' && (
+                        <p className="mt-3 text-xs text-quiet">
+                          No unfamiliar retest remains for this gap. Previously exposed variants are
+                          not reused.
+                        </p>
                       )}
                       {quotes.map((quote, index) => (
                         <blockquote

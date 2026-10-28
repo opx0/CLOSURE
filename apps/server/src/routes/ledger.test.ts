@@ -16,13 +16,15 @@ test('a gap opened in a session shows up on the ledger, with the words behind it
   expect(response.statusCode).toBe(200)
 
   const body = response.json() as {
-    gaps: { status: string; competency: string; evidenceIds: string[] }[]
+    gaps: { id: string; status: string; competency: string; evidenceIds: string[] }[]
+    practice: { gapId: string; nextAction: string }[]
     quotes: { evidenceId: string; quoted: string }[]
     unresolvedCitations: number
   }
   expect(body.gaps).toHaveLength(1)
   // Passing a drill would not close it and neither does anything here: only transfer closes a gap.
   expect(body.gaps[0]?.status).toBe('open')
+  expect(body.practice).toEqual([{ gapId: body.gaps[0]!.id, nextAction: 'drill' }])
   expect(body.unresolvedCitations).toBe(0)
 
   const evidenceId = body.gaps[0]?.evidenceIds[0]
@@ -35,8 +37,13 @@ test('an empty ledger is an empty ledger, not an error', async () => {
 
   expect(response.statusCode).toBe(200)
   expect(
-    response.json() as { gaps: unknown[]; quotes: unknown[]; unresolvedCitations: number },
-  ).toEqual({ gaps: [], quotes: [], unresolvedCitations: 0 })
+    response.json() as {
+      gaps: unknown[]
+      practice: unknown[]
+      quotes: unknown[]
+      unresolvedCitations: number
+    },
+  ).toEqual({ gaps: [], practice: [], quotes: [], unresolvedCitations: 0 })
 })
 
 test('replay re-checks every citation and says how many it read', async () => {
