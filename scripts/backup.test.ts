@@ -92,7 +92,7 @@ test('v2 backup restores worker plans and nudge claims while v1 remains readable
     const legacy = join(dir, 'legacy')
     expect(await backupJsonl(events, exports, legacy)).toBe(1)
     expect(await restoreJsonl(legacy, join(dir, 'legacy-restored'))).toBe(1)
-    expect(await readdir(join(dir, 'legacy-restored'))).toEqual(['events', 'exports'])
+    expect((await readdir(join(dir, 'legacy-restored'))).sort()).toEqual(['events', 'exports'])
     await writeFile(join(backup, 'nudges/claim.jsonl'), 'tampered')
     await expect(restoreJsonl(backup, join(dir, 'tampered'))).rejects.toThrow('checksum')
     expect(await readdir(dir)).not.toContain('tampered')
