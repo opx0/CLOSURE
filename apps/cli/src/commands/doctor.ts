@@ -8,19 +8,52 @@ import { checkLocalGeneration } from '../adapters/local-only.ts'
 
 type Check = { name: string; ok: boolean; detail: string }
 
-async function llamaReachable(baseUrl: string): Promise<Check> {
+export async function llamaReachable(baseUrl: string): Promise<Check> {
   try {
-    const response = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(2000) })
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
+      signal: AbortSignal.timeout(2000),
+      redirect: 'error',
+    })
+    if (!response.ok) {
+      return {
+        name: 'local model (llama.cpp)',
+        ok: false,
+        detail: `${baseUrl} answered ${response.status}`,
+      }
+    }
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      return {
+        name: 'local model (llama.cpp)',
+        ok: false,
+        detail: `${baseUrl} returned an invalid model catalog`,
+      }
+    }
+    const models = body !== null && typeof body === 'object' && 'data' in body ? body.data : null
+    const advertised =
+      Array.isArray(models) &&
+      models.some(
+        (model) =>
+          model !== null &&
+          typeof model === 'object' &&
+          'id' in model &&
+          typeof model.id === 'string' &&
+          model.id.length > 0,
+      )
     return {
       name: 'local model (llama.cpp)',
-      ok: response.ok,
-      detail: response.ok ? baseUrl : `${baseUrl} answered ${response.status}`,
+      ok: advertised,
+      detail: advertised
+        ? `${baseUrl} advertises a model; actual inference and quality unverified`
+        : `${baseUrl} did not advertise a loaded model`,
     }
   } catch (error) {
     return {
       name: 'local model (llama.cpp)',
       ok: false,
-      detail: `${baseUrl} unreachable — start it with \`bun run llama:up\` (${String(error)})`,
+      detail: `${baseUrl} unavailable or redirected — start it with \`bun run llama:up\` if needed (${String(error)})`,
     }
   }
 }
