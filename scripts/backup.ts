@@ -9,10 +9,11 @@ interface Entry {
   bytes: number
 }
 interface Manifest {
-  version: 1
+  version: 1 | 2
   store: 'jsonl'
   files: Entry[]
 }
+type RootKind = 'events' | 'exports' | 'plans' | 'nudges'
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 const within = (root: string, path: string) => path === root || path.startsWith(root + sep)
 
@@ -59,6 +60,16 @@ async function inventory(root: string, prefix: string): Promise<Entry[]> {
   return entries
 }
 
+async function optionalRoot(path: string): Promise<string | null> {
+  try {
+    if (!(await lstat(path)).isDirectory()) throw new Error('Backup roots must be directories')
+    return await realpath(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw error
+  }
+}
+
 async function newDestination(destination: string): Promise<string> {
   const parent = await realpath(dirname(resolve(destination)))
   const target = join(parent, basename(resolve(destination)))
@@ -70,26 +81,42 @@ export async function backupJsonl(
   eventDir: string,
   exportDir: string,
   destination: string,
+  workerDirs?: { plans: string; nudges: string },
 ): Promise<number> {
   for (const path of [eventDir, exportDir]) {
     if (!(await lstat(path)).isDirectory())
       throw new Error('Backup roots must be existing directories, without symlinks')
   }
-  const roots = { events: await realpath(eventDir), exports: await realpath(exportDir) }
+  const roots: Record<RootKind, string | null> = {
+    events: await realpath(eventDir),
+    exports: await realpath(exportDir),
+    plans: workerDirs ? await optionalRoot(workerDirs.plans) : null,
+    nudges: workerDirs ? await optionalRoot(workerDirs.nudges) : null,
+  }
   const target = join(await realpath(dirname(resolve(destination))), basename(resolve(destination)))
-  for (const root of Object.values(roots)) {
+  for (const root of Object.values(roots).filter((path): path is string => path !== null)) {
     if (within(root, target) || within(target, root))
       throw new Error('Backup destination must be separate from data roots')
   }
-  const files = [
-    ...(await inventory(roots.events, 'events')),
-    ...(await inventory(roots.exports, 'exports')),
-  ]
+  const collect = async (): Promise<Entry[]> => {
+    const files: Entry[] = []
+    for (const kind of Object.keys(roots) as RootKind[]) {
+      const root = roots[kind]
+      if (root) files.push(...(await inventory(root, kind)))
+      if (workerDirs && (kind === 'plans' || kind === 'nudges')) {
+        const current = await optionalRoot(workerDirs[kind])
+        if (current !== root) throw new Error('Source changed during backup; stop writers')
+      }
+    }
+    return files
+  }
+  const files = await collect()
   const created = await newDestination(target)
   try {
     for (const entry of files) {
       const [kind, ...parts] = entry.path.split('/')
-      const root = kind === 'events' ? roots.events : roots.exports
+      const root = roots[kind as RootKind]
+      if (!root) throw new Error('Invalid backup root')
       const bytes = await regularFile(root, join(root, ...parts))
       if (digest(bytes) !== entry.sha256)
         throw new Error('Source changed during backup; stop writers')
@@ -98,15 +125,12 @@ export async function backupJsonl(
       await writeFile(output, bytes, { flag: 'wx', mode: 0o600 })
     }
     // Detect additions/removals/changes that occurred while copying.
-    const final = [
-      ...(await inventory(roots.events, 'events')),
-      ...(await inventory(roots.exports, 'exports')),
-    ]
+    const final = await collect()
     if (JSON.stringify(files) !== JSON.stringify(final))
       throw new Error('Source changed during backup; stop writers')
     await writeFile(
       join(created, 'manifest.json'),
-      JSON.stringify({ version: 1, store: 'jsonl', files } satisfies Manifest),
+      JSON.stringify({ version: workerDirs ? 2 : 1, store: 'jsonl', files } satisfies Manifest),
       { flag: 'wx', mode: 0o600 },
     )
     return files.length
@@ -125,7 +149,7 @@ export async function restoreJsonl(backup: string, destination: string): Promise
     !manifest ||
     typeof manifest !== 'object' ||
     !('version' in manifest) ||
-    manifest.version !== 1 ||
+    (manifest.version !== 1 && manifest.version !== 2) ||
     !('store' in manifest) ||
     manifest.store !== 'jsonl' ||
     !('files' in manifest) ||
@@ -149,7 +173,9 @@ export async function restoreJsonl(backup: string, destination: string): Promise
       Number(item.bytes) < 0 ||
       isAbsolute(item.path) ||
       item.path.includes('\\') ||
-      !/^(events|exports)\//.test(item.path) ||
+      !(manifest.version === 1
+        ? /^(events|exports)\//.test(item.path)
+        : /^(events|exports|plans|nudges)\//.test(item.path)) ||
       item.path.split('/').some((part) => !part || part === '.' || part === '..') ||
       seen.has(item.path)
     )
@@ -174,6 +200,10 @@ export async function restoreJsonl(backup: string, destination: string): Promise
     }
     await mkdir(join(created, 'events'), { recursive: true, mode: 0o700 })
     await mkdir(join(created, 'exports'), { recursive: true, mode: 0o700 })
+    if (manifest.version === 2) {
+      await mkdir(join(created, 'plans'), { recursive: true, mode: 0o700 })
+      await mkdir(join(created, 'nudges'), { recursive: true, mode: 0o700 })
+    }
     return files.length
   } catch (error) {
     await rm(created, { recursive: true, force: true })
@@ -193,8 +223,12 @@ if (import.meta.main) {
     process.env.LEVELHEAD_EVENT_DIR ?? '.levelhead/events',
     process.env.LEVELHEAD_EXPORT_DIR ?? '.levelhead/exports',
     destination,
+    {
+      plans: join(process.env.LEVELHEAD_EVENT_DIR ?? '.levelhead/events', '..', 'plans'),
+      nudges: join(process.env.LEVELHEAD_EVENT_DIR ?? '.levelhead/events', '..', 'nudges'),
+    },
   )
   console.log(
-    `Backed up ${count} files. JSONL/events and exports only; no DB, repository checkout, configuration secrets or model assets. Writer shutdown is your assertion, not detected.`,
+    `Backed up ${count} files. JSONL events, exports, worker plans and nudge ledgers only; no DB, repository checkout, configuration secrets or model assets. Writer shutdown is your assertion, not detected.`,
   )
 }

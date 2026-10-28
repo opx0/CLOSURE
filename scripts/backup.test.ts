@@ -68,3 +68,35 @@ test('restore rejects traversal entries before creating a destination', async ()
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('v2 backup restores worker plans and nudge claims while v1 remains readable', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-worker-backup-'))
+  const events = join(dir, 'events'),
+    exports = join(dir, 'exports'),
+    plans = join(dir, 'plans'),
+    nudges = join(dir, 'nudges')
+  try {
+    for (const path of [events, exports, plans, nudges]) await mkdir(path)
+    await writeFile(join(events, 'owner.jsonl'), '{"event":1}\n')
+    await writeFile(join(plans, 'owner.jsonl'), '{"due":"later"}\n')
+    await writeFile(join(nudges, 'claim.jsonl'), '{"attempted":true}\n')
+    const backup = join(dir, 'backup')
+    expect(await backupJsonl(events, exports, backup, { plans, nudges })).toBe(3)
+    expect(JSON.parse(await readFile(join(backup, 'manifest.json'), 'utf8')).version).toBe(2)
+    const restored = join(dir, 'restored')
+    expect(await restoreJsonl(backup, restored)).toBe(3)
+    expect(await readFile(join(restored, 'plans/owner.jsonl'), 'utf8')).toBe('{"due":"later"}\n')
+    expect(await readFile(join(restored, 'nudges/claim.jsonl'), 'utf8')).toBe(
+      '{"attempted":true}\n',
+    )
+    const legacy = join(dir, 'legacy')
+    expect(await backupJsonl(events, exports, legacy)).toBe(1)
+    expect(await restoreJsonl(legacy, join(dir, 'legacy-restored'))).toBe(1)
+    expect(await readdir(join(dir, 'legacy-restored'))).toEqual(['events', 'exports'])
+    await writeFile(join(backup, 'nudges/claim.jsonl'), 'tampered')
+    await expect(restoreJsonl(backup, join(dir, 'tampered'))).rejects.toThrow('checksum')
+    expect(await readdir(dir)).not.toContain('tampered')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
