@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { eventDirWritable, speechReadiness } from './doctor.ts'
+import { eventDirWritable, llamaReachable, speechReadiness } from './doctor.ts'
 
 test('doctor preserves pre-existing probe files and cleans up its own directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'levelhead-doctor-'))
@@ -30,5 +30,35 @@ test('speech health distinguishes batch availability from unverified streaming',
     expect(check.detail).toContain('unverified')
   } finally {
     server.stop(true)
+  }
+})
+
+test('doctor does not mistake any HTTP 200 or a redirect for a ready local model', async () => {
+  const target = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      switch (new URL(request.url).pathname) {
+        case '/valid/models':
+          return Response.json({ object: 'list', data: [{ id: 'local-model' }] })
+        case '/empty/models':
+          return Response.json({ object: 'list', data: [] })
+        case '/redirect/models':
+          return Response.redirect('https://example.com/models', 307)
+        default:
+          return new Response('<html>not a model</html>', { status: 200 })
+      }
+    },
+  })
+  try {
+    expect((await llamaReachable(`${target.url}valid`)).ok).toBe(true)
+    expect((await llamaReachable(`${target.url}valid`)).detail).toContain(
+      'inference and quality unverified',
+    )
+    expect((await llamaReachable(`${target.url}empty`)).ok).toBe(false)
+    expect((await llamaReachable(`${target.url}html`)).ok).toBe(false)
+    expect((await llamaReachable(`${target.url}redirect`)).ok).toBe(false)
+  } finally {
+    target.stop(true)
   }
 })
