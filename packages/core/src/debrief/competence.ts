@@ -137,17 +137,7 @@ export function improvementPlan(
     priorities.push({
       ...evidence,
       gapId: gap.id,
-      nextAction:
-        gap.status === 'open' &&
-        (topic !== undefined ||
-          (gap.claimId !== undefined &&
-            (context.confirmedClaims === undefined || claim !== undefined)))
-          ? 'drill'
-          : gap.status === 'drilled' &&
-              gap.topicId !== undefined &&
-              nextTransferVariant(gap.topicId, context.exposedVariants ?? new Set()) !== undefined
-            ? 'transfer'
-            : 'unavailable',
+      nextAction: practiceActionForGap(gap, context),
       ...(gap.topicId === undefined ? {} : { topicId: gap.topicId }),
       ...(gap.claimId === undefined ? {} : { claimId: gap.claimId }),
       ...(concepts === undefined
@@ -165,6 +155,30 @@ export function improvementPlan(
     })
   }
   return { leading: priorities.slice(0, 3), remaining: priorities.slice(3), strengths, uncertainty }
+}
+
+export function practiceActionForGap(
+  gap: GapEntry,
+  context: {
+    exposedVariants?: ReadonlySet<string>
+    confirmedClaims?: ReadonlyMap<string, Claim>
+  } = {},
+): ImprovementPlan['leading'][number]['nextAction'] {
+  if (gap.status === 'open') {
+    if (gap.topicId !== undefined && topicById(gap.topicId) !== undefined) return 'drill'
+    if (
+      gap.claimId !== undefined &&
+      (context.confirmedClaims === undefined || context.confirmedClaims.has(gap.claimId))
+    )
+      return 'drill'
+  }
+  if (
+    gap.status === 'drilled' &&
+    gap.topicId !== undefined &&
+    nextTransferVariant(gap.topicId, context.exposedVariants ?? new Set()) !== undefined
+  )
+    return 'transfer'
+  return 'unavailable'
 }
 
 // A finding cites span ids and a ledger row cites evidence ids. Both resolve to the same quoted text

@@ -1,7 +1,13 @@
 import { expect, test } from 'bun:test'
 import type { Finding, GapEntry, Span } from '@levelhead/contracts'
 import type { AttemptRecord, SessionView } from '../events/replay.ts'
-import { competenceLane, improvementPlan, quotesFrom, renderCompetenceLane } from './competence.ts'
+import {
+  competenceLane,
+  improvementPlan,
+  practiceActionForGap,
+  quotesFrom,
+  renderCompetenceLane,
+} from './competence.ts'
 
 const citations = {
   transcriptSpanIds: ['span-1'] as [string],
@@ -323,4 +329,20 @@ test('confirmed claim practice guidance stays bounded to the candidate claim', (
   expect(improvementPlan(view, { confirmedClaims: new Map() }).leading[0]?.nextAction).toBe(
     'unavailable',
   )
+})
+
+test('practice links use current status, catalog eligibility, and prior exposure', () => {
+  const topicGap = { ...openGap, topicId: 'dsa.hash_maps' }
+  delete topicGap.claimId
+  expect(practiceActionForGap(topicGap)).toBe('drill')
+  expect(practiceActionForGap({ ...topicGap, status: 'drilled' })).toBe('transfer')
+  expect(
+    practiceActionForGap(
+      { ...topicGap, status: 'drilled' },
+      { exposedVariants: new Set(['hash_maps.adversarial_keys@1']) },
+    ),
+  ).toBe('unavailable')
+  expect(practiceActionForGap({ ...topicGap, topicId: 'unknown' })).toBe('unavailable')
+  expect(practiceActionForGap({ ...openGap, status: 'unverified' })).toBe('unavailable')
+  expect(practiceActionForGap(openGap, { confirmedClaims: new Map() })).toBe('unavailable')
 })

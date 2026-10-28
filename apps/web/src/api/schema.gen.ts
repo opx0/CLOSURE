@@ -2276,6 +2276,10 @@ export interface paths {
                                     passed: boolean;
                                 }[];
                             }[];
+                            practice: {
+                                gapId: string;
+                                nextAction: "drill" | "transfer" | "unavailable";
+                            }[];
                             quotes: {
                                 evidenceId: string;
                                 quoted: string;

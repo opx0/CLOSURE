@@ -12190,6 +12190,7 @@
                   "type": "object",
                   "required": [
                     "gaps",
+                    "practice",
                     "quotes",
                     "unresolvedCitations"
                   ],
@@ -12377,6 +12378,44 @@
                                 }
                               }
                             }
+                          }
+                        }
+                      }
+                    },
+                    "practice": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "gapId",
+                          "nextAction"
+                        ],
+                        "properties": {
+                          "gapId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "nextAction": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "drill"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "transfer"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "unavailable"
+                                ]
+                              }
+                            ]
                           }
                         }
                       }
