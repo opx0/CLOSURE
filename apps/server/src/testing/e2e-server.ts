@@ -293,7 +293,13 @@ const store = new MemoryEventStore()
 const clock = new FixedClock()
 const ids = new SeqIds()
 const app = await buildApp(
-  loadConfig({ PORT: String(port), LOG_LEVEL: 'fatal', LEVELHEAD_RATE_LIMIT_PER_MINUTE: '10000' }),
+  loadConfig({
+    PORT: String(port),
+    LOG_LEVEL: 'fatal',
+    LEVELHEAD_RATE_LIMIT_PER_MINUTE: '10000',
+    VOICE_STREAM_URL: 'ws://127.0.0.1:3098',
+    VOICE_STREAM_TOKEN: 'e2e-private-sidecar-token',
+  }),
   {
     storeFor: () => store,
     clock,

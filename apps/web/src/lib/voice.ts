@@ -68,16 +68,87 @@ export async function transcribe(blob: Blob): Promise<string> {
   return ((await response.json()) as { text: string }).text
 }
 
+interface SpeechPlayback {
+  controller: AbortController
+  audio: HTMLAudioElement | null
+  url: string | null
+}
+
+let currentSpeech: SpeechPlayback | null = null
+
+export function cancelSpeech(): void {
+  const playing = currentSpeech
+  currentSpeech = null
+  if (playing === null) return
+  playing.controller.abort()
+  playing.audio?.pause()
+  if (playing.url !== null) URL.revokeObjectURL(playing.url)
+}
+
+export function speechPhrases(text: string): string[] {
+  const phrases: string[] = []
+  let start = 0
+  for (const match of text.matchAll(/[.!?]+(?=\s|$)/g)) {
+    const end = match.index + match[0].length
+    const phrase = text.slice(start, end).trim()
+    if (phrase) phrases.push(phrase)
+    start = end
+  }
+  const tail = text.slice(start).trim()
+  if (tail) phrases.push(tail)
+  return phrases
+}
+
+// One phrase plays while the next is synthesized. A new question cancels both its old audio and
+// the pending fetch, so a late TTS response cannot speak over the current prompt.
 export async function speak(text: string): Promise<void> {
-  const response = await fetch(`${voiceUrl()}/speak`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text }),
-  })
-  if (!response.ok) throw new Error(`the voice service answered ${response.status}`)
-  const audio = new Audio(URL.createObjectURL(await response.blob()))
-  await new Promise<void>((resolve) => {
-    audio.onended = () => resolve()
-    void audio.play().catch(() => resolve())
-  })
+  cancelSpeech()
+  const phrases = speechPhrases(text)
+  if (phrases.length === 0) return
+  const playback: SpeechPlayback = { controller: new AbortController(), audio: null, url: null }
+  currentSpeech = playback
+  const load = (phrase: string) =>
+    fetch(`${voiceUrl()}/speak`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: phrase }),
+      signal: playback.controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`the voice service answered ${response.status}`)
+      return response.blob()
+    })
+  // A prefetched phrase must settle without an unhandled rejection while the previous phrase plays.
+  const settled = (phrase: string) =>
+    load(phrase).then(
+      (blob) => ({ blob, error: null }),
+      (error: unknown) => ({ blob: null, error }),
+    )
+  let next = settled(phrases[0]!)
+  try {
+    for (let index = 0; index < phrases.length; index += 1) {
+      const result = await next
+      if (playback.controller.signal.aborted) return
+      if (result.error !== null || result.blob === null) throw result.error
+      if (index + 1 < phrases.length) next = settled(phrases[index + 1]!)
+      const url = URL.createObjectURL(result.blob)
+      const audio = new Audio(url)
+      playback.audio = audio
+      playback.url = url
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve()
+        audio.onerror = () => reject(new Error('speech playback failed'))
+        playback.controller.signal.addEventListener('abort', () => resolve(), { once: true })
+        void audio.play().catch(reject)
+      })
+      URL.revokeObjectURL(url)
+      playback.url = null
+      playback.audio = null
+      if (playback.controller.signal.aborted) return
+    }
+  } finally {
+    if (currentSpeech === playback) currentSpeech = null
+    playback.controller.abort()
+    playback.audio?.pause()
+    if (playback.url !== null) URL.revokeObjectURL(playback.url)
+  }
 }

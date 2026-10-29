@@ -2,7 +2,12 @@ import { expect, test } from 'bun:test'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { eventDirWritable, llamaReachable, speechReadiness } from './doctor.ts'
+import {
+  eventDirWritable,
+  llamaReachable,
+  speechReadiness,
+  streamingAssetsReadiness,
+} from './doctor.ts'
 
 test('doctor preserves pre-existing probe files and cleans up its own directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'levelhead-doctor-'))
@@ -26,10 +31,50 @@ test('speech health distinguishes batch availability from unverified streaming',
   })
   try {
     const check = await speechReadiness(String(server.port))
+    expect(check.available).toBe(true)
     expect(check.detail).toContain('batch ASR/full-WAV TTS reachable')
     expect(check.detail).toContain('unverified')
   } finally {
     server.stop(true)
+  }
+})
+
+test('an invalid speech health response keeps text mode ready without marking speech available', async () => {
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch() {
+      return Response.json({ status: 'ok' })
+    },
+  })
+  try {
+    const check = await speechReadiness(String(server.port))
+    expect(check.ok).toBe(true)
+    expect(check.available).toBe(false)
+    expect(check.detail).toContain('did not confirm batch ASR/TTS')
+  } finally {
+    server.stop(true)
+  }
+})
+
+test('streaming readiness requires all local files and does not claim decoding', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-streaming-assets-'))
+  try {
+    const names = ['TOKENS', 'ENCODER', 'DECODER', 'JOINER'] as const
+    const env = Object.fromEntries(
+      names.map((name) => [`VOICE_STREAM_${name}`, join(dir, name.toLowerCase())]),
+    )
+    expect((await streamingAssetsReadiness(env)).detail).toContain('preprovision')
+    expect((await streamingAssetsReadiness(env)).available).toBe(false)
+    for (const name of names) await writeFile(join(dir, name.toLowerCase()), 'test')
+    expect((await streamingAssetsReadiness(env)).available).toBe(true)
+    expect((await streamingAssetsReadiness(env)).detail).toContain(
+      'decoding and quality unverified',
+    )
+    expect((await streamingAssetsReadiness({})).detail).toContain('text mode')
+    expect((await streamingAssetsReadiness({})).available).toBe(false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
   }
 })
 

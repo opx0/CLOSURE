@@ -37,6 +37,8 @@ const ConfigSchema = Type.Object({
   LEVELHEAD_CORS_ORIGIN: Type.String({ default: '' }),
   LEVELHEAD_RATE_LIMIT_PER_MINUTE: Type.Integer({ minimum: 1, default: 120 }),
   LEVELHEAD_MAX_BODY_BYTES: Type.Integer({ minimum: 1024, default: 256 * 1024 }),
+  VOICE_STREAM_URL: Type.String({ minLength: 1, default: 'ws://127.0.0.1:8092' }),
+  VOICE_STREAM_TOKEN: Type.Optional(Type.String({ pattern: '^[A-Za-z0-9_-]{16,}$' })),
   // A showcase instance runs on a synthetic résumé and refuses to keep anyone's real material.
   LEVELHEAD_DEMO_MODE: Type.Boolean({ default: false }),
   LEVELHEAD_PREVIEW_MODE: Type.Boolean({ default: false }),

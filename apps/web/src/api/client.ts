@@ -96,6 +96,11 @@ export type Analytics = Json<'/analytics', 'get'>
 export type ScreenSimulation = Json<'/mirror', 'post'>
 
 export const api = {
+  voiceTicket: (id: string) =>
+    request<Json<'/sessions/{id}/voice-ticket', 'post'>>(
+      `/sessions/${encodeURIComponent(id)}/voice-ticket`,
+      { method: 'POST' },
+    ),
   health: () => request<Json<'/health', 'get'>>('/health'),
 
   hint: (id: string, level: number) =>
@@ -165,6 +170,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+
+  timing: (sessionId: string, action: 'pause' | 'resume') =>
+    request<Json<'/sessions/{id}/timing', 'post'>>(`/sessions/${sessionId}/timing`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+
+  stopSession: (sessionId: string) =>
+    request<Json<'/sessions/{id}/stop', 'post'>>(`/sessions/${sessionId}/stop`, { method: 'POST' }),
 
   sessions: () => request<Json<'/sessions', 'get'>>('/sessions'),
 

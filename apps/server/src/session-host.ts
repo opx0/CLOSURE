@@ -31,6 +31,7 @@ export interface StartSessionInput {
   pressureCeiling: PressureLevel
   rounds: readonly RoundKind[]
   turnsPerRound: number
+  timing?: { answerSeconds: number; turnsPerRound: number }
   drill: boolean
   drillGap?: GapEntry
   transferGap?: GapEntry
@@ -89,6 +90,8 @@ export interface TurnUpdate {
   // Delivery, when the caller measured any. Beside the interview, never inside a finding (§7).
   delivery?: DeliveryReport
   stoppedBy?: SessionResult['stoppedBy']
+  deadlineAt?: string
+  timingPaused?: boolean
 }
 
 export class SessionNotAwaitingAnswer extends Error {
@@ -132,7 +135,18 @@ export class LiveSession {
   readonly #ids: CapturingIds
   readonly #listeners = new Set<TurnListener>()
   #buffer = emptyBuffer()
-  #waiting: ((answer: string) => void) | null = null
+  #waiting: ((answer: string | { kind: 'timeout' | 'stopped' }) => void) | null = null
+  #deadlineAt: string | null = null
+  #timer: ReturnType<typeof setTimeout> | null = null
+  #remainingMs: number | null = null
+  #attemptId: string | null = null
+  #timingWriter:
+    | ((
+        payload:
+          | { change: 'answer_deadline'; attemptId: string; deadlineAt: string }
+          | { change: 'answer_timing_paused'; attemptId: string; remainingMs: number },
+      ) => Promise<void>)
+    | null = null
   #restWaiters: (() => void)[] = []
   #atRest = false
   #outcome: SessionResult | null = null
@@ -147,6 +161,84 @@ export class LiveSession {
 
   get awaitingAnswer(): boolean {
     return this.#waiting !== null
+  }
+
+  get timingPaused(): boolean {
+    return this.#remainingMs !== null
+  }
+
+  #armTimer(ms: number): void {
+    this.#timer = setTimeout(() => {
+      const waiting = this.#waiting
+      if (waiting === null) return
+      this.#waiting = null
+      this.#deadlineAt = null
+      this.#timer = null
+      this.#atRest = false
+      waiting({ kind: 'timeout' })
+    }, ms)
+    this.#timer.unref?.()
+  }
+
+  async #appendTiming(change: 'answer_deadline' | 'answer_timing_paused', value: string | number) {
+    const attemptId = this.#attemptId
+    if (!attemptId || !this.#timingWriter) throw new Error('No active timed question')
+    if (change === 'answer_deadline')
+      await this.#timingWriter({ change, attemptId, deadlineAt: value as string })
+    else await this.#timingWriter({ change, attemptId, remainingMs: value as number })
+  }
+
+  async pauseTiming(): Promise<number> {
+    if (!this.awaitingAnswer || this.#deadlineAt === null || this.#remainingMs !== null)
+      throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
+    const remaining = Math.max(0, Date.parse(this.#deadlineAt) - Date.parse(this.#deps.clock.now()))
+    if (remaining === 0) throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
+    const deadlineAt = this.#deadlineAt
+    if (this.#timer !== null) clearTimeout(this.#timer)
+    this.#timer = null
+    this.#deadlineAt = null
+    this.#remainingMs = remaining
+    try {
+      await this.#appendTiming('answer_timing_paused', remaining)
+    } catch (error) {
+      this.#remainingMs = null
+      this.#deadlineAt = deadlineAt
+      this.#armTimer(remaining)
+      throw error
+    }
+    return remaining
+  }
+
+  async resumeTiming(): Promise<string> {
+    if (!this.awaitingAnswer || this.#remainingMs === null)
+      throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
+    const remaining = this.#remainingMs
+    const deadlineAt = new Date(Date.parse(this.#deps.clock.now()) + remaining).toISOString()
+    this.#remainingMs = null
+    this.#deadlineAt = deadlineAt
+    try {
+      await this.#appendTiming('answer_deadline', deadlineAt)
+    } catch (error) {
+      this.#remainingMs = remaining
+      this.#deadlineAt = null
+      throw error
+    }
+    this.#armTimer(remaining)
+    return deadlineAt
+  }
+
+  async stop(): Promise<TurnUpdate> {
+    const waiting = this.#waiting
+    if (waiting === null) throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
+    if (this.#timer !== null) clearTimeout(this.#timer)
+    this.#timer = null
+    this.#waiting = null
+    this.#deadlineAt = null
+    this.#remainingMs = null
+    this.#atRest = false
+    waiting({ kind: 'stopped' })
+    await this.#rested()
+    return this.#drain()
   }
 
   // A stream is a view of progress, never the record of it (STACK §12): every update pushed here
@@ -167,6 +259,7 @@ export class LiveSession {
       pressureCeiling: this.#input.pressureCeiling,
       rounds: this.#input.rounds,
       turnsPerRound: this.#input.turnsPerRound,
+      ...(this.#input.timing === undefined ? {} : { timing: this.#input.timing }),
       drill: this.#input.drill,
       ...(this.#input.transferGap === undefined ? {} : { transferGap: this.#input.transferGap }),
       ...(this.#input.transferVariant === undefined
@@ -208,11 +301,20 @@ export class LiveSession {
 
   async submit(answer: string): Promise<TurnUpdate> {
     const waiting = this.#waiting
-    if (waiting === null) throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
+    if (waiting === null || this.timingPaused)
+      throw new SessionNotAwaitingAnswer(this.#ids.sessionId ?? 'unknown')
     this.#waiting = null
+    if (this.#timer !== null) clearTimeout(this.#timer)
+    this.#timer = null
     this.#hint = null
     this.#atRest = false
-    waiting(answer)
+    waiting(
+      this.#deadlineAt !== null &&
+        Date.parse(this.#deps.clock.now()) >= Date.parse(this.#deadlineAt)
+        ? { kind: 'timeout' }
+        : answer,
+    )
+    this.#deadlineAt = null
     await this.#rested()
     return this.#drain()
   }
@@ -224,10 +326,14 @@ export class LiveSession {
   #io(): SessionIo {
     const buffer = () => this.#buffer
     return {
+      bindTimingWriter: (writer) => {
+        this.#timingWriter = writer
+      },
       round: (kind, index, total, brief) => {
         buffer().round = { kind, index, total, ...(brief === undefined ? {} : { brief }) }
       },
       question: (text, meta) => {
+        this.#attemptId = meta.attemptId
         this.#hint = meta.hint ?? null
         const { topic, claim, artifact } = meta
         buffer().question = {
@@ -244,9 +350,11 @@ export class LiveSession {
           ...(artifact === undefined ? {} : { artifact: shown(artifact) }),
         }
       },
-      answer: () =>
-        new Promise<string>((resolve) => {
+      answer: (deadlineAt) =>
+        new Promise<string | { kind: 'timeout' | 'stopped' }>((resolve) => {
           this.#waiting = resolve
+          this.#deadlineAt = deadlineAt ?? null
+          if (deadlineAt !== undefined) this.#armTimer(this.#input.timing!.answerSeconds * 1000)
           this.#rest()
         }),
       findings: (findings, quotes) => {
@@ -295,6 +403,8 @@ export class LiveSession {
       quotes: [...buffer.quotes].map(([evidenceId, quoted]) => ({ evidenceId, quoted })),
       notices: buffer.notices,
       ...(this.#outcome === null ? {} : { stoppedBy: this.#outcome.stoppedBy }),
+      ...(this.#deadlineAt === null ? {} : { deadlineAt: this.#deadlineAt }),
+      ...(this.timingPaused ? { timingPaused: true } : {}),
     }
     for (const listener of this.#listeners) listener(update)
     return update

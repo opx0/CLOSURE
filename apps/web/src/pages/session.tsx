@@ -8,6 +8,7 @@ import { EvidenceProvider, Highlighted, useEvidence } from '../components/eviden
 import { FindingCard } from '../components/finding-card.tsx'
 import { ClaimChip, FilePanel, TopicChip } from '../components/question.tsx'
 import { Recorder } from '../components/recorder.tsx'
+import { LiveRecorder } from '../components/live-recorder.tsx'
 import { Button, Empty, Failed, Loading, Panel, Quiet, Tag } from '../components/primitives.tsx'
 import { JourneyIcon, JourneyLink, PageIntro, PracticeFlow } from '../components/journey.tsx'
 import { useClaimSet, usePreparation } from '../lib/claim-set.ts'
@@ -29,7 +30,7 @@ import {
   type TopicSummary,
 } from '../lib/catalog.ts'
 import { words } from '../lib/format.ts'
-import { speak, type SpokenAnswer } from '../lib/voice.ts'
+import { cancelSpeech, speak, type SpokenAnswer } from '../lib/voice.ts'
 
 type Question = NonNullable<TurnUpdate['question']>
 type RoundInfo = NonNullable<TurnUpdate['round']>
@@ -57,6 +58,7 @@ const STOPPED: Record<string, string> = {
   end_topic: 'the interviewer ran out of new ground to cover',
   ceiling: 'a cost or model-call ceiling was reached, so it stopped rather than degrade',
   evaluator_failure: 'the evaluator failed, so it stopped rather than guess',
+  timeout: 'answer time expired; the unanswered question was saved without a judgment',
   practice_outcome_rejected:
     'an invalid or conflicting practice outcome was rejected; earlier gap progress was preserved',
 }
@@ -79,6 +81,8 @@ interface Room {
   pressure: number
   ceiling: number
   closedBy: string | null
+  deadlineAt?: string | undefined
+  timingPaused?: boolean
 }
 
 interface Opening {
@@ -93,7 +97,11 @@ function absorb(room: Room, update: TurnUpdate): Room {
     mode: room.mode,
     exchanges:
       asked === undefined
-        ? room.exchanges
+        ? update.stoppedBy === 'timeout'
+          ? room.exchanges.map((exchange, index) =>
+              index === room.exchanges.length - 1 ? { ...exchange, answer: null } : exchange,
+            )
+          : room.exchanges
         : [
             ...room.exchanges,
             {
@@ -110,6 +118,8 @@ function absorb(room: Room, update: TurnUpdate): Room {
     pressure: asked?.pressureLevel ?? room.pressure,
     ceiling: room.ceiling,
     closedBy: update.status === 'closed' ? (update.stoppedBy ?? 'closed') : room.closedBy,
+    deadlineAt: update.deadlineAt,
+    timingPaused: update.timingPaused ?? false,
   }
 }
 
@@ -124,6 +134,8 @@ function opened({ update, ceiling, mode }: Opening): Room {
     pressure: 0,
     ceiling,
     closedBy: null,
+    deadlineAt: update.deadlineAt,
+    timingPaused: update.timingPaused ?? false,
   }
   return absorb(empty, update)
 }
@@ -222,6 +234,8 @@ async function restore(sessionId: string, topics: readonly TopicSummary[]): Prom
     round,
     pressure: view.pressureLevel,
     ceiling: view.session?.pressureCeiling ?? 3,
+    deadlineAt: view.deadlineAt,
+    timingPaused: view.timingPaused ?? false,
     closedBy: view.state === 'closed' ? (view.closed?.reason ?? 'closed') : null,
   }
 }
@@ -377,6 +391,12 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       ? requestedTurns
       : 4,
   )
+  const timed = params.get('timed') === 'true'
+  const requestedSeconds = Number(params.get('answerSeconds'))
+  const answerSeconds =
+    Number.isInteger(requestedSeconds) && requestedSeconds >= 10 && requestedSeconds <= 900
+      ? requestedSeconds
+      : 90
 
   const snapshots = useQuery({ queryKey: ['snapshots'], queryFn: api.snapshots })
   const claimSet = useClaimSet()
@@ -458,7 +478,8 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       mode,
       pressureCeiling: ceiling,
       turnsPerRound: turns,
-      drill: !params.has('turns'),
+      drill: !timed && !params.has('turns'),
+      ...(timed && mode === 'simulation' ? { timedMock: { answerSeconds } } : {}),
       ...(asks('claim') && selectedClaimIds !== undefined && selectedClaimIds.length > 0
         ? { claimIds: selectedClaimIds }
         : {}),
@@ -728,6 +749,28 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
                   className={`${INPUT} w-24`}
                 />
               </Field>
+              {mode === 'simulation' && gapId === null && (
+                <Field label="Timed mock">
+                  <input
+                    type="checkbox"
+                    checked={timed}
+                    onChange={(event) => updateSetup('timed', String(event.target.checked))}
+                  />
+                  <span className="ml-2">Limit each answer</span>
+                </Field>
+              )}
+              {timed && mode === 'simulation' && (
+                <Field label="Seconds per answer (10–900)">
+                  <input
+                    type="number"
+                    min={10}
+                    max={900}
+                    value={answerSeconds}
+                    onChange={(event) => updateSetup('answerSeconds', event.target.value)}
+                    className={`${INPUT} w-24`}
+                  />
+                </Field>
+              )}
             </div>
           </details>
         </div>
@@ -756,7 +799,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
           <Quiet>
             {rounds.length === 0
               ? 'Pick at least one round.'
-              : `${role.label} · ${LEVEL_LABEL[level]} · ${turns} questions per round${params.has('turns') ? '' : ', and one drill if an answer opens a gap'}`}
+              : `${role.label} · ${LEVEL_LABEL[level]} · ${turns} questions per round${timed && mode === 'simulation' ? ` · ${answerSeconds}s per answer` : params.has('turns') ? '' : ', and one drill if an answer opens a gap'}`}
           </Quiet>
         </div>
         {start.isError && <StartFailed error={start.error} />}
@@ -907,6 +950,7 @@ function InterviewRoom({
   const [spoken, setSpoken] = useState<SpokenAnswer | null>(null)
   const [voice, setVoice] = useState(false)
   const [delivery, setDelivery] = useState<Record<string, number | string> | null>(null)
+  const [now, setNow] = useState(Date.now())
   const answerBox = useRef<HTMLTextAreaElement>(null)
 
   const restored = useQuery({
@@ -918,14 +962,54 @@ function InterviewRoom({
   useEffect(() => {
     if (room === null && restored.data !== undefined) setRoom(restored.data)
   }, [room, restored.data])
+  useEffect(() => () => cancelSpeech(), [sessionId])
+  useEffect(() => {
+    if (room?.deadlineAt === undefined || room.closedBy !== null) return
+    let checking = false
+    const interval = setInterval(() => {
+      setNow(Date.now())
+      if (Date.now() < Date.parse(room.deadlineAt!) || checking) return
+      checking = true
+      void api
+        .session(sessionId)
+        .then(async (view) => {
+          if (view.availability === 'closed')
+            setRoom(await restore(sessionId, catalog.data?.topics ?? []))
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          checking = false
+        })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [room?.deadlineAt, room?.closedBy, sessionId, catalog.data?.topics])
 
   const reply = useMutation({
     mutationFn: (text: string) => api.answer(sessionId, text),
     onSuccess: (update) => {
       setRoom((current) => (current === null ? current : absorb(current, update)))
       if (voice && update.question !== undefined) void speak(update.question.text).catch(() => {})
+      else cancelSpeech()
       void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'topics' })
     },
+  })
+  const timing = useMutation({
+    mutationFn: (action: 'pause' | 'resume') => api.timing(sessionId, action),
+    onSuccess: (update) =>
+      setRoom((current) =>
+        current === null
+          ? null
+          : {
+              ...current,
+              timingPaused: update.paused,
+              deadlineAt: update.deadlineAt,
+            },
+      ),
+  })
+  const stop = useMutation({
+    mutationFn: () => api.stopSession(sessionId),
+    onSuccess: (update) =>
+      setRoom((current) => (current === null ? null : absorb(current, update))),
   })
 
   // Delivery is recorded against the attempt the answer belonged to, after the turn is judged, and
@@ -945,7 +1029,7 @@ function InterviewRoom({
   }
 
   const send = () => {
-    if (answer.trim() === '' || room === null || reply.isPending) return
+    if (answer.trim() === '' || room === null || room.timingPaused || reply.isPending) return
     const attemptId = room.exchanges.at(-1)?.question.attemptId
     const heard = spoken
     setRoom({
@@ -955,8 +1039,9 @@ function InterviewRoom({
       ),
     })
     reply.mutate(answer, {
-      onSuccess: () => {
-        if (attemptId !== undefined && heard !== null) void recordDelivery(attemptId, heard)
+      onSuccess: (update) => {
+        if (attemptId !== undefined && heard !== null && update.stoppedBy !== 'timeout')
+          void recordDelivery(attemptId, heard)
         setAnswer('')
         setSpoken(null)
         answerBox.current?.focus()
@@ -1042,12 +1127,37 @@ function InterviewRoom({
             <p className="text-sm font-medium">
               {!live ? 'Interview complete' : reply.isPending ? 'Reading your answer' : 'Your turn'}
             </p>
+            {live && room.deadlineAt !== undefined && (
+              <p className="mt-1 text-xs text-quiet" role="timer">
+                {now >= Date.parse(room.deadlineAt)
+                  ? 'Time expired — finishing the question'
+                  : `${Math.ceil((Date.parse(room.deadlineAt) - now) / 1000)} seconds left for this answer`}
+              </p>
+            )}
             <p className="text-xs text-quiet">
               {!live
                 ? 'The transcript and findings stay together.'
                 : 'Text and recorded answers use the same interview.'}
             </p>
+            {live && room.timingPaused && (
+              <p className="mt-1 text-xs text-quiet">Timed mock paused</p>
+            )}
           </div>
+          {live && (room.deadlineAt !== undefined || room.timingPaused) && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => timing.mutate(room.timingPaused ? 'resume' : 'pause')}
+                disabled={timing.isPending || reply.isPending}
+              >
+                {room.timingPaused ? 'Resume timer' : 'Pause timer'}
+              </Button>
+              <Button onClick={() => stop.mutate()} disabled={stop.isPending || reply.isPending}>
+                Stop mock
+              </Button>
+            </div>
+          )}
+          {timing.isError && <Failed error={timing.error} />}
+          {stop.isError && <Failed error={stop.error} />}
           <PressureLadder level={room.pressure} ceiling={room.ceiling} />
         </div>
         <div className="conversation-layout">
@@ -1116,7 +1226,11 @@ function InterviewRoom({
                     className="ring-focus w-full rounded-xl border border-edge bg-ink-2 p-3.5 text-sm leading-relaxed text-body outline-none placeholder:text-quiet/60 focus:border-accent/50"
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button tone="primary" onClick={send} disabled={answer.trim() === ''}>
+                    <Button
+                      tone="primary"
+                      onClick={send}
+                      disabled={answer.trim() === '' || Boolean(room.timingPaused)}
+                    >
                       Send answer
                     </Button>
                     <span className="text-[12px] text-quiet">Ctrl + Enter sends</span>
@@ -1124,13 +1238,21 @@ function InterviewRoom({
                       <input
                         type="checkbox"
                         checked={voice}
-                        onChange={(event) => setVoice(event.target.checked)}
+                        onChange={(event) => {
+                          setVoice(event.target.checked)
+                          if (!event.target.checked) cancelSpeech()
+                        }}
                       />
                       read questions aloud and let me answer by voice
                     </label>
                   </div>
                   {voice && (
-                    <div className="mt-2">
+                    <div className="mt-2 space-y-3">
+                      <LiveRecorder
+                        key={room.exchanges.at(-1)?.question.attemptId ?? sessionId}
+                        sessionId={sessionId}
+                        onAnswer={(text) => setAnswer(text)}
+                      />
                       <Recorder
                         onAnswer={(heard) => {
                           setSpoken(heard)

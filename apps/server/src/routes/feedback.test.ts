@@ -177,6 +177,36 @@ test('answer corrections are versioned, retry-safe and preserve original evidenc
   }
 })
 
+test('a corrected answer without an original finding still needs reassessment', async () => {
+  const { app, store } = await testApi({
+    questions: ['Explain the queue.'],
+    scripted: [EXTRACTION, judged('This quote does not occur in the answer.')],
+  })
+  try {
+    const { start } = await interviewed(app)
+    const view = replay(await store.read(start.sessionId))
+    expect(view.findings).toHaveLength(0)
+    const attemptId = view.transcript.find((turn) => turn.role === 'candidate')!.attemptId
+    const response = await app.inject({
+      method: 'POST',
+      url: `/sessions/${start.sessionId}/corrections`,
+      payload: {
+        requestId: 'empty-finding-correction',
+        attemptId,
+        previousRevision: 1,
+        text: 'The recognizer omitted my answer about lease recovery.',
+        reason: 'The transcript was incomplete.',
+      },
+    })
+    expect(response.statusCode).toBe(200)
+    const audit = (await app.inject(`/sessions/${start.sessionId}/feedback`)).json()
+    expect(audit.supersededFindingIds).toEqual([])
+    expect(audit.pendingReassessment).toBe(true)
+  } finally {
+    await app.close()
+  }
+})
+
 test('active simulations cannot expose debriefs or accept post-interview corrections', async () => {
   const { app } = await testApi({ questions: ['Explain indexes.'] })
   try {

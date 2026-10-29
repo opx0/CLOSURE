@@ -69,6 +69,8 @@ export interface SessionView {
   readonly invocations: readonly InvocationRecord[]
   readonly totals: { readonly costUsd: number; readonly tokens: number }
   readonly closed: { readonly reason: string } | null
+  readonly deadlineAt?: string
+  readonly timingPaused?: boolean
 }
 
 function unhandled(value: never, what: string): never {
@@ -105,6 +107,8 @@ export function replay(events: readonly AnyEvent[]): SessionView {
   let state: SessionState = 'selecting'
   let pressureLevel = 0
   let closed: { reason: string } | null = null
+  let deadlineAt: string | undefined
+  let timingPaused = false
 
   for (const [position, event] of events.entries()) {
     // Gapless from 0 — a hole means a lost event or an edited log, not a session that happened this way.
@@ -157,6 +161,8 @@ export function replay(events: readonly AnyEvent[]): SessionView {
       }
 
       case 'answer':
+        deadlineAt = undefined
+        timingPaused = false
         revisions.set(event.payload.attemptId, 1)
         sources.set(event.payload.sourceId, event.payload.text)
         transcript.push({
@@ -322,6 +328,26 @@ export function replay(events: readonly AnyEvent[]): SessionView {
             if (change.briefInvocation !== undefined) invocations.push(change.briefInvocation)
             break
 
+          case 'answer_timed_out':
+            // The question remains visible without an answer, finding, or invented score.
+            deadlineAt = undefined
+            break
+
+          case 'answer_deadline':
+            deadlineAt = change.deadlineAt
+            timingPaused = false
+            break
+
+          case 'answer_timing_paused':
+            deadlineAt = undefined
+            timingPaused = true
+            break
+
+          case 'answer_stopped':
+            deadlineAt = undefined
+            timingPaused = false
+            break
+
           case 'snapshot_pinned':
             snapshot = change.snapshot
             for (const artifact of change.artifacts) artifacts.set(artifact.id, artifact)
@@ -349,6 +375,8 @@ export function replay(events: readonly AnyEvent[]): SessionView {
             break
 
           case 'session_closed':
+            deadlineAt = undefined
+            timingPaused = false
             closed = { reason: change.reason }
             state = 'closed'
             break
@@ -409,6 +437,8 @@ export function replay(events: readonly AnyEvent[]): SessionView {
     invocations,
     totals,
     closed,
+    ...(deadlineAt === undefined ? {} : { deadlineAt }),
+    ...(timingPaused ? { timingPaused } : {}),
   }
 }
 

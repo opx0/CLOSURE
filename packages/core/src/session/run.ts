@@ -73,6 +73,13 @@ export type Subject =
   | { kind: 'artifact'; id: string; artifact: ArtifactContext; claim: Claim | null }
 
 export interface SessionIo {
+  bindTimingWriter?(
+    write: (
+      payload:
+        | { change: 'answer_deadline'; attemptId: string; deadlineAt: string }
+        | { change: 'answer_timing_paused'; attemptId: string; remainingMs: number },
+    ) => Promise<void>,
+  ): void
   round(kind: RoundKind, index: number, total: number, brief?: string): void
   question(
     text: string,
@@ -90,7 +97,7 @@ export interface SessionIo {
       artifact?: ArtifactContext
     },
   ): void
-  answer(): Promise<string>
+  answer(deadlineAt?: string): Promise<string | { kind: 'timeout' | 'stopped' }>
   findings(findings: readonly Finding[], quotes: ReadonlyMap<string, string>): void
   // Only called in coach mode; simulation withholds feedback until the section ends (§4.9).
   confirmRetry(): Promise<boolean>
@@ -127,6 +134,7 @@ export interface RunSessionInput {
   pressureCeiling: PressureLevel
   rounds: readonly RoundKind[]
   turnsPerRound: number
+  timing?: { answerSeconds: number; turnsPerRound: number }
   drill: boolean
   transferGap?: GapEntry
   transferVariant?: TransferVariant
@@ -138,7 +146,8 @@ export interface RunSessionInput {
   deps: SessionDeps
 }
 
-type SessionStopReason = 'turns' | 'end_topic' | 'ceiling' | 'evaluator_failure'
+type SessionStopReason =
+  'turns' | 'end_topic' | 'ceiling' | 'evaluator_failure' | 'timeout' | 'stopped'
 export type SessionResult = { sessionId: string; view: SessionView } & (
   | { stoppedBy: SessionStopReason }
   | { stoppedBy: 'practice_outcome_rejected'; failure: PracticeOutcomeFailure }
@@ -257,6 +266,9 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
   const { deps } = input
   const sessionId = deps.ids.next('ses')
   const log = await SessionLog.open(deps, sessionId)
+  deps.io.bindTimingWriter?.(async (payload) => {
+    await log.append('state_change', payload)
+  })
   const ceilings = new CeilingLedger(input.ceilings)
 
   const ceiling = Math.min(
@@ -293,6 +305,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     ...(roleId === undefined ? {} : { roleId }),
     ...(asksTopics ? { topicIds: plannedTopics.flat().map((topic) => topic.id) } : {}),
     rounds: [...input.rounds],
+    ...(input.timing === undefined ? {} : { timing: input.timing }),
     ...(input.pinned === undefined ? {} : { snapshotId: input.pinned.snapshot.id }),
     ...(input.story === undefined ? {} : { story: input.story }),
     ...((input.drillGap ?? input.transferGap) === undefined
@@ -548,7 +561,30 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     })
     transcript.push({ role: 'interviewer', text })
 
-    const answerText = await deps.io.answer()
+    const deadlineAt =
+      input.timing === undefined
+        ? undefined
+        : new Date(Date.parse(deps.clock.now()) + input.timing.answerSeconds * 1000).toISOString()
+    if (deadlineAt !== undefined)
+      await log.append('state_change', { change: 'answer_deadline', attemptId, deadlineAt })
+    const answerText = await deps.io.answer(deadlineAt)
+    if (typeof answerText !== 'string') {
+      if (answerText.kind === 'timeout') {
+        await log.append('state_change', {
+          change: 'answer_timed_out',
+          attemptId,
+          deadlineAt: deadlineAt!,
+        })
+        deps.io.notice(
+          'Answer time expired. The unanswered question is preserved without a judgment.',
+        )
+      } else {
+        await log.append('state_change', { change: 'answer_stopped', attemptId })
+        deps.io.notice('Interview stopped. The unanswered question remains ungraded.')
+      }
+      outcome.stoppedBy = answerText.kind
+      return null
+    }
     answered = true
     const sourceId = `answer:${attemptId}`
     await log.append('state_change', {
@@ -947,7 +983,11 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
           if (batch.findings.length > 0) deps.io.findings(batch.findings, quotes)
         }
       }
-      if (outcome.stoppedBy === 'evaluator_failure' || rejection !== undefined) break
+      if (
+        ['evaluator_failure', 'timeout', 'stopped'].includes(outcome.stoppedBy) ||
+        rejection !== undefined
+      )
+        break
     }
   } catch (error) {
     if (!(error instanceof CeilingBreach)) throw error

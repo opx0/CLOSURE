@@ -677,6 +677,10 @@ export interface paths {
                                     roleId?: string;
                                     topicIds?: string[];
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                    timing?: {
+                                        answerSeconds: number;
+                                        turnsPerRound: number;
+                                    };
                                     snapshotId?: string;
                                     practiceGapId?: string;
                                     practiceVariantId?: string;
@@ -726,6 +730,9 @@ export interface paths {
                         pressureCeiling?: number;
                         rounds?: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
                         turnsPerRound?: number;
+                        timedMock?: {
+                            answerSeconds?: number;
+                        };
                         drill?: boolean;
                     };
                 };
@@ -866,7 +873,10 @@ export interface paths {
                                 quoted: string;
                             }[];
                             notices: string[];
-                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "practice_outcome_rejected";
+                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "timeout" | "stopped" | "practice_outcome_rejected";
+                            /** Format: date-time */
+                            deadlineAt?: string;
+                            timingPaused?: boolean;
                         };
                     };
                 };
@@ -879,6 +889,247 @@ export interface paths {
                         "application/json": {
                             error: string;
                             detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/timing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        action: "pause" | "resume";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            paused: boolean;
+                            deadlineAt?: string;
+                            remainingMs?: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sessionId: string;
+                            status: "awaiting_answer" | "closed";
+                            round?: {
+                                kind: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
+                                index: number;
+                                total: number;
+                                brief?: string;
+                            };
+                            question?: {
+                                attemptId: string;
+                                text: string;
+                                turn: number;
+                                action: "PROBE_MECHANISM" | "TEST_FAILURE_MODE" | "PROBE_TRADE_OFF" | "CHANGE_CONSTRAINT" | "REQUEST_EVIDENCE" | "DRILL" | "TRANSFER_TEST" | "INTERRUPT" | "FALSE_PREMISE" | "SUSTAINED_CHALLENGE" | "CONSTRAINT_SHOCK" | "TERSE_FOLLOW_UP" | "APPEAL_TO_AUTHORITY" | "END_TOPIC";
+                                pressureLevel: number;
+                                round: "project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design";
+                                topic?: {
+                                    id: string;
+                                    area: "os" | "dbms" | "networks" | "oop" | "dsa" | "system_design" | "web" | "backend" | "ml" | "data" | "devops" | "behavioral";
+                                    title: string;
+                                };
+                                claim?: {
+                                    id: string;
+                                    assertion: string;
+                                };
+                                artifact?: {
+                                    path: string;
+                                    symbol?: string;
+                                    startLine?: number;
+                                    endLine?: number;
+                                    code: string;
+                                };
+                            };
+                            findings: ({
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "claim";
+                                claimId: string;
+                                verdict: "supported" | "partially_supported" | "unsupported_by_available_evidence" | "contradicted";
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "claim_abstained";
+                                claimId: string;
+                                abstention: "insufficient_evidence" | "not_verifiable";
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "composure";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                signals: ("folding" | "fabricating" | "holding_ground" | "honest_yielding" | "coherence_after_interruption" | "escalation")[];
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                            } | {
+                                id: string;
+                                attemptId: string;
+                                rubric: {
+                                    id: string;
+                                    version: number;
+                                };
+                                level: "junior" | "mid" | "senior" | "staff";
+                                rationale: string;
+                                confidence: number;
+                                modelVersion: string;
+                                promptVersion: string;
+                                transcriptSpanIds: string[];
+                                evidenceIds: string[];
+                                /** @enum {string} */
+                                kind: "competency_abstained";
+                                competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                abstention: "insufficient_evidence" | "not_verifiable";
+                            })[];
+                            quotes: {
+                                evidenceId: string;
+                                quoted: string;
+                            }[];
+                            notices: string[];
+                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "timeout" | "stopped" | "practice_outcome_rejected";
+                            /** Format: date-time */
+                            deadlineAt?: string;
+                            timingPaused?: boolean;
                         };
                     };
                 };
@@ -1121,7 +1372,10 @@ export interface paths {
                                 quoted: string;
                             }[];
                             notices: string[];
-                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "practice_outcome_rejected";
+                            stoppedBy?: "turns" | "end_topic" | "ceiling" | "evaluator_failure" | "timeout" | "stopped" | "practice_outcome_rejected";
+                            /** Format: date-time */
+                            deadlineAt?: string;
+                            timingPaused?: boolean;
                         };
                     };
                 };
@@ -1265,6 +1519,10 @@ export interface paths {
                                 roleId?: string;
                                 topicIds?: string[];
                                 rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                timing?: {
+                                    answerSeconds: number;
+                                    turnsPerRound: number;
+                                };
                                 snapshotId?: string;
                                 practiceGapId?: string;
                                 practiceVariantId?: string;
@@ -1472,6 +1730,9 @@ export interface paths {
                             closed: {
                                 reason: string;
                             } | null;
+                            /** Format: date-time */
+                            deadlineAt?: string;
+                            timingPaused?: boolean;
                         };
                     };
                 };
@@ -1861,6 +2122,10 @@ export interface paths {
                                     roleId?: string;
                                     topicIds?: string[];
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                    timing?: {
+                                        answerSeconds: number;
+                                        turnsPerRound: number;
+                                    };
                                     snapshotId?: string;
                                     practiceGapId?: string;
                                     practiceVariantId?: string;
@@ -1877,6 +2142,27 @@ export interface paths {
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
+                            } | {
+                                /** @enum {string} */
+                                change: "answer_deadline";
+                                attemptId: string;
+                                /** Format: date-time */
+                                deadlineAt: string;
+                            } | {
+                                /** @enum {string} */
+                                change: "answer_timed_out";
+                                attemptId: string;
+                                /** Format: date-time */
+                                deadlineAt: string;
+                            } | {
+                                /** @enum {string} */
+                                change: "answer_stopped";
+                                attemptId: string;
+                            } | {
+                                /** @enum {string} */
+                                change: "answer_timing_paused";
+                                attemptId: string;
+                                remainingMs: number;
                             } | {
                                 /** @enum {string} */
                                 change: "session_state";
@@ -2220,6 +2506,83 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{id}/voice-ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ticket: string;
+                            attemptId: string;
+                            expiresAt: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4401,6 +4764,10 @@ export interface paths {
                                     roleId?: string;
                                     topicIds?: string[];
                                     rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                    timing?: {
+                                        answerSeconds: number;
+                                        turnsPerRound: number;
+                                    };
                                     snapshotId?: string;
                                     practiceGapId?: string;
                                     practiceVariantId?: string;
@@ -4756,6 +5123,10 @@ export interface paths {
                                             roleId?: string;
                                             topicIds?: string[];
                                             rounds: ("project_deep_dive" | "design_extension" | "behavioral" | "code_walkthrough" | "cs_fundamentals" | "problem_solving" | "role_knowledge" | "system_design")[];
+                                            timing?: {
+                                                answerSeconds: number;
+                                                turnsPerRound: number;
+                                            };
                                             snapshotId?: string;
                                             practiceGapId?: string;
                                             practiceVariantId?: string;
@@ -4772,6 +5143,27 @@ export interface paths {
                                             /** Format: date-time */
                                             startedAt: string;
                                         };
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "answer_deadline";
+                                        attemptId: string;
+                                        /** Format: date-time */
+                                        deadlineAt: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "answer_timed_out";
+                                        attemptId: string;
+                                        /** Format: date-time */
+                                        deadlineAt: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "answer_stopped";
+                                        attemptId: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        change: "answer_timing_paused";
+                                        attemptId: string;
+                                        remainingMs: number;
                                     } | {
                                         /** @enum {string} */
                                         change: "session_state";

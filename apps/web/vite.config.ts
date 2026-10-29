@@ -11,7 +11,7 @@ export default defineConfig({
     proxy: {
       '/claims': 'http://localhost:3001',
       '/resume': 'http://localhost:3001',
-      '/sessions': 'http://localhost:3001',
+      '/sessions': { target: 'http://localhost:3001', ws: true },
       '/ledger': 'http://localhost:3001',
       '/schedule': 'http://localhost:3001',
       '/review': 'http://localhost:3001',

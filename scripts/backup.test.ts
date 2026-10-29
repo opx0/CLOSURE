@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { backupJsonl, restoreJsonl } from './backup.ts'
 import { JsonlEventStore } from '../apps/cli/src/store/jsonl.ts'
-import { EVENT_SCHEMA_VERSION } from '@levelhead/contracts'
+import { EVENT_SCHEMA_VERSION, type AnyEvent } from '@levelhead/contracts'
+import { citationAvailability, replay } from '@levelhead/core'
 
 test('backup restores readable owner events without changing originals or existing destinations', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'levelhead-backup-'))
@@ -93,9 +94,173 @@ test('v2 backup restores worker plans and nudge claims while v1 remains readable
     expect(await backupJsonl(events, exports, legacy)).toBe(1)
     expect(await restoreJsonl(legacy, join(dir, 'legacy-restored'))).toBe(1)
     expect((await readdir(join(dir, 'legacy-restored'))).sort()).toEqual(['events', 'exports'])
+    await mkdir(join(legacy, 'plans'))
+    await expect(restoreJsonl(legacy, join(dir, 'legacy-unlisted'))).rejects.toThrow(
+      'unexpected payload root',
+    )
+    expect(await readdir(dir)).not.toContain('legacy-unlisted')
+    await writeFile(join(backup, 'plans/unlisted.jsonl'), '{"unlisted":true}\n')
+    await expect(restoreJsonl(backup, join(dir, 'incomplete'))).rejects.toThrow(
+      'does not cover every payload file',
+    )
+    expect(await readdir(dir)).not.toContain('incomplete')
+    await rm(join(backup, 'plans/unlisted.jsonl'))
     await writeFile(join(backup, 'nudges/claim.jsonl'), 'tampered')
     await expect(restoreJsonl(backup, join(dir, 'tampered'))).rejects.toThrow('checksum')
     expect(await readdir(dir)).not.toContain('tampered')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('v3 backup restores benchmark outputs beside exports without changing the source', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-benchmark-backup-'))
+  const events = join(dir, 'events')
+  const exports = join(dir, 'exports')
+  const plans = join(dir, 'plans')
+  const nudges = join(dir, 'nudges')
+  const benchmarks = join(dir, 'benchmarks')
+  try {
+    for (const path of [events, exports, plans, nudges, benchmarks]) await mkdir(path)
+    await mkdir(join(benchmarks, 'run-1'))
+    const report = '{"synthetic":true,"gates":[]}'
+    await writeFile(join(benchmarks, 'run-1', 'report.json'), report)
+    const backup = join(dir, 'backup')
+    expect(
+      await backupJsonl(
+        events,
+        exports,
+        backup,
+        { plans, nudges, benchmarks },
+        {
+          LEVELHEAD_STORE: 'jsonl',
+          LEVELHEAD_EVENT_DIR: events,
+          DATABASE_URL: 'postgres://user:secret@localhost/db',
+          MODEL_PROVIDER_API_KEY: 'private-model-key',
+        },
+      ),
+    ).toBe(1)
+    const manifest = JSON.parse(await readFile(join(backup, 'manifest.json'), 'utf8')) as {
+      version: number
+      settings: Record<string, string>
+    }
+    expect(manifest.version).toBe(3)
+    expect(manifest.settings).toEqual({ LEVELHEAD_STORE: 'jsonl', LEVELHEAD_EVENT_DIR: events })
+    expect(JSON.stringify(manifest)).not.toContain('secret')
+    expect(JSON.stringify(manifest)).not.toContain('private-model-key')
+    const restored = join(dir, 'restored')
+    expect(await restoreJsonl(backup, restored)).toBe(1)
+    expect(await readFile(join(restored, 'benchmarks/run-1/report.json'), 'utf8')).toBe(report)
+    expect(JSON.parse(await readFile(join(restored, 'recovery-settings.json'), 'utf8'))).toEqual(
+      manifest.settings,
+    )
+    expect(await readFile(join(benchmarks, 'run-1/report.json'), 'utf8')).toBe(report)
+    expect((await readdir(restored)).sort()).toEqual([
+      'benchmarks',
+      'events',
+      'exports',
+      'nudges',
+      'plans',
+      'recovery-settings.json',
+    ])
+    await mkdir(join(backup, 'extra'))
+    await expect(restoreJsonl(backup, join(dir, 'unlisted'))).rejects.toThrow(
+      'unexpected payload root',
+    )
+    expect(await readdir(dir)).not.toContain('unlisted')
+    await rm(join(backup, 'extra'), { recursive: true })
+    manifest.settings.DATABASE_URL = 'postgres://user:secret@localhost/db'
+    await writeFile(join(backup, 'manifest.json'), JSON.stringify(manifest))
+    await expect(restoreJsonl(backup, join(dir, 'secret-settings'))).rejects.toThrow(
+      'Invalid backup settings',
+    )
+    expect(await readdir(dir)).not.toContain('secret-settings')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('an event-only install can be backed up before its first export', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-event-only-'))
+  try {
+    const events = join(dir, 'events')
+    await mkdir(events)
+    await writeFile(join(events, 'local.jsonl'), '{"event":1}\n')
+    const backup = join(dir, 'backup')
+    expect(await backupJsonl(events, join(dir, 'exports'), backup)).toBe(1)
+    const restored = join(dir, 'restored')
+    expect(await restoreJsonl(backup, restored)).toBe(1)
+    expect(await readdir(join(restored, 'exports'))).toEqual([])
+    expect(await readFile(join(restored, 'events/local.jsonl'), 'utf8')).toBe('{"event":1}\n')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a separate restore replays deleted citations and preserves the scheduled plan', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-restore-replay-'))
+  const events = join(dir, 'events')
+  const exports = join(dir, 'exports')
+  const plans = join(dir, 'plans')
+  const nudges = join(dir, 'nudges')
+  const snapshot = {
+    id: 'snap_1',
+    repoPath: '/source/queue',
+    commit: 'a'.repeat(40),
+    pinnedAt: '2026-10-27T00:00:00.000Z',
+    fileCount: 1,
+  }
+  const evidence = {
+    id: 'evidence_1',
+    subject: { kind: 'claim' as const, claimId: 'claim_1' },
+    target: { kind: 'artifact' as const, artifactId: 'artifact_1' },
+    trust: 'repository_observed' as const,
+  }
+  const event = (seq: number, payload: AnyEvent['payload']): AnyEvent =>
+    ({
+      eventId: `evt_${seq}`,
+      sessionId: 'repo',
+      seq,
+      occurredAt: '2026-10-27T00:00:00.000Z',
+      schemaVersion: EVENT_SCHEMA_VERSION,
+      kind: 'state_change',
+      payload,
+    }) as AnyEvent
+  try {
+    for (const path of [events, exports, plans, nudges]) await mkdir(path)
+    const store = new JsonlEventStore(events, 'owner')
+    await store.append(
+      event(0, {
+        change: 'snapshot_pinned',
+        snapshot,
+        artifacts: [{ id: 'artifact_1', snapshotId: 'snap_1', kind: 'file', path: 'src/queue.ts' }],
+        evidence: [evidence],
+      }),
+    )
+    await store.append(
+      event(1, {
+        change: 'snapshot_deleted',
+        tombstone: {
+          snapshotId: 'snap_1',
+          commit: snapshot.commit,
+          contentHash: 'hash',
+          artifactCount: 1,
+          reason: 'candidate_requested',
+          deletedAt: '2026-10-28T00:00:00.000Z',
+        },
+      }),
+    )
+    const schedule = '{"work":[{"dueAt":"2026-11-04T00:00:00.000Z"}],"retrievals":[]}\n'
+    await writeFile(join(plans, 'owner.json'), schedule)
+    const backup = join(dir, 'backup')
+    await backupJsonl(events, exports, backup, { plans, nudges })
+    const restored = join(dir, 'restored')
+    await restoreJsonl(backup, restored)
+    const restoredLog = await new JsonlEventStore(join(restored, 'events'), 'owner').read('repo')
+    expect(restoredLog).toEqual(await store.read('repo'))
+    expect(citationAvailability(evidence, replay(restoredLog))).toBe('snapshot_deleted')
+    expect(await readFile(join(restored, 'plans/owner.json'), 'utf8')).toBe(schedule)
+    expect(await readFile(join(plans, 'owner.json'), 'utf8')).toBe(schedule)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

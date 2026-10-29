@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { silentLogger, type JobQueuePort } from '@levelhead/core'
+import { silentLogger, type Clock, type JobQueuePort } from '@levelhead/core'
 import { buildApp } from '../app.ts'
 import type { Config } from '../config.ts'
 import type { ServerDeps } from '../deps.ts'
@@ -14,6 +14,7 @@ import {
 // Reuses the CLI's fakes — a second set here would let HTTP tests pass on shapes the real model
 // could never return.
 const TEST_CONFIG: Config = {
+  VOICE_STREAM_URL: 'ws://127.0.0.1:8092',
   NODE_ENV: 'test',
   PORT: 0,
   LOG_LEVEL: 'fatal',
@@ -80,12 +81,13 @@ export async function testApi(
     scripted?: readonly unknown[]
     config?: Partial<Config>
     queue?: JobQueuePort
+    clock?: Clock
   } = {},
 ): Promise<TestApi> {
   const store = new MemoryEventStore()
   const deps: ServerDeps = {
     storeFor: () => store,
-    clock: new FixedClock(),
+    clock: input.clock ?? new FixedClock(),
     ids: new SeqIds(),
     conductor: new ScriptedConductor(input.questions ?? []),
     evaluator: new ScriptedEvaluator(input.scripted ?? []),

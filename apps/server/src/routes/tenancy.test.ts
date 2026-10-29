@@ -13,6 +13,7 @@ import {
 import { ANSWER, EXTRACTION, RESUME, judged, ANSWER_QUOTE } from '../testing/harness.ts'
 
 const CONFIG: Config = {
+  VOICE_STREAM_URL: 'ws://127.0.0.1:8092',
   NODE_ENV: 'test',
   PORT: 0,
   LOG_LEVEL: 'fatal',

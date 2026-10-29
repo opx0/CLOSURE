@@ -73,6 +73,13 @@ export const SessionSchema = Type.Object({
   topicIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
   // One element is the ordinary case, not a special one — Simulation can chain rounds like a real loop.
   rounds: Type.Array(RoundKindSchema, { minItems: 1 }),
+  // Present for timed Simulation. Pinned at start so reload/history retains the policy.
+  timing: Type.Optional(
+    Type.Object({
+      answerSeconds: Type.Integer({ minimum: 10, maximum: 900 }),
+      turnsPerRound: Type.Integer({ minimum: 1, maximum: 20 }),
+    }),
+  ),
   snapshotId: Type.Optional(Type.String({ minLength: 1 })),
   practiceGapId: Type.Optional(Type.String({ minLength: 1 })),
   practiceVariantId: Type.Optional(Type.String({ minLength: 1 })),

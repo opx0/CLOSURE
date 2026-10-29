@@ -55,6 +55,17 @@ export const contextPlugin = fp(
       request.correlationId = correlationIdFrom(request.headers[CORRELATION_HEADER])
       reply.header(CORRELATION_HEADER, request.correlationId)
 
+      // Browser WebSockets cannot set Authorization headers. The voice upgrade is authenticated
+      // by a short-lived, one-use ticket in Sec-WebSocket-Protocol at route pre-validation.
+      // Every other path, including ticket issuance, follows normal bearer authentication.
+      if (
+        request.headers.upgrade?.toLowerCase() === 'websocket' &&
+        /^\/sessions\/[A-Za-z0-9][A-Za-z0-9._-]*\/voice$/.test(request.url.split('?')[0] ?? '')
+      ) {
+        request.principal = LOCAL_PRINCIPAL
+        return
+      }
+
       const offered = request.headers.authorization
       const demoOwner =
         options.demoMode && offered?.startsWith('Bearer ') === true

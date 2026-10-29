@@ -2516,6 +2516,25 @@
                                   ]
                                 }
                               },
+                              "timing": {
+                                "type": "object",
+                                "required": [
+                                  "answerSeconds",
+                                  "turnsPerRound"
+                                ],
+                                "properties": {
+                                  "answerSeconds": {
+                                    "minimum": 10,
+                                    "maximum": 900,
+                                    "type": "integer"
+                                  },
+                                  "turnsPerRound": {
+                                    "minimum": 1,
+                                    "maximum": 20,
+                                    "type": "integer"
+                                  }
+                                }
+                              },
                               "snapshotId": {
                                 "minLength": 1,
                                 "type": "string"
@@ -2827,6 +2846,16 @@
                     "minimum": 1,
                     "maximum": 20,
                     "type": "integer"
+                  },
+                  "timedMock": {
+                    "type": "object",
+                    "properties": {
+                      "answerSeconds": {
+                        "minimum": 10,
+                        "maximum": 900,
+                        "type": "integer"
+                      }
+                    }
                   },
                   "drill": {
                     "type": "boolean"
@@ -4105,10 +4134,29 @@
                         {
                           "type": "string",
                           "enum": [
+                            "timeout"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "stopped"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
                             "practice_outcome_rejected"
                           ]
                         }
                       ]
+                    },
+                    "deadlineAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "timingPaused": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -4130,6 +4178,1440 @@
                     },
                     "detail": {
                       "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/timing": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "pause"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "resume"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paused"
+                  ],
+                  "properties": {
+                    "paused": {
+                      "type": "boolean"
+                    },
+                    "deadlineAt": {
+                      "type": "string"
+                    },
+                    "remainingMs": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/stop": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "sessionId",
+                    "status",
+                    "findings",
+                    "quotes",
+                    "notices"
+                  ],
+                  "properties": {
+                    "sessionId": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "awaiting_answer"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "closed"
+                          ]
+                        }
+                      ]
+                    },
+                    "round": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "index",
+                        "total"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "project_deep_dive"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "design_extension"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "behavioral"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "code_walkthrough"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "cs_fundamentals"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "problem_solving"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "role_knowledge"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "system_design"
+                              ]
+                            }
+                          ]
+                        },
+                        "index": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "brief": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "question": {
+                      "type": "object",
+                      "required": [
+                        "attemptId",
+                        "text",
+                        "turn",
+                        "action",
+                        "pressureLevel",
+                        "round"
+                      ],
+                      "properties": {
+                        "attemptId": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "text": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "turn": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "action": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "PROBE_MECHANISM"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "TEST_FAILURE_MODE"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "PROBE_TRADE_OFF"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "CHANGE_CONSTRAINT"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "REQUEST_EVIDENCE"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "DRILL"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "TRANSFER_TEST"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "INTERRUPT"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "FALSE_PREMISE"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "SUSTAINED_CHALLENGE"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "CONSTRAINT_SHOCK"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "TERSE_FOLLOW_UP"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "APPEAL_TO_AUTHORITY"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "END_TOPIC"
+                              ]
+                            }
+                          ]
+                        },
+                        "pressureLevel": {
+                          "minimum": 0,
+                          "maximum": 3,
+                          "type": "integer"
+                        },
+                        "round": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "project_deep_dive"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "design_extension"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "behavioral"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "code_walkthrough"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "cs_fundamentals"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "problem_solving"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "role_knowledge"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "system_design"
+                              ]
+                            }
+                          ]
+                        },
+                        "topic": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "area",
+                            "title"
+                          ],
+                          "properties": {
+                            "id": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "area": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "os"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "dbms"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "networks"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "oop"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "dsa"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "system_design"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "web"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "backend"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "ml"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "data"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "devops"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "behavioral"
+                                  ]
+                                }
+                              ]
+                            },
+                            "title": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "claim": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "assertion"
+                          ],
+                          "properties": {
+                            "id": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "assertion": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "artifact": {
+                          "type": "object",
+                          "required": [
+                            "path",
+                            "code"
+                          ],
+                          "properties": {
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "symbol": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "startLine": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "endLine": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "attemptId",
+                              "rubric",
+                              "level",
+                              "rationale",
+                              "confidence",
+                              "modelVersion",
+                              "promptVersion",
+                              "transcriptSpanIds",
+                              "evidenceIds",
+                              "kind",
+                              "claimId",
+                              "verdict"
+                            ],
+                            "properties": {
+                              "id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "attemptId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "rubric": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "version"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "level": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "junior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mid"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "senior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "staff"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "rationale": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "minimum": 0,
+                                "maximum": 1,
+                                "type": "number"
+                              },
+                              "modelVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "promptVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transcriptSpanIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "evidenceIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "claim"
+                                ]
+                              },
+                              "claimId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "verdict": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "supported"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "partially_supported"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "unsupported_by_available_evidence"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "contradicted"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "attemptId",
+                              "rubric",
+                              "level",
+                              "rationale",
+                              "confidence",
+                              "modelVersion",
+                              "promptVersion",
+                              "transcriptSpanIds",
+                              "evidenceIds",
+                              "kind",
+                              "claimId",
+                              "abstention"
+                            ],
+                            "properties": {
+                              "id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "attemptId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "rubric": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "version"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "level": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "junior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mid"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "senior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "staff"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "rationale": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "minimum": 0,
+                                "maximum": 1,
+                                "type": "number"
+                              },
+                              "modelVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "promptVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transcriptSpanIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "evidenceIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "claim_abstained"
+                                ]
+                              },
+                              "claimId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "abstention": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "insufficient_evidence"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "not_verifiable"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "attemptId",
+                              "rubric",
+                              "level",
+                              "rationale",
+                              "confidence",
+                              "modelVersion",
+                              "promptVersion",
+                              "transcriptSpanIds",
+                              "evidenceIds",
+                              "kind",
+                              "competency",
+                              "signals"
+                            ],
+                            "properties": {
+                              "id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "attemptId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "rubric": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "version"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "level": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "junior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mid"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "senior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "staff"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "rationale": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "minimum": 0,
+                                "maximum": 1,
+                                "type": "number"
+                              },
+                              "modelVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "promptVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transcriptSpanIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "evidenceIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "composure"
+                                ]
+                              },
+                              "competency": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mechanism"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "trade_offs"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "failure_modes"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "composure"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "signals": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "folding"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "fabricating"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "holding_ground"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "honest_yielding"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "coherence_after_interruption"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "escalation"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "attemptId",
+                              "rubric",
+                              "level",
+                              "rationale",
+                              "confidence",
+                              "modelVersion",
+                              "promptVersion",
+                              "transcriptSpanIds",
+                              "evidenceIds",
+                              "kind",
+                              "competency",
+                              "levelMet"
+                            ],
+                            "properties": {
+                              "id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "attemptId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "rubric": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "version"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "level": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "junior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mid"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "senior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "staff"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "rationale": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "minimum": 0,
+                                "maximum": 1,
+                                "type": "number"
+                              },
+                              "modelVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "promptVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transcriptSpanIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "evidenceIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "competency"
+                                ]
+                              },
+                              "competency": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mechanism"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "trade_offs"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "failure_modes"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "composure"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "levelMet": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "junior"
+                                        ]
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "mid"
+                                        ]
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "senior"
+                                        ]
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "staff"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "attemptId",
+                              "rubric",
+                              "level",
+                              "rationale",
+                              "confidence",
+                              "modelVersion",
+                              "promptVersion",
+                              "transcriptSpanIds",
+                              "evidenceIds",
+                              "kind",
+                              "competency",
+                              "abstention"
+                            ],
+                            "properties": {
+                              "id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "attemptId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "rubric": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "version"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "level": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "junior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mid"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "senior"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "staff"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "rationale": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "minimum": 0,
+                                "maximum": 1,
+                                "type": "number"
+                              },
+                              "modelVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "promptVersion": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transcriptSpanIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "evidenceIds": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "competency_abstained"
+                                ]
+                              },
+                              "competency": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "mechanism"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "trade_offs"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "failure_modes"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "composure"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "abstention": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "insufficient_evidence"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "not_verifiable"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "quotes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "evidenceId",
+                          "quoted"
+                        ],
+                        "properties": {
+                          "evidenceId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "quoted": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "stoppedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "turns"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "end_topic"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "ceiling"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "evaluator_failure"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "timeout"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "stopped"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "practice_outcome_rejected"
+                          ]
+                        }
+                      ]
+                    },
+                    "deadlineAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "timingPaused": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -5543,10 +7025,29 @@
                         {
                           "type": "string",
                           "enum": [
+                            "timeout"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "stopped"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
                             "practice_outcome_rejected"
                           ]
                         }
                       ]
+                    },
+                    "deadlineAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "timingPaused": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -5975,6 +7476,25 @@
                                     ]
                                   }
                                 ]
+                              }
+                            },
+                            "timing": {
+                              "type": "object",
+                              "required": [
+                                "answerSeconds",
+                                "turnsPerRound"
+                              ],
+                              "properties": {
+                                "answerSeconds": {
+                                  "minimum": 10,
+                                  "maximum": 900,
+                                  "type": "integer"
+                                },
+                                "turnsPerRound": {
+                                  "minimum": 1,
+                                  "maximum": 20,
+                                  "type": "integer"
+                                }
                               }
                             },
                             "snapshotId": {
@@ -7588,6 +9108,13 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "deadlineAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "timingPaused": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -10199,6 +11726,25 @@
                                           ]
                                         }
                                       },
+                                      "timing": {
+                                        "type": "object",
+                                        "required": [
+                                          "answerSeconds",
+                                          "turnsPerRound"
+                                        ],
+                                        "properties": {
+                                          "answerSeconds": {
+                                            "minimum": 10,
+                                            "maximum": 900,
+                                            "type": "integer"
+                                          },
+                                          "turnsPerRound": {
+                                            "minimum": 1,
+                                            "maximum": 20,
+                                            "type": "integer"
+                                          }
+                                        }
+                                      },
                                       "snapshotId": {
                                         "minLength": 1,
                                         "type": "string"
@@ -10263,6 +11809,97 @@
                                         "type": "string"
                                       }
                                     }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "attemptId",
+                                  "deadlineAt"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "answer_deadline"
+                                    ]
+                                  },
+                                  "attemptId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "deadlineAt": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "attemptId",
+                                  "deadlineAt"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "answer_timed_out"
+                                    ]
+                                  },
+                                  "attemptId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "deadlineAt": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "attemptId"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "answer_stopped"
+                                    ]
+                                  },
+                                  "attemptId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "attemptId",
+                                  "remainingMs"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "answer_timing_paused"
+                                    ]
+                                  },
+                                  "attemptId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "remainingMs": {
+                                    "minimum": 0,
+                                    "type": "integer"
                                   }
                                 }
                               },
@@ -12152,6 +13789,115 @@
         ],
         "responses": {
           "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/voice-ticket": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ticket",
+                    "attemptId",
+                    "expiresAt"
+                  ],
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "attemptId": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -22656,6 +24402,25 @@
                                       ]
                                     }
                                   },
+                                  "timing": {
+                                    "type": "object",
+                                    "required": [
+                                      "answerSeconds",
+                                      "turnsPerRound"
+                                    ],
+                                    "properties": {
+                                      "answerSeconds": {
+                                        "minimum": 10,
+                                        "maximum": 900,
+                                        "type": "integer"
+                                      },
+                                      "turnsPerRound": {
+                                        "minimum": 1,
+                                        "maximum": 20,
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
                                   "snapshotId": {
                                     "minLength": 1,
                                     "type": "string"
@@ -25285,6 +27050,25 @@
                                                     ]
                                                   }
                                                 },
+                                                "timing": {
+                                                  "type": "object",
+                                                  "required": [
+                                                    "answerSeconds",
+                                                    "turnsPerRound"
+                                                  ],
+                                                  "properties": {
+                                                    "answerSeconds": {
+                                                      "minimum": 10,
+                                                      "maximum": 900,
+                                                      "type": "integer"
+                                                    },
+                                                    "turnsPerRound": {
+                                                      "minimum": 1,
+                                                      "maximum": 20,
+                                                      "type": "integer"
+                                                    }
+                                                  }
+                                                },
                                                 "snapshotId": {
                                                   "minLength": 1,
                                                   "type": "string"
@@ -25349,6 +27133,97 @@
                                                   "type": "string"
                                                 }
                                               }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "attemptId",
+                                            "deadlineAt"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "answer_deadline"
+                                              ]
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "deadlineAt": {
+                                              "format": "date-time",
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "attemptId",
+                                            "deadlineAt"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "answer_timed_out"
+                                              ]
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "deadlineAt": {
+                                              "format": "date-time",
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "attemptId"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "answer_stopped"
+                                              ]
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "attemptId",
+                                            "remainingMs"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "answer_timing_paused"
+                                              ]
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "remainingMs": {
+                                              "minimum": 0,
+                                              "type": "integer"
                                             }
                                           }
                                         },

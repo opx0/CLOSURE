@@ -49,7 +49,8 @@ export function feedbackRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           reviews: [...(view.findingReviews ?? [])],
           historicalFindings: wireFindings(view.historicalFindings ?? view.findings),
           supersededFindingIds: [...(view.supersededFindings?.keys() ?? [])],
-          pendingReassessment: (view.supersededFindings?.size ?? 0) > 0,
+          // A corrected answer still needs assessment when the original evaluator made no finding.
+          pendingReassessment: (view.answerCorrections?.length ?? 0) > 0,
         }
       },
     )

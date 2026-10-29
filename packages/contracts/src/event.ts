@@ -192,6 +192,25 @@ export const StateChangeSchema = eventOf(
     }),
     Type.Object({ change: Type.Literal('session_started'), session: SessionSchema }),
     Type.Object({
+      change: Type.Literal('answer_deadline'),
+      attemptId: Type.String({ minLength: 1 }),
+      deadlineAt: Type.String({ format: 'date-time' }),
+    }),
+    Type.Object({
+      change: Type.Literal('answer_timed_out'),
+      attemptId: Type.String({ minLength: 1 }),
+      deadlineAt: Type.String({ format: 'date-time' }),
+    }),
+    Type.Object({
+      change: Type.Literal('answer_stopped'),
+      attemptId: Type.String({ minLength: 1 }),
+    }),
+    Type.Object({
+      change: Type.Literal('answer_timing_paused'),
+      attemptId: Type.String({ minLength: 1 }),
+      remainingMs: Type.Integer({ minimum: 0 }),
+    }),
+    Type.Object({
       change: Type.Literal('session_state'),
       from: SessionStateSchema,
       to: SessionStateSchema,

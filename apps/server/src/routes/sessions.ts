@@ -94,9 +94,13 @@ const TurnUpdateSchema = Type.Object({
       Type.Literal('end_topic'),
       Type.Literal('ceiling'),
       Type.Literal('evaluator_failure'),
+      Type.Literal('timeout'),
+      Type.Literal('stopped'),
       Type.Literal('practice_outcome_rejected'),
     ]),
   ),
+  deadlineAt: Type.Optional(Type.String({ format: 'date-time' })),
+  timingPaused: Type.Optional(Type.Boolean()),
 })
 
 const AvailabilitySchema = Type.Union([
@@ -139,6 +143,8 @@ const SessionViewSchema = Type.Object({
   // Cost and tokens so the caller can check a ceiling promise — not a quality number.
   totals: Type.Object({ costUsd: Type.Number(), tokens: Type.Number() }),
   closed: Type.Union([Type.Object({ reason: Type.String() }), Type.Null()]),
+  deadlineAt: Type.Optional(Type.String({ format: 'date-time' })),
+  timingPaused: Type.Optional(Type.Boolean()),
 })
 
 const NO_CLAIMS = {
@@ -240,6 +246,11 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             pressureCeiling: Type.Optional(PressureLevelSchema),
             rounds: Type.Optional(Type.Array(RoundKindSchema, { minItems: 1 })),
             turnsPerRound: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+            timedMock: Type.Optional(
+              Type.Object({
+                answerSeconds: Type.Optional(Type.Integer({ minimum: 10, maximum: 900 })),
+              }),
+            ),
             drill: Type.Optional(Type.Boolean()),
           }),
           response: { 201: TurnUpdateSchema, 400: ErrorSchema, 409: ErrorSchema },
@@ -252,6 +263,14 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
           .then(async () => {
             const body = request.body
             const store = deps.storeFor(request.principal)
+            if (
+              body.timedMock !== undefined &&
+              (body.mode !== 'simulation' || body.gapId !== undefined)
+            )
+              return reply.code(400).send({
+                error: 'Timed mocks require Simulation without a targeted gap',
+                detail: 'Start a separate timed Simulation session.',
+              })
             if ((body.storyId === undefined) !== (body.storyRevision === undefined))
               return reply.code(400).send({
                 error: 'Select an exact story version',
@@ -428,6 +447,14 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
               personaId: body.personaId ?? 'collaborator',
               pressureCeiling: (body.pressureCeiling ?? 1) as PressureLevel,
               turnsPerRound: target === undefined ? (body.turnsPerRound ?? 6) : 1,
+              ...(body.timedMock === undefined
+                ? {}
+                : {
+                    timing: {
+                      answerSeconds: body.timedMock.answerSeconds ?? 90,
+                      turnsPerRound: body.turnsPerRound ?? 6,
+                    },
+                  }),
               drill: target === undefined ? (body.drill ?? true) : false,
               ...(target === undefined
                 ? { retrievals: dueForRetrieval([...gaps.values()], deps.clock.now(), 3) }
@@ -443,6 +470,57 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
         } finally {
           if (launches.get(key) === launch) launches.delete(key)
         }
+      },
+    )
+
+    app.post(
+      '/sessions/:id/timing',
+      {
+        schema: {
+          tags: ['sessions'],
+          params: SessionIdParamsSchema,
+          body: Type.Object({
+            action: Type.Union([Type.Literal('pause'), Type.Literal('resume')]),
+          }),
+          response: {
+            200: Type.Object({
+              paused: Type.Boolean(),
+              deadlineAt: Type.Optional(Type.String()),
+              remainingMs: Type.Optional(Type.Number()),
+            }),
+            409: ErrorSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const live = host.get(request.params.id, request.principal.ownerId)
+        if (!live?.awaitingAnswer || live.timingPaused === (request.body.action === 'pause'))
+          return reply.code(409).send({ error: 'No matching active timer state' })
+        try {
+          return request.body.action === 'pause'
+            ? { paused: true, remainingMs: await live.pauseTiming() }
+            : { paused: false, deadlineAt: await live.resumeTiming() }
+        } catch {
+          return reply.code(409).send({ error: 'Timed question is no longer available' })
+        }
+      },
+    )
+
+    app.post(
+      '/sessions/:id/stop',
+      {
+        schema: {
+          tags: ['sessions'],
+          params: SessionIdParamsSchema,
+          response: { 200: TurnUpdateSchema, 409: ErrorSchema },
+        },
+      },
+      async (request, reply) => {
+        const live = host.get(request.params.id, request.principal.ownerId)
+        if (!live?.awaitingAnswer)
+          return reply.code(409).send({ error: 'No active question to stop' })
+        const update = await live.stop()
+        return { ...update, findings: wireFindings(update.findings) }
       },
     )
 
@@ -497,6 +575,8 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
         if (!live.awaitingAnswer) {
           return reply.code(409).send({ error: 'session is not waiting for an answer' })
         }
+        if (live.timingPaused)
+          return reply.code(409).send({ error: 'Resume the timed mock before answering' })
         const update = await live.submit(request.body.text)
         return { ...update, findings: wireFindings(update.findings) }
       },
@@ -586,6 +666,8 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
           invocations: [...view.invocations],
           totals: view.totals,
           closed: view.closed,
+          ...(view.deadlineAt === undefined ? {} : { deadlineAt: view.deadlineAt }),
+          ...(view.timingPaused ? { timingPaused: true } : {}),
         }
       },
     )

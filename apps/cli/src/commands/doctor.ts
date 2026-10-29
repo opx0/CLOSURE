@@ -6,7 +6,7 @@ import { loadCliConfig } from '../config.ts'
 import { dim, heading, line } from '../terminal.ts'
 import { checkLocalGeneration } from '../adapters/local-only.ts'
 
-type Check = { name: string; ok: boolean; detail: string }
+type Check = { name: string; ok: boolean; detail: string; available?: boolean }
 
 export async function llamaReachable(baseUrl: string): Promise<Check> {
   try {
@@ -80,6 +80,7 @@ export async function speechReadiness(port = process.env.VOICE_PORT ?? '8091'): 
     return {
       name: 'speech (optional)',
       ok: true,
+      available: ready,
       detail: ready
         ? 'batch ASR/full-WAV TTS reachable; live streaming and latency unverified'
         : 'health response did not confirm batch ASR/TTS; text mode available',
@@ -88,8 +89,42 @@ export async function speechReadiness(port = process.env.VOICE_PORT ?? '8091'): 
     return {
       name: 'speech (optional)',
       ok: true,
+      available: false,
       detail: 'unavailable; text mode available. Run bun run voice:up after provisioning models.',
     }
+  }
+}
+
+export async function streamingAssetsReadiness(
+  env: Record<string, string | undefined> = process.env,
+): Promise<Check> {
+  const names = ['TOKENS', 'ENCODER', 'DECODER', 'JOINER'] as const
+  const paths = names.map((name) => env[`VOICE_STREAM_${name}`])
+  if (paths.every((path) => !path))
+    return {
+      name: 'streaming ASR (optional)',
+      ok: true,
+      available: false,
+      detail: 'no model paths configured; batch speech or text mode remains available',
+    }
+  const missing: string[] = []
+  for (const [index, path] of paths.entries()) {
+    if (
+      !path ||
+      !(await stat(path)
+        .then((info) => info.isFile())
+        .catch(() => false))
+    )
+      missing.push(names[index]!)
+  }
+  return {
+    name: 'streaming ASR (optional)',
+    ok: true,
+    available: missing.length === 0,
+    detail:
+      missing.length > 0
+        ? `not ready: preprovision ${missing.join(', ')}; no download will be attempted`
+        : 'all four local paths exist; model load, live decoding and quality unverified',
   }
 }
 
@@ -193,6 +228,7 @@ export async function doctor(): Promise<number> {
     await databaseReachable(config.databaseUrl),
     await webBuilt(),
     await speechReadiness(),
+    await streamingAssetsReadiness(),
     policy.ok
       ? await llamaReachable(config.llamaBaseUrl)
       : {
@@ -212,7 +248,7 @@ export async function doctor(): Promise<number> {
 
   heading('levelhead doctor')
   for (const check of checks) {
-    line(`${check.ok ? '✓' : '✗'} ${check.name}`)
+    line(`${!check.ok ? '✗' : check.available === false ? '–' : '✓'} ${check.name}`)
     dim(`  ${check.detail}`)
   }
   line('')

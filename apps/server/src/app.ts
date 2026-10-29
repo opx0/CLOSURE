@@ -9,6 +9,7 @@ import fastifyCors from '@fastify/cors'
 import fastifyHelmet from '@fastify/helmet'
 import fastifyRateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
+import fastifyWebsocket from '@fastify/websocket'
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { newCorrelationId } from '@levelhead/observability'
 import type { Config } from './config.ts'
@@ -20,6 +21,7 @@ import { metricsRoutes } from './routes/metrics.ts'
 import { claimsRoutes } from './routes/claims.ts'
 import { sessionRoutes } from './routes/sessions.ts'
 import { streamRoutes } from './routes/stream.ts'
+import { voiceRoutes } from './routes/voice.ts'
 import { ledgerRoutes } from './routes/ledger.ts'
 import { scheduleRoutes } from './routes/schedule.ts'
 import { reviewRoutes } from './routes/review.ts'
@@ -104,6 +106,7 @@ export async function buildApp(config: Config, deps: ServerDeps): Promise<Fastif
     tokens: config.LEVELHEAD_API_TOKENS,
     demoMode: config.LEVELHEAD_DEMO_MODE,
   })
+  await app.register(fastifyWebsocket)
 
   await app.register(fastifySwagger, {
     openapi: {
@@ -152,6 +155,7 @@ export async function buildApp(config: Config, deps: ServerDeps): Promise<Fastif
   await app.register(resumeRoutes(deps))
   await app.register(sessionRoutes(deps, host))
   await app.register(streamRoutes(host))
+  await app.register(voiceRoutes(deps, host, config))
   await app.register(ledgerRoutes(deps))
   await app.register(scheduleRoutes(deps))
   await app.register(reviewRoutes(deps))
