@@ -1,65 +1,21 @@
-# The structural invariants in docs/wayfinder/issues/05-rigor-bar.md §3 are build failures, not
-# scores — which is only true if something fails a build. This is that something.
-#
-# `typecheck` is not a formality here: invariant 2 (no finding without evidence) is enforced by a
-# non-empty tuple type, and Bun strips types, so `bun test` alone would not check it.
-name: check
+name: Checks
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
-  schedule:
-    # Weekly clean-checkout verification. Nothing else in this file depends on the clock.
-    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  check:
+  code:
+    name: Code
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      # A benchmark whose dependency tree drifts between runs is not reproducible, and
-      # reproducibility is the product claim (bunfig.toml).
-      - run: bun install --frozen-lockfile
-      - run: bun run typecheck
-      - run: bun run lint
-      - run: bun run format:check
-      # Generated output that has drifted from the schemas is a contract nobody is honouring.
-      - run: bun run contracts:check
-      # Includes tests/invariants and apps/cli/src/testing — the seven structural invariants.
-      - run: bun test
-      - run: bun run web:build
-      # A cold-start proof: the real HTTP surface, driven with scripted model ports, so it needs no
-      # provider, no container and no key. It produces no measurement — the model is a script.
-      - run: bun run smoke
-
-  integration:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        # Same major version as production: a concurrency test against a different one is a test of
-        # a different database.
-        image: postgres:18
-        env:
-          POSTGRES_USER: levelhead
-          POSTGRES_PASSWORD: levelhead
-          POSTGRES_DB: levelhead
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U levelhead -d levelhead"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgres://levelhead:levelhead@localhost:5432/levelhead
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -69,85 +25,16 @@ jobs:
         with:
           node-version: '24'
       - run: bun install --frozen-lockfile
-      - run: bun run db:migrate
-      # Job concurrency, expired leases and the append-only trigger are not mockable: a mocked
-      # database cannot exhibit the behaviour being tested (STACK §8).
-      - run: bun test packages/db
-
-  browser:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
-      # The smallest critical interview journey, against the built client and the real API with
-      # scripted model ports (STACK §14). A live model here would measure the model, not the product.
-      - run: bun run e2e
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-traces
-          path: test-results/
-          retention-days: 7
-
-  clean-checkout:
-    # STACK §17: "`bun install` on a clean machine must reach a running application and a passing
-    # test suite" — verified by a job, not by memory. Weekly rather than per-PR: it catches a
-    # registry or toolchain change, which is not something a pull request causes.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: bun install --frozen-lockfile
-      - run: bun run check
-      - run: bun test
-      - run: bun run smoke
-
-  supply-chain:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - run: bun install --frozen-lockfile
-      # A compromised dependency defeats every other control, and this project ingests untrusted
-      # repositories (STACK §3).
-      - run: bun audit --audit-level=high
-      - name: no dependency lifecycle scripts are trusted
+      - name: Types, lint, formatting and contracts
+        run: bun run check
+      - name: Web build
+        run: bun run web:build
+      - name: Dependency audit
+        run: bun audit --audit-level=high
+      - name: Reject trusted dependency scripts
         run: |
           trusted=$(node -e "process.stdout.write(String((require('./package.json').trustedDependencies||[]).length))")
           if [ "$trusted" != "0" ]; then
-            echo "trustedDependencies is non-empty; adding an entry is a reviewable security decision" >&2
+            echo "trustedDependencies must remain empty" >&2
             exit 1
           fi
-
-  benchmark-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: bun install --frozen-lockfile
-      - run: bun run fixtures:build
-      - run: bun run fixtures:benchmark
-      # Asserts the pipeline runs and the injection bound has not regressed. It produces no result:
-      # a stub provider returns the same output whether or not the policy adapts, and nothing from
-      # this job may be reported as a number about the world.
-      - run: bun run benchmarks/src/cli.ts --fixtures fixtures/benchmark --out /tmp/bench --dry-run

@@ -1,8 +1,8 @@
-name: PR Agent
+name: PR-Agent
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, ready_for_review]
   issue_comment:
     types: [created]
 
@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   review:
+    name: Review
     if: >-
       github.event.sender.type != 'Bot' &&
       (
@@ -33,7 +34,6 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Check Gemini API key
-        id: key
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -50,10 +50,10 @@ jobs:
           config.model: 'gemini/gemini-3.8-flash'
           config.fallback_models: '[]'
           config.restricted_mode: 'true'
+          config.log_level: 'INFO'
           github_action_config.auto_review: 'true'
           github_action_config.auto_describe: 'false'
           github_action_config.auto_improve: 'false'
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
-          github_action_config.handle_push_trigger: 'true'
-          github_action_config.push_commands: '["/review"]'
+          github_action_config.pr_actions: '["opened", "ready_for_review"]'
+          github_action_config.handle_push_trigger: 'false'
           github_action_config.fail_on_tool_errors: 'true'

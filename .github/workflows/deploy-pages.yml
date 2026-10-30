@@ -1,4 +1,4 @@
-name: deploy-static-showcase
+name: Pages
 
 on:
   push:
@@ -17,7 +17,10 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

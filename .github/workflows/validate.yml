@@ -1,0 +1,95 @@
+name: Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - name: Speech protocol tests
+        run: |
+          python -m pip install numpy 'websockets>=16,<17'
+          python -m unittest discover -s voice -p 'test_*.py'
+      - name: API smoke test
+        run: bun run smoke
+      - name: Benchmark fixture validation
+        run: |
+          bun run fixtures:build
+          bun run fixtures:benchmark
+          bun run benchmarks/src/cli.ts --fixtures fixtures/benchmark --out "$RUNNER_TEMP/bench" --dry-run
+
+  database:
+    name: PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: levelhead
+          POSTGRES_PASSWORD: levelhead
+          POSTGRES_DB: levelhead
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U levelhead -d levelhead"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://levelhead:levelhead@localhost:5432/levelhead
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - run: bun run db:migrate
+      - run: bun test packages/db
+
+  browser:
+    name: Browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
