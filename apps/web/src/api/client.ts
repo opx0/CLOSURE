@@ -121,9 +121,13 @@ export const api = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
   reassessAnswer: (id: string, body: { requestId: string; attemptId: string; revision: number }) =>
-    request<{ revision: number; findings: number }>(`/sessions/${encodeURIComponent(id)}/reassess`, {
-      method: 'POST', body: JSON.stringify(body),
-    }),
+    request<{ revision: number; findings: number }>(
+      `/sessions/${encodeURIComponent(id)}/reassess`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
   reviewFinding: (id: string, body: Body<'/sessions/{id}/feedback', 'post'>) =>
     request<Json<'/sessions/{id}/feedback', 'post'>>(
       `/sessions/${encodeURIComponent(id)}/feedback`,

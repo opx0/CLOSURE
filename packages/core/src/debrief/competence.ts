@@ -97,10 +97,12 @@ export function improvementPlan(
   const historical = view.historicalFindings ?? view.findings
   for (const [id] of view.supersededFindings ?? []) {
     const finding = historical.find((finding) => finding.id === id)
-    const correction = finding === undefined ? undefined : view.answerCorrections?.filter(
-      (item) => item.attemptId === finding.attemptId,
-    ).at(-1)
-    if (correction && view.reassessedRevisions?.get(correction.attemptId) === correction.revision) continue
+    const correction =
+      finding === undefined
+        ? undefined
+        : view.answerCorrections?.filter((item) => item.attemptId === finding.attemptId).at(-1)
+    if (correction && view.reassessedRevisions?.get(correction.attemptId) === correction.revision)
+      continue
     if (finding !== undefined)
       uncertainty.push(
         summary(
@@ -183,8 +185,14 @@ export function practiceActionForGap(
     nextTransferVariant(gap.topicId, context.exposedVariants ?? new Set()) !== undefined
   )
     return 'transfer'
-  if (gap.status === 'drilled' && gap.artifactId !== undefined &&
-    TRANSFER_VARIANTS.some((variant) => nextTransferVariant(variant.topicId, context.exposedVariants ?? new Set()) !== undefined))
+  if (
+    gap.status === 'drilled' &&
+    gap.artifactId !== undefined &&
+    TRANSFER_VARIANTS.some(
+      (variant) =>
+        nextTransferVariant(variant.topicId, context.exposedVariants ?? new Set()) !== undefined,
+    )
+  )
     return 'transfer'
   return 'unavailable'
 }

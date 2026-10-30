@@ -675,7 +675,8 @@ test('a walkthrough with a pinned repository and no résumé opens ranked code a
     turnsPerRound: 5,
   })
 
-  expect(read).toEqual(['art_parse', 'art_schedule'])
+  expect(read.slice(0, 2)).toEqual(['art_parse', 'art_schedule'])
+  expect(new Set(read)).toEqual(new Set(['art_parse', 'art_schedule']))
   expect(asked[0]?.meta.artifact).toEqual({
     artifactId: 'art_parse',
     path: 'src/parse.ts',
@@ -693,6 +694,53 @@ test('a walkthrough with a pinned repository and no résumé opens ranked code a
     true,
   )
   expect(result.view.session?.topicIds).toBeUndefined()
+})
+
+test('a walkthrough halts if the pinned source becomes unavailable', async () => {
+  const parse = 'function parse(input: string) {\n  return input.split(",")\n}'
+  const artifact: Artifact = {
+    id: 'art_parse',
+    snapshotId: 'snap_1',
+    kind: 'function',
+    path: 'src/parse.ts',
+    symbol: 'parse',
+    startLine: 10,
+    endLine: 30,
+  }
+  let calls = 0
+  const repository: RepositoryPort = {
+    async pin() {
+      throw new Error('a session never pins')
+    },
+    async read() {
+      calls += 1
+      if (calls > 1) return null
+      return parse
+    },
+  }
+  const pinned: PinnedContext = {
+    snapshot: {
+      id: 'snap_1',
+      repoPath: '/work/project',
+      commit: 'abc123',
+      pinnedAt: '2026-09-24T08:00:00.000Z',
+      fileCount: 1,
+    },
+    artifacts: [artifact],
+    evidence: [],
+    repository,
+  }
+
+  const { notices, result } = await run({
+    rounds: ['code_walkthrough'],
+    pinned,
+    turnsPerRound: 3,
+  })
+
+  expect(notices).toContain(
+    'The pinned source is no longer available. This question cannot be assessed.',
+  )
+  expect(result.stoppedBy).toBe('end_topic')
 })
 
 test('a round with nothing to ask about is skipped out loud, not asked generically', async () => {

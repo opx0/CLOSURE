@@ -369,7 +369,11 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                   error: 'Select an owned open gap for a drill, or a drilled gap for Transfer',
                   detail: body.gapId ?? 'gapId is required',
                 })
-              if (target.topicId === undefined && target.claimId === undefined && !(target.snapshotId && target.artifactId))
+              if (
+                target.topicId === undefined &&
+                target.claimId === undefined &&
+                !(target.snapshotId && target.artifactId)
+              )
                 return reply.code(400).send({
                   error: 'This gap has no available topic or claim target',
                   detail: target.id,
@@ -379,16 +383,31 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                   .code(400)
                   .send({ error: 'The target topic is unavailable', detail: target.topicId })
             }
-            if (body.transferTopicId !== undefined &&
-              (body.mode !== 'transfer' || target?.artifactId === undefined))
-              return reply.code(400).send({ error: 'Transfer topic is only selectable for a project gap' })
-            if (body.mode === 'transfer' && target?.artifactId !== undefined && body.transferTopicId === undefined)
-              return reply.code(400).send({ error: 'Choose an unfamiliar topic for this independent retest' })
-            const transferTopicId = target?.artifactId !== undefined && body.mode === 'transfer'
-              ? body.transferTopicId : target?.topicId
-            const targetTopic = transferTopicId === undefined ? undefined : topicById(transferTopicId)
+            if (
+              body.transferTopicId !== undefined &&
+              (body.mode !== 'transfer' || target?.artifactId === undefined)
+            )
+              return reply
+                .code(400)
+                .send({ error: 'Transfer topic is only selectable for a project gap' })
+            if (
+              body.mode === 'transfer' &&
+              target?.artifactId !== undefined &&
+              body.transferTopicId === undefined
+            )
+              return reply
+                .code(400)
+                .send({ error: 'Choose an unfamiliar topic for this independent retest' })
+            const transferTopicId =
+              target?.artifactId !== undefined && body.mode === 'transfer'
+                ? body.transferTopicId
+                : target?.topicId
+            const targetTopic =
+              transferTopicId === undefined ? undefined : topicById(transferTopicId)
             if (transferTopicId !== undefined && targetTopic === undefined)
-              return reply.code(400).send({ error: 'The retest topic is unavailable', detail: transferTopicId })
+              return reply
+                .code(400)
+                .send({ error: 'The retest topic is unavailable', detail: transferTopicId })
             if (
               target !== undefined &&
               history.some(
@@ -433,8 +452,8 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                       target?.snapshotId !== undefined && body.mode === 'drill'
                         ? 'code_walkthrough'
                         : targetTopic === undefined
-                        ? 'project_deep_dive'
-                        : AREA_ROUND[targetTopic.area],
+                          ? 'project_deep_dive'
+                          : AREA_ROUND[targetTopic.area],
                     ],
               topicIds: targetTopic === undefined ? body.topicIds : [targetTopic.id],
             })
@@ -459,8 +478,12 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             if (resolved.needsClaims && confirmed.length === 0)
               return reply.code(409).send(NO_CLAIMS)
 
-            const wanted = body.mode === 'transfer' && target?.artifactId !== undefined
-              ? undefined : target?.claimId === undefined ? body.claimIds : [target.claimId]
+            const wanted =
+              body.mode === 'transfer' && target?.artifactId !== undefined
+                ? undefined
+                : target?.claimId === undefined
+                  ? body.claimIds
+                  : [target.claimId]
             const selected =
               wanted === undefined
                 ? confirmed
@@ -485,8 +508,14 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                       : `${body.snapshotId} is not a pinned snapshot, or it was deleted`,
                 })
               }
-              if (target?.artifactId !== undefined && !pinned.artifacts.some((artifact) => artifact.id === target.artifactId))
-                return reply.code(400).send({ error: 'Practice source is no longer available', detail: target.artifactId })
+              if (
+                target?.artifactId !== undefined &&
+                !pinned.artifacts.some((artifact) => artifact.id === target.artifactId)
+              )
+                return reply.code(400).send({
+                  error: 'Practice source is no longer available',
+                  detail: target.artifactId,
+                })
             }
 
             const update = await host.start({

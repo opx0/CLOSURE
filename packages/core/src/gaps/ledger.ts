@@ -20,14 +20,21 @@ export interface LedgerDeps {
 }
 
 // One gap per competency per claim or topic, so the same weakness found again lands on the existing row.
-export function gapKey(competency: Competency, claimId?: string, topicId?: string, artifactId?: string): string {
+export function gapKey(
+  competency: Competency,
+  claimId?: string,
+  topicId?: string,
+  artifactId?: string,
+): string {
   const key = `${competency}:${claimId ?? '-'}`
   const topicKey = topicId === undefined ? key : `${key}:${topicId}`
   return artifactId === undefined ? topicKey : `${topicKey}:artifact:${artifactId}`
 }
 
 export function indexGaps(gaps: readonly GapEntry[]): Map<string, GapEntry> {
-  return new Map(gaps.map((gap) => [gapKey(gap.competency, gap.claimId, gap.topicId, gap.artifactId), gap]))
+  return new Map(
+    gaps.map((gap) => [gapKey(gap.competency, gap.claimId, gap.topicId, gap.artifactId), gap]),
+  )
 }
 
 // What the attempt behind the findings was about. Findings do not carry it; the policy action did.
@@ -79,7 +86,10 @@ function needFrom(finding: Finding, topicId: string | undefined): GapNeed | null
 function bearsOn(finding: Finding, gap: GapEntry): boolean {
   // A project gap can be drilled against the original claim or independently retested on the
   // same competency in an unfamiliar topic. The latter must never need the familiar source.
-  if (gap.artifactId !== undefined && (finding.kind === 'competency' || finding.kind === 'competency_abstained'))
+  if (
+    gap.artifactId !== undefined &&
+    (finding.kind === 'competency' || finding.kind === 'competency_abstained')
+  )
     return finding.competency === gap.competency
   switch (finding.kind) {
     case 'claim':
@@ -127,8 +137,16 @@ export function gapsFromFindings(
     const need = needFrom(finding, subject.topicId)
     if (need === null) continue
 
-    const project = subject.artifactId !== undefined && subject.snapshotId !== undefined && need.competency !== 'composure'
-    const key = gapKey(need.competency, need.claimId, need.topicId, project ? subject.artifactId : undefined)
+    const project =
+      subject.artifactId !== undefined &&
+      subject.snapshotId !== undefined &&
+      need.competency !== 'composure'
+    const key = gapKey(
+      need.competency,
+      need.claimId,
+      need.topicId,
+      project ? subject.artifactId : undefined,
+    )
     const fresh = openedByKey.get(key)
     if (fresh !== undefined) {
       // A second finding about the same gap in this batch joins that row, not a duplicate of it.

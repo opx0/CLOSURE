@@ -265,3 +265,70 @@ test('a separate restore replays deleted citations and preserves the scheduled p
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('v4 backup restores configured source files alongside settings without leaking credentials', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'levelhead-sources-backup-'))
+  const events = join(dir, 'events')
+  const exports = join(dir, 'exports')
+  const plans = join(dir, 'plans')
+  const nudges = join(dir, 'nudges')
+  const benchmarks = join(dir, 'benchmarks')
+  const sources = join(dir, 'sources')
+  try {
+    for (const path of [events, exports, plans, nudges, benchmarks, sources]) await mkdir(path)
+    await writeFile(join(events, 'owner.jsonl'), '{"event":1}\n')
+    await writeFile(join(sources, 'main.ts'), 'console.log("hello world")\n')
+    const backup = join(dir, 'backup')
+    const fileCount = await backupJsonl(
+      events,
+      exports,
+      backup,
+      { plans, nudges, benchmarks, sources },
+      {
+        LEVELHEAD_STORE: 'jsonl',
+        LEVELHEAD_EVENT_DIR: events,
+        LEVELHEAD_SOURCE_DIR: sources,
+        DATABASE_URL: 'postgres://user:supersecret@127.0.0.1/db',
+        MODEL_PROVIDER_API_KEY: 'sk-secret-key-12345',
+      },
+    )
+    expect(fileCount).toBe(2)
+    const manifest = JSON.parse(await readFile(join(backup, 'manifest.json'), 'utf8')) as {
+      version: number
+      settings: Record<string, string>
+      files: Array<{ path: string }>
+    }
+    expect(manifest.version).toBe(4)
+    expect(manifest.files.map((file) => file.path).sort()).toEqual([
+      'events/owner.jsonl',
+      'sources/main.ts',
+    ])
+    expect(manifest.settings).toEqual({
+      LEVELHEAD_STORE: 'jsonl',
+      LEVELHEAD_EVENT_DIR: events,
+      LEVELHEAD_SOURCE_DIR: sources,
+    })
+    expect(JSON.stringify(manifest)).not.toContain('supersecret')
+    expect(JSON.stringify(manifest)).not.toContain('sk-secret-key-12345')
+
+    const restored = join(dir, 'restored')
+    expect(await restoreJsonl(backup, restored)).toBe(2)
+    expect(await readFile(join(restored, 'sources/main.ts'), 'utf8')).toBe(
+      'console.log("hello world")\n',
+    )
+    expect(JSON.parse(await readFile(join(restored, 'recovery-settings.json'), 'utf8'))).toEqual(
+      manifest.settings,
+    )
+    expect((await readdir(restored)).sort()).toEqual([
+      'benchmarks',
+      'events',
+      'exports',
+      'nudges',
+      'plans',
+      'recovery-settings.json',
+      'sources',
+    ])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

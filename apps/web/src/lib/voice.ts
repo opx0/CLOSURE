@@ -126,7 +126,7 @@ export async function speak(text: string): Promise<void> {
       if (!response.ok) throw new Error(`the voice service answered ${response.status}`)
       return await response.blob()
     } catch (error) {
-      if (timedOut) throw new Error('speech synthesis timed out')
+      if (timedOut) throw new Error('speech synthesis timed out', { cause: error })
       throw error
     } finally {
       clearTimeout(timeout)
@@ -164,9 +164,11 @@ export async function speak(text: string): Promise<void> {
         audio.onended = () => finish()
         audio.onerror = () => finish(new Error('speech playback failed'))
         playback.controller.signal.addEventListener('abort', cancel, { once: true })
-        void audio.play().catch((error: unknown) =>
-          finish(error instanceof Error ? error : new Error('speech playback failed')),
-        )
+        void audio
+          .play()
+          .catch((error: unknown) =>
+            finish(error instanceof Error ? error : new Error('speech playback failed')),
+          )
       })
       URL.revokeObjectURL(url)
       playback.url = null

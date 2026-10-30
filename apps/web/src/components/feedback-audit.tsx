@@ -50,7 +50,11 @@ export function FeedbackAudit({ sessionId }: { sessionId: string }) {
       const signature = JSON.stringify([attemptId, revision])
       if (reassessRequest.current?.signature !== signature)
         reassessRequest.current = { signature, id: crypto.randomUUID() }
-      return api.reassessAnswer(sessionId, { attemptId, revision, requestId: reassessRequest.current.id })
+      return api.reassessAnswer(sessionId, {
+        attemptId,
+        revision,
+        requestId: reassessRequest.current.id,
+      })
     },
     onSuccess: refresh,
   })
@@ -104,7 +108,10 @@ export function FeedbackAudit({ sessionId }: { sessionId: string }) {
             refresh={refresh}
           />
           {revision > 1 && audit.data.pendingReassessment && (
-            <Button disabled={reassess.isPending} onClick={() => reassess.mutate({ attemptId: selected.attemptId, revision })}>
+            <Button
+              disabled={reassess.isPending}
+              onClick={() => reassess.mutate({ attemptId: selected.attemptId, revision })}
+            >
               Reassess this revision
             </Button>
           )}
