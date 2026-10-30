@@ -5,6 +5,7 @@ import {
   type PolicyAction,
   type RoundKind,
   type Topic,
+  type Design,
 } from '@levelhead/contracts'
 import type { PromptArtifact } from './artifact.ts'
 import { asData, definePrompt } from './registry.ts'
@@ -23,6 +24,7 @@ export interface AnswerEvaluationVars {
   round: RoundKind
   claim: { type: ClaimType; assertion: string } | null
   topic?: Pick<Topic, 'area' | 'title' | 'ask'> | undefined
+  design?: Design | undefined
   // Only anchors for this level and the rubrics this turn can actually produce a finding against, or the model judges against a bar it was never given.
   anchors: EvaluationAnchor[]
   // §4.8: the code the candidate was shown — without it, judging a walkthrough means judging from memory, which is inventing evidence.
@@ -34,7 +36,7 @@ export interface AnswerEvaluationVars {
 // Text stays inside this function: `definePrompt` hashes its source, so hoisting it to a module constant would silently break attribution.
 export const answerEvaluationPrompt = definePrompt<AnswerEvaluationVars>(
   'answer-evaluation',
-  2,
+  3,
   (vars) => {
     // Narrows what counts as an answer to what this round actually asked; never relaxes the system-block contract, which holds for every round.
     const roundFocus: Record<RoundKind, string> = {
@@ -92,6 +94,23 @@ export const answerEvaluationPrompt = definePrompt<AnswerEvaluationVars>(
           : [
               `The topic the interviewer chose for this turn: ${vars.topic.title} (${vars.topic.area}).`,
               `The question it opened on: ${vars.topic.ask}`,
+            ].join('\n'),
+        vars.design === undefined || vars.round !== 'system_design'
+          ? ''
+          : [
+              'The design artifact pinned for this question. Judge the answer against the stated constraint, but never credit the artifact as spoken knowledge. Quote only the answer:',
+              asData(
+                'candidate design',
+                [
+                  `Title: ${vars.design.title}`,
+                  `Requirements: ${vars.design.requirements}`,
+                  `Estimates: ${vars.design.estimates}`,
+                  `API: ${vars.design.api}`,
+                  `Data model: ${vars.design.dataModel}`,
+                  `Mermaid source: ${vars.design.diagram}`,
+                  `Constraint: ${vars.design.constraint}`,
+                ].join('\n'),
+              ),
             ].join('\n'),
         '',
         // Path and symbol are repository content too, so they're fenced with the code, not written into an instruction line the candidate could author (ADR-014).

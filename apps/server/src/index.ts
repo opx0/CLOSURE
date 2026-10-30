@@ -42,6 +42,15 @@ const retrieval: RetrievalPort | null = pool === null ? null : new PostgresRetri
 // The only place in the server that reads the environment. Everything below takes what it is given.
 const app = await buildApp(config, {
   storeFor,
+  ...(config.LEVELHEAD_RESTORE_SOURCE_FROM === undefined ||
+  config.LEVELHEAD_RESTORE_SOURCE_TO === undefined
+    ? {}
+    : {
+        sourceRelocation: {
+          from: config.LEVELHEAD_RESTORE_SOURCE_FROM,
+          to: config.LEVELHEAD_RESTORE_SOURCE_TO,
+        },
+      }),
   clock: new SystemClock(),
   ids,
   conductor,

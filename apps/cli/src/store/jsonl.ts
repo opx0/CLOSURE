@@ -5,7 +5,8 @@ import { AppendOnlyViolation, readEvent, type EventStore } from '@levelhead/core
 
 const DEFAULT_DIR = '.levelhead/events'
 const EXTENSION = '.jsonl'
-const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+// Internal append-only ledgers such as _stories and _designs share the store and need safe names.
+const SAFE_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/
 
 function isMissing(error: unknown): boolean {
   return (

@@ -107,16 +107,32 @@ export async function speak(text: string): Promise<void> {
   if (phrases.length === 0) return
   const playback: SpeechPlayback = { controller: new AbortController(), audio: null, url: null }
   currentSpeech = playback
-  const load = (phrase: string) =>
-    fetch(`${voiceUrl()}/speak`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: phrase }),
-      signal: playback.controller.signal,
-    }).then(async (response) => {
+  const load = async (phrase: string) => {
+    const controller = new AbortController()
+    const cancel = () => controller.abort()
+    playback.controller.signal.addEventListener('abort', cancel, { once: true })
+    let timedOut = false
+    const timeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 30_000)
+    try {
+      const response = await fetch(`${voiceUrl()}/speak`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: phrase }),
+        signal: controller.signal,
+      })
       if (!response.ok) throw new Error(`the voice service answered ${response.status}`)
-      return response.blob()
-    })
+      return await response.blob()
+    } catch (error) {
+      if (timedOut) throw new Error('speech synthesis timed out')
+      throw error
+    } finally {
+      clearTimeout(timeout)
+      playback.controller.signal.removeEventListener('abort', cancel)
+    }
+  }
   // A prefetched phrase must settle without an unhandled rejection while the previous phrase plays.
   const settled = (phrase: string) =>
     load(phrase).then(
@@ -135,10 +151,22 @@ export async function speak(text: string): Promise<void> {
       playback.audio = audio
       playback.url = url
       await new Promise<void>((resolve, reject) => {
-        audio.onended = () => resolve()
-        audio.onerror = () => reject(new Error('speech playback failed'))
-        playback.controller.signal.addEventListener('abort', () => resolve(), { once: true })
-        void audio.play().catch(reject)
+        const finish = (error?: Error) => {
+          clearTimeout(timeout)
+          playback.controller.signal.removeEventListener('abort', cancel)
+          audio.onended = null
+          audio.onerror = null
+          if (error) reject(error)
+          else resolve()
+        }
+        const cancel = () => finish()
+        const timeout = setTimeout(() => finish(new Error('speech playback timed out')), 120_000)
+        audio.onended = () => finish()
+        audio.onerror = () => finish(new Error('speech playback failed'))
+        playback.controller.signal.addEventListener('abort', cancel, { once: true })
+        void audio.play().catch((error: unknown) =>
+          finish(error instanceof Error ? error : new Error('speech playback failed')),
+        )
       })
       URL.revokeObjectURL(url)
       playback.url = null

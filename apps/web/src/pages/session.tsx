@@ -364,11 +364,21 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const story = stories.data?.stories.find(
     (entry) => entry.id === storyId && entry.revision === storyRevision,
   )
+  const designId = params.get('designId')
+  const designRevision = Number(params.get('designRevision'))
+  const designs = useQuery({
+    queryKey: ['designs'],
+    queryFn: api.designs,
+    enabled: designId !== null,
+  })
+  const design = designs.data?.designs.find(
+    (entry) => entry.id === designId && entry.revision === designRevision,
+  )
   const practice = useQuery({ queryKey: ['ledger'], queryFn: api.ledger, enabled: gapId !== null })
   const practiceGap = practice.data?.gaps.find((gap) => gap.id === gapId)
   const preparationState = usePreparation()
   const snapshotId =
-    params.get('snapshotId') ?? preparationState.data?.selection?.snapshotId ?? null
+    practiceGap?.snapshotId ?? params.get('snapshotId') ?? preparationState.data?.selection?.snapshotId ?? null
   const selectedClaimIds = preparationState.data?.selection?.claimIds
 
   const updateSetup = (key: string, value: string) =>
@@ -383,6 +393,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const setLevel = (value: Level) => updateSetup('level', value)
   const [persona, setPersona] = useState<Persona>('collaborator')
   const mode = MODES.find((entry) => entry.id === params.get('mode'))?.id ?? 'coach'
+  const transferTopicId = params.get('transferTopicId')
   const setMode = (value: Mode) => updateSetup('mode', value)
   const [ceiling, setCeiling] = useState(1)
   const requestedTurns = Number(params.get('turns'))
@@ -428,7 +439,10 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       : interviewRounds
 
   const loop = role.defaultRounds.filter((round) => interviewRounds.includes(round))
-  const targetTopic = data.topics.find((topic) => topic.id === practiceGap?.topicId)
+  const targetTopic = data.topics.find((topic) =>
+    topic.id === (mode === 'transfer' && practiceGap?.artifactId !== undefined
+      ? transferTopicId : practiceGap?.topicId),
+  )
   const requestedTopicId = params.get('topicId')
   const requestedTopic =
     requestedTopicId === null
@@ -436,7 +450,7 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       : data.topics.find((topic) => topic.id === requestedTopicId)
   const rounds =
     gapId !== null && practiceGap !== undefined
-      ? [targetTopic?.round ?? 'project_deep_dive']
+      ? [practiceGap.snapshotId !== undefined && mode === 'drill' ? 'code_walkthrough' : (targetTopic?.round ?? 'project_deep_dive')]
       : params.has('rounds')
         ? requested
         : loop.slice(0, 1)
@@ -468,7 +482,10 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
     start.mutate({
       roleId: role.id,
       ...(gapId === null ? {} : { gapId }),
+      ...(mode === 'transfer' && practiceGap?.artifactId !== undefined && transferTopicId !== null
+        ? { transferTopicId } : {}),
       ...(story === undefined ? {} : { storyId: story.id, storyRevision: story.revision }),
+      ...(design === undefined ? {} : { designId: design.id, designRevision: design.revision }),
       ...(gapId === null && requestedTopic !== undefined && rounds.includes(requestedTopic.round)
         ? { topicIds: [requestedTopic.id] }
         : {}),
@@ -535,6 +552,19 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
           ) : (
             <>
               <p>{practiceGap.summary}</p>
+              {mode === 'transfer' && practiceGap.artifactId !== undefined && (
+                <label className="mt-3 block text-sm">
+                  Choose an unfamiliar topic that tests the same skill
+                  <select className="journey-select mt-2" value={transferTopicId ?? ''}
+                    onChange={(event) => updateSetup('transferTopicId', event.target.value)}>
+                    <option value="">Choose a topic</option>
+                    {data.topics.filter((topic) => [
+                      'dbms.indexes', 'dsa.hash_maps', 'dsa.bfs_dfs',
+                      'dbms.transactions_isolation', 'os.deadlock', 'backend.rest_idempotency',
+                    ].includes(topic.id)).map((topic) => <option key={topic.id} value={topic.id}>{topic.title}</option>)}
+                  </select>
+                </label>
+              )}
               <p className="mt-2 text-xs text-quiet">
                 The saved target and original assessment level determine this drill. Coaching does
                 not close a gap.
@@ -783,10 +813,12 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
               (gapId !== null &&
                 (practiceGap === undefined ||
                   practiceGap.status !== (mode === 'transfer' ? 'drilled' : 'open'))) ||
+              (mode === 'transfer' && practiceGap?.artifactId !== undefined && !transferTopicId) ||
               (gapId === null &&
                 requestedTopicId !== null &&
                 (requestedTopic === undefined || !rounds.includes(requestedTopic.round))) ||
               (storyId !== null && (story === undefined || !rounds.includes('behavioral'))) ||
+              (designId !== null && (design === undefined || !rounds.includes('system_design'))) ||
               start.isPending ||
               rounds.length === 0 ||
               noProject ||
@@ -949,6 +981,7 @@ function InterviewRoom({
   })
   const [spoken, setSpoken] = useState<SpokenAnswer | null>(null)
   const [voice, setVoice] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
   const [delivery, setDelivery] = useState<Record<string, number | string> | null>(null)
   const [now, setNow] = useState(Date.now())
   const answerBox = useRef<HTMLTextAreaElement>(null)
@@ -988,7 +1021,12 @@ function InterviewRoom({
     mutationFn: (text: string) => api.answer(sessionId, text),
     onSuccess: (update) => {
       setRoom((current) => (current === null ? current : absorb(current, update)))
-      if (voice && update.question !== undefined) void speak(update.question.text).catch(() => {})
+      if (voice && update.question !== undefined) {
+        setSpeechError(null)
+        void speak(update.question.text).catch(() =>
+          setSpeechError('Question audio could not play. The question remains available as text.'),
+        )
+      }
       else cancelSpeech()
       void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'topics' })
     },
@@ -1240,12 +1278,16 @@ function InterviewRoom({
                         checked={voice}
                         onChange={(event) => {
                           setVoice(event.target.checked)
-                          if (!event.target.checked) cancelSpeech()
+                          if (!event.target.checked) {
+                            cancelSpeech()
+                            setSpeechError(null)
+                          }
                         }}
                       />
                       read questions aloud and let me answer by voice
                     </label>
                   </div>
+                  {speechError !== null && <p role="alert" className="mt-2 text-xs text-broken">{speechError}</p>}
                   {voice && (
                     <div className="mt-2 space-y-3">
                       <LiveRecorder

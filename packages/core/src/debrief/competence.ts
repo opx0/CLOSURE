@@ -13,7 +13,7 @@ import {
 } from '@levelhead/contracts'
 import type { SessionView } from '../events/replay.ts'
 import { renderLedger } from '../gaps/ledger.ts'
-import { topicById, nextTransferVariant } from '../topics/index.ts'
+import { topicById, nextTransferVariant, TRANSFER_VARIANTS } from '../topics/index.ts'
 import { spanViolations } from '../events/sources.ts'
 
 // One of the debrief's two halves. This file may name findings, gaps, rubrics and competencies and
@@ -97,6 +97,10 @@ export function improvementPlan(
   const historical = view.historicalFindings ?? view.findings
   for (const [id] of view.supersededFindings ?? []) {
     const finding = historical.find((finding) => finding.id === id)
+    const correction = finding === undefined ? undefined : view.answerCorrections?.filter(
+      (item) => item.attemptId === finding.attemptId,
+    ).at(-1)
+    if (correction && view.reassessedRevisions?.get(correction.attemptId) === correction.revision) continue
     if (finding !== undefined)
       uncertainty.push(
         summary(
@@ -165,6 +169,7 @@ export function practiceActionForGap(
   } = {},
 ): ImprovementPlan['leading'][number]['nextAction'] {
   if (gap.status === 'open') {
+    if (gap.snapshotId !== undefined && gap.artifactId !== undefined) return 'drill'
     if (gap.topicId !== undefined && topicById(gap.topicId) !== undefined) return 'drill'
     if (
       gap.claimId !== undefined &&
@@ -177,6 +182,9 @@ export function practiceActionForGap(
     gap.topicId !== undefined &&
     nextTransferVariant(gap.topicId, context.exposedVariants ?? new Set()) !== undefined
   )
+    return 'transfer'
+  if (gap.status === 'drilled' && gap.artifactId !== undefined &&
+    TRANSFER_VARIANTS.some((variant) => nextTransferVariant(variant.topicId, context.exposedVariants ?? new Set()) !== undefined))
     return 'transfer'
   return 'unavailable'
 }

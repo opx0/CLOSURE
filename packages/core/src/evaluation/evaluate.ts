@@ -19,6 +19,7 @@ import {
   type Span,
   type Competency,
   type Topic,
+  type Design,
 } from '@levelhead/contracts'
 import { answerEvaluationPrompt, type AnswerEvaluationVars } from '@levelhead/prompts'
 import type { ArtifactContext } from '../ports/conductor.ts'
@@ -114,6 +115,7 @@ export interface EvaluateAnswerInput {
   // Present only on a walkthrough (§4.8); where an answer contradicts the code shown, the code wins.
   artifact?: ArtifactContext
   topic?: Topic
+  design?: Design
   level: Level
   answerText: string
   answerSourceId: string
@@ -199,6 +201,7 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
     ...(input.topic === undefined
       ? {}
       : { topic: { area: input.topic.area, title: input.topic.title, ask: input.topic.ask } }),
+    ...(input.design === undefined ? {} : { design: input.design }),
     anchors: anchorsForTurn(input),
     // Conductor and Evaluator are handed the same lines, or a walkthrough is judged against code
     // the candidate was never shown.

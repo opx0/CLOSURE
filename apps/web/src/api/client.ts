@@ -120,6 +120,10 @@ export const api = {
       `/sessions/${encodeURIComponent(id)}/corrections`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+  reassessAnswer: (id: string, body: { requestId: string; attemptId: string; revision: number }) =>
+    request<{ revision: number; findings: number }>(`/sessions/${encodeURIComponent(id)}/reassess`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
   reviewFinding: (id: string, body: Body<'/sessions/{id}/feedback', 'post'>) =>
     request<Json<'/sessions/{id}/feedback', 'post'>>(
       `/sessions/${encodeURIComponent(id)}/feedback`,
@@ -129,6 +133,9 @@ export const api = {
   stories: () => request<Json<'/stories', 'get'>>('/stories'),
   saveStory: (story: Body<'/stories', 'post'>) =>
     request<Json<'/stories', 'post'>>('/stories', { method: 'POST', body: JSON.stringify(story) }),
+  designs: () => request<Json<'/designs', 'get'>>('/designs'),
+  saveDesign: (design: Body<'/designs', 'post'>) =>
+    request<Json<'/designs', 'post'>>('/designs', { method: 'POST', body: JSON.stringify(design) }),
   preparationGoals: () => request<Json<'/preparation/goals', 'get'>>('/preparation/goals'),
   savePreparationGoals: (goals: Body<'/preparation/goals', 'post'>) =>
     request<Json<'/preparation/goals', 'post'>>('/preparation/goals', {

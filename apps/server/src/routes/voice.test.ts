@@ -173,6 +173,73 @@ test('ticket issuance is scoped to the bearer owner and requires a live unanswer
   }
 })
 
+test('answering by text closes the old voice stream before the next question', async () => {
+  const recognizer = new WebSocketServer({
+    host: '127.0.0.1',
+    port: 0,
+    handleProtocols: (protocols) =>
+      protocols.has(`lh-sidecar.${TOKEN}`) ? `lh-sidecar.${TOKEN}` : false,
+  })
+  await new Promise<void>((resolve) => recognizer.once('listening', resolve))
+  const address = recognizer.address()
+  if (address === null || typeof address === 'string') throw new Error('sidecar did not listen')
+  const { app } = await testApi({
+    questions: ['First question.', 'Second question.'],
+    scripted: [EXTRACTION, { findings: [] }, { findings: [] }],
+    config: { VOICE_STREAM_URL: `ws://127.0.0.1:${address.port}`, VOICE_STREAM_TOKEN: TOKEN },
+  })
+  let socket: ClientSocket | null = null
+  try {
+    await confirmedClaim(app)
+    const started = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      payload: {
+        rounds: ['project_deep_dive'],
+        mode: 'coach',
+        turnsPerRound: 2,
+        drill: false,
+      },
+    })
+    expect(started.statusCode).toBe(201)
+    const id = started.json().sessionId as string
+    const oldAttempt = started.json().question.attemptId as string
+    const ticket = (
+      await app.inject({ method: 'POST', url: `/sessions/${id}/voice-ticket` })
+    ).json().ticket as string
+    await app.listen({ host: '127.0.0.1', port: 0 })
+    const listener = app.server.address()
+    if (listener === null || typeof listener === 'string') throw new Error('app did not listen')
+    const origin = `http://127.0.0.1:${listener.port}`
+    socket = new ClientSocket(
+      `ws://127.0.0.1:${listener.port}/sessions/${id}/voice`,
+      [`lh-voice.${ticket}`],
+      { headers: { Origin: origin } },
+    )
+    const closed = new Promise<number>((resolve) => socket!.once('close', resolve))
+    await new Promise<void>((resolve, reject) => {
+      socket!.once('open', resolve)
+      socket!.once('error', reject)
+    })
+    const answer = await app.inject({
+      method: 'POST',
+      url: `/sessions/${id}/answers`,
+      payload: { text: 'A durable queue needs a lease and an idempotency key.' },
+    })
+    expect(answer.statusCode).toBe(200)
+    expect(answer.json().question.attemptId).not.toBe(oldAttempt)
+    expect(await closed).toBe(1000)
+    const nextTicket = await app.inject({ method: 'POST', url: `/sessions/${id}/voice-ticket` })
+    expect(nextTicket.statusCode).toBe(200)
+    expect(nextTicket.json().attemptId).toBe(answer.json().question.attemptId)
+  } finally {
+    socket?.terminate()
+    await app.close()
+    for (const peer of recognizer.clients) peer.terminate()
+    await new Promise<void>((resolve) => recognizer.close(() => resolve()))
+  }
+})
+
 test('a fresh ticket reattaches to the same recognizer stream and duplicate audio is not forwarded', async () => {
   let sidecarConnections = 0
   let sidecarFrames = 0

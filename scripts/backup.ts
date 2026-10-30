@@ -9,15 +9,16 @@ interface Entry {
   bytes: number
 }
 interface Manifest {
-  version: 1 | 2 | 3
+  version: 1 | 2 | 3 | 4
   store: 'jsonl'
   files: Entry[]
   settings?: Record<string, string>
 }
-type RootKind = 'events' | 'exports' | 'plans' | 'nudges' | 'benchmarks'
+type RootKind = 'events' | 'exports' | 'plans' | 'nudges' | 'benchmarks' | 'sources'
 const SETTING_KEYS = [
   'LEVELHEAD_STORE',
   'LEVELHEAD_EVENT_DIR',
+  'LEVELHEAD_SOURCE_DIR',
   'LEVELHEAD_EXPORT_DIR',
   'LEVELHEAD_HOST',
   'PORT',
@@ -102,7 +103,7 @@ export async function backupJsonl(
   eventDir: string,
   exportDir: string,
   destination: string,
-  workerDirs?: { plans: string; nudges: string; benchmarks?: string },
+  workerDirs?: { plans: string; nudges: string; benchmarks?: string; sources?: string },
   settings?: Record<string, string | undefined>,
 ): Promise<number> {
   if (!(await lstat(eventDir)).isDirectory())
@@ -113,7 +114,10 @@ export async function backupJsonl(
     plans: workerDirs ? await optionalRoot(workerDirs.plans) : null,
     nudges: workerDirs ? await optionalRoot(workerDirs.nudges) : null,
     benchmarks: workerDirs?.benchmarks ? await optionalRoot(workerDirs.benchmarks) : null,
+    sources: workerDirs?.sources ? await optionalRoot(workerDirs.sources) : null,
   }
+  if (workerDirs?.sources && roots.sources === null)
+    throw new Error('Configured source root does not exist')
   const target = join(await realpath(dirname(resolve(destination))), basename(resolve(destination)))
   for (const root of Object.values(roots).filter((path): path is string => path !== null)) {
     if (within(root, target) || within(target, root))
@@ -126,7 +130,10 @@ export async function backupJsonl(
       if (root) files.push(...(await inventory(root, kind)))
       if (kind === 'exports' && (await optionalRoot(exportDir)) !== root)
         throw new Error('Source changed during backup; stop writers')
-      if (workerDirs && (kind === 'plans' || kind === 'nudges' || kind === 'benchmarks')) {
+      if (
+        workerDirs &&
+        (kind === 'plans' || kind === 'nudges' || kind === 'benchmarks' || kind === 'sources')
+      ) {
         const configured = workerDirs[kind]
         const current = configured ? await optionalRoot(configured) : null
         if (current !== root) throw new Error('Source changed during backup; stop writers')
@@ -156,7 +163,13 @@ export async function backupJsonl(
     await writeFile(
       join(created, 'manifest.json'),
       JSON.stringify({
-        version: settings !== undefined || workerDirs?.benchmarks ? 3 : workerDirs ? 2 : 1,
+        version: workerDirs?.sources
+          ? 4
+          : settings !== undefined || workerDirs?.benchmarks
+            ? 3
+            : workerDirs
+              ? 2
+              : 1,
         store: 'jsonl',
         files,
         ...(settings === undefined ? {} : { settings: safeBackupSettings(settings) }),
@@ -179,7 +192,10 @@ export async function restoreJsonl(backup: string, destination: string): Promise
     !manifest ||
     typeof manifest !== 'object' ||
     !('version' in manifest) ||
-    (manifest.version !== 1 && manifest.version !== 2 && manifest.version !== 3) ||
+    (manifest.version !== 1 &&
+      manifest.version !== 2 &&
+      manifest.version !== 3 &&
+      manifest.version !== 4) ||
     !('store' in manifest) ||
     manifest.store !== 'jsonl' ||
     !('files' in manifest) ||
@@ -190,7 +206,7 @@ export async function restoreJsonl(backup: string, destination: string): Promise
   let settings: Record<string, string> | undefined
   if ('settings' in manifest) {
     if (
-      manifest.version !== 3 ||
+      (manifest.version !== 3 && manifest.version !== 4) ||
       !manifest.settings ||
       typeof manifest.settings !== 'object' ||
       Array.isArray(manifest.settings)
@@ -228,7 +244,9 @@ export async function restoreJsonl(backup: string, destination: string): Promise
         ? /^(events|exports)\//.test(item.path)
         : manifest.version === 2
           ? /^(events|exports|plans|nudges)\//.test(item.path)
-          : /^(events|exports|plans|nudges|benchmarks)\//.test(item.path)) ||
+          : manifest.version === 3
+            ? /^(events|exports|plans|nudges|benchmarks)\//.test(item.path)
+            : /^(events|exports|plans|nudges|benchmarks|sources)\//.test(item.path)) ||
       item.path.split('/').some((part) => !part || part === '.' || part === '..') ||
       seen.has(item.path)
     )
@@ -244,7 +262,9 @@ export async function restoreJsonl(backup: string, destination: string): Promise
       ? ['events', 'exports']
       : manifest.version === 2
         ? ['events', 'exports', 'plans', 'nudges']
-        : ['events', 'exports', 'plans', 'nudges', 'benchmarks']
+        : manifest.version === 3
+          ? ['events', 'exports', 'plans', 'nudges', 'benchmarks']
+          : ['events', 'exports', 'plans', 'nudges', 'benchmarks', 'sources']
   ) as RootKind[]
   for (const name of await readdir(root)) {
     if (name !== 'manifest.json' && !allowedRoots.includes(name as RootKind))
@@ -280,8 +300,10 @@ export async function restoreJsonl(backup: string, destination: string): Promise
       await mkdir(join(created, 'plans'), { recursive: true, mode: 0o700 })
       await mkdir(join(created, 'nudges'), { recursive: true, mode: 0o700 })
     }
-    if (manifest.version === 3)
+    if (manifest.version >= 3)
       await mkdir(join(created, 'benchmarks'), { recursive: true, mode: 0o700 })
+    if (manifest.version === 4)
+      await mkdir(join(created, 'sources'), { recursive: true, mode: 0o700 })
     if (settings !== undefined)
       await writeFile(join(created, 'recovery-settings.json'), JSON.stringify(settings, null, 2), {
         flag: 'wx',
@@ -314,10 +336,11 @@ if (import.meta.main) {
         '..',
         'benchmarks',
       ),
+      ...(process.env.LEVELHEAD_SOURCE_DIR ? { sources: process.env.LEVELHEAD_SOURCE_DIR } : {}),
     },
     process.env,
   )
   console.log(
-    `Backed up ${count} files. JSONL events, exports, worker plans, nudge ledgers and benchmark outputs only; no DB, repository checkout, configuration secrets or model assets. Writer shutdown is your assertion, not detected.`,
+    `Backed up ${count} files. JSONL events, exports, worker data and any explicitly configured source directory are included; source files are copied verbatim and may contain secrets. Database and model assets are not included. Restore source path mapping is configured separately. Writer shutdown is your assertion, not detected.`,
   )
 }

@@ -230,7 +230,7 @@ test('an unattended timed mock closes on the timer without an answer request', a
   }
 }, 15_000)
 
-test('a closed timed mock reopens from a fresh server over its JSONL history', async () => {
+test('a completed multi-round timed mock reopens from a fresh server over its JSONL history', async () => {
   const root = await mkdtemp(join(tmpdir(), 'levelhead-timed-restart-'))
   const config = loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'fatal', LEVELHEAD_EVENT_DIR: root })
   const make = () =>
@@ -238,8 +238,8 @@ test('a closed timed mock reopens from a fresh server over its JSONL history', a
       storeFor: () => new JsonlEventStore(root, 'owner'),
       clock: new SystemClock(),
       ids: new RandomIds(),
-      conductor: new ScriptedConductor(['Explain indexing.']),
-      evaluator: new ScriptedEvaluator([]),
+      conductor: new ScriptedConductor(['Explain indexing.', 'Explain a search algorithm.']),
+      evaluator: new ScriptedEvaluator([finding, finding]),
       ceilings: { sessionCostUsd: 2, sessionTokens: 120000, modelCallsPerTurn: 3 },
       logger: silentLogger,
       queue: null,
@@ -253,33 +253,49 @@ test('a closed timed mock reopens from a fresh server over its JSONL history', a
       url: '/sessions',
       payload: {
         mode: 'simulation',
-        rounds: ['cs_fundamentals'],
+        rounds: ['cs_fundamentals', 'problem_solving'],
         turnsPerRound: 1,
         drill: false,
         timedMock: { answerSeconds: 90 },
       },
     })
     const id = started.json().sessionId as string
-    expect((await first.inject({ method: 'POST', url: `/sessions/${id}/stop` })).statusCode).toBe(
-      200,
-    )
+    const next = await first.inject({
+      method: 'POST',
+      url: `/sessions/${id}/answers`,
+      payload: { text: answer },
+    })
+    expect(next.json()).toMatchObject({
+      status: 'awaiting_answer',
+      round: { index: 1 },
+      findings: [{ attemptId: started.json().question.attemptId }],
+    })
+    expect(next.json().deadlineAt).toBeTruthy()
+    const final = await first.inject({
+      method: 'POST',
+      url: `/sessions/${id}/answers`,
+      payload: { text: answer },
+    })
+    expect(final.json()).toMatchObject({ status: 'closed', stoppedBy: 'turns' })
     await first.close()
     reopened = await make()
     const view = (await reopened.inject(`/sessions/${id}`)).json()
     expect(view.availability).toBe('closed')
     expect(view.session.timing).toEqual({ answerSeconds: 90, turnsPerRound: 1 })
-    expect(view.closed.reason).toBe('stopped')
-    expect(view.transcript.filter((entry: { role: string }) => entry.role === 'candidate')).toEqual(
-      [],
-    )
+    expect(view.session.rounds).toEqual(['cs_fundamentals', 'problem_solving'])
+    expect(view.closed.reason).toBe('turns')
+    expect(
+      view.transcript.filter((entry: { role: string }) => entry.role === 'candidate'),
+    ).toHaveLength(2)
+    expect(view.findings).toHaveLength(2)
     expect(
       (await reopened.inject(`/sessions/${id}/events`))
         .json()
-        .some(
+        .filter(
           (event: { kind: string; payload: { change?: string } }) =>
-            event.kind === 'state_change' && event.payload.change === 'answer_stopped',
+            event.kind === 'state_change' && event.payload.change === 'round_started',
         ),
-    ).toBe(true)
+    ).toHaveLength(2)
   } finally {
     await reopened?.close()
     await first.close()

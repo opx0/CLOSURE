@@ -10,6 +10,7 @@ import { SnapshotSchema } from './snapshot.ts'
 import { FindingSchema } from './finding.ts'
 import { AnswerCorrectionSchema, FindingReviewSchema } from './feedback.ts'
 import { StorySchema } from './story.ts'
+import { DesignSchema } from './design.ts'
 import { GapEntrySchema, GapStatusSchema, PracticeOutcomeSchema } from './gap.ts'
 import { InvocationRecordSchema } from './invocation.ts'
 import {
@@ -131,6 +132,8 @@ export const QuestionRenderedSchema = eventOf(
     invocation: InvocationRecordSchema,
     storyId: Type.Optional(Type.String({ minLength: 1 })),
     storyRevision: Type.Optional(Type.Integer({ minimum: 1 })),
+    designId: Type.Optional(Type.String({ minLength: 1 })),
+    designRevision: Type.Optional(Type.Integer({ minimum: 1 })),
   }),
 )
 
@@ -171,6 +174,16 @@ export const StateChangeSchema = eventOf(
   'state_change',
   Type.Union([
     Type.Object({ change: Type.Literal('answer_corrected'), ...AnswerCorrectionSchema.properties }),
+    Type.Object({
+      change: Type.Literal('answer_reassessed'),
+      requestId: Type.String({ minLength: 1, maxLength: 128 }),
+      attemptId: Type.String({ minLength: 1 }),
+      revision: Type.Integer({ minimum: 2 }),
+      findings: Type.Array(FindingSchema),
+      spans: Type.Array(SpanSchema),
+      evidence: Type.Array(EvidenceSchema),
+      invocation: InvocationRecordSchema,
+    }),
     Type.Object({ change: Type.Literal('finding_reviewed'), ...FindingReviewSchema.properties }),
     Type.Object({
       change: Type.Literal('practice_assistance'),
@@ -185,6 +198,7 @@ export const StateChangeSchema = eventOf(
     }),
     Type.Object({ change: Type.Literal('preparation_goals_saved'), goals: PreparationGoalsSchema }),
     Type.Object({ change: Type.Literal('story_saved'), story: StorySchema }),
+    Type.Object({ change: Type.Literal('design_saved'), design: DesignSchema }),
     Type.Object({
       change: Type.Literal('practice_plan_saved'),
       gapId: Type.String({ minLength: 1 }),

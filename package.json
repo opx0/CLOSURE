@@ -20,6 +20,8 @@
     "runtime:budget": "bun run scripts/runtime-budget.ts",
     "models:preflight": "bun run benchmarks/src/local-models/cli.ts",
     "models:asr:run": "bun run benchmarks/src/local-models/asr-cli.ts",
+    "models:llm:run": "bun run benchmarks/src/local-models/llm-cli.ts",
+    "models:select": "bun run benchmarks/src/local-models/select-cli.ts",
     "feedback:check": "bun run scripts/check-feedback.ts",
     "review:packet": "bun run scripts/review-packet.ts",
     "review:validate": "bun run scripts/review-records.ts",

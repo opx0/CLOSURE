@@ -117,3 +117,55 @@ test('a server restart preserves the draft and ends an interrupted Simulation wi
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('a timed two-round Simulation survives page reload and reopens after server restart', async ({
+  page,
+}) => {
+  const root = await mkdtemp(join(tmpdir(), 'levelhead-timed-browser-'))
+  let server: Awaited<ReturnType<typeof start>> | undefined
+  try {
+    server = await start(root)
+    const origin = `http://127.0.0.1:${server.port}`
+    const answer = 'A B-tree stores ordered keys and updates them on inserts.'
+    const started = await page.request.post(`${origin}/sessions`, {
+      data: {
+        mode: 'simulation',
+        rounds: ['cs_fundamentals', 'problem_solving'],
+        turnsPerRound: 1,
+        drill: false,
+        timedMock: { answerSeconds: 90 },
+      },
+    })
+    expect(started.status()).toBe(201)
+    const id = (await started.json()).sessionId as string
+    await page.goto(`${origin}/app/session?id=${id}`)
+    await expect(page.getByText('Round 1 of 2 · CS fundamentals')).toBeVisible()
+    await expect(page.getByRole('timer')).toContainText('seconds left')
+    await page.getByPlaceholder('Answer in your own words').fill(answer)
+    await page.getByRole('button', { name: 'Send answer' }).click()
+    await expect(page.getByText('Round 2 of 2 · Problem solving')).toBeVisible()
+    await expect(page.getByRole('timer')).toContainText('seconds left')
+    await page.reload()
+    await expect(page.getByText('Round 2 of 2 · Problem solving')).toBeVisible()
+    await expect(page.getByPlaceholder('Answer in your own words')).toBeVisible()
+    await expect(page.getByRole('timer')).toContainText('seconds left')
+    await page.getByPlaceholder('Answer in your own words').fill(answer)
+    await page.getByRole('button', { name: 'Send answer' }).click()
+    await expect(page.getByText('Interview complete')).toBeVisible()
+    const port = server.port
+    await stop(server.process)
+    server = await start(root, port)
+    await page.reload()
+    await expect(page.getByText('Interview complete')).toBeVisible()
+    await expect(page.getByText('Round 1 of 2 · CS fundamentals')).toBeVisible()
+    await expect(page.getByText('Round 2 of 2 · Problem solving')).toBeVisible()
+    const saved = await (await page.request.get(`${origin}/sessions/${id}`)).json()
+    expect(saved.availability).toBe('closed')
+    expect(saved.session.timing).toEqual({ answerSeconds: 90, turnsPerRound: 1 })
+    expect(saved.closed.reason).toBe('turns')
+    expect(saved.findings).toHaveLength(2)
+  } finally {
+    if (server) await stop(server.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})

@@ -8,25 +8,24 @@ import { ScriptedConductor, ScriptedEvaluator } from '../../../cli/src/testing/f
 const root = process.env.RECOVERY_EVENT_DIR
 if (!root) throw new Error('The restart test must provide its own temporary event directory')
 const quote = 'A B-tree stores ordered keys and updates them on inserts.'
+const finding = {
+  findings: [
+    {
+      kind: 'competency',
+      competency: 'mechanism',
+      levelMet: 'junior',
+      rationale: 'Describes the keys.',
+      confidence: 0.8,
+      quotes: [quote],
+    },
+  ],
+}
 const app = await buildApp(loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'fatal' }), {
   storeFor: (owner) => new JsonlEventStore(root, typeof owner === 'string' ? owner : owner.ownerId),
   clock: new SystemClock(),
   ids: new RandomIds(),
   conductor: new ScriptedConductor(['Explain the index.', 'What changes on a write?']),
-  evaluator: new ScriptedEvaluator([
-    {
-      findings: [
-        {
-          kind: 'competency',
-          competency: 'mechanism',
-          levelMet: 'junior',
-          rationale: 'Describes the keys.',
-          confidence: 0.8,
-          quotes: [quote],
-        },
-      ],
-    },
-  ]),
+  evaluator: new ScriptedEvaluator([finding, finding]),
   ceilings: { sessionCostUsd: 2, sessionTokens: 120000, modelCallsPerTurn: 3 },
   logger: silentLogger,
   queue: null,

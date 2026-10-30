@@ -18,6 +18,7 @@ import type { ProviderResilience } from './resilience.ts'
 export interface OpenAiCompatibleConductorConfig {
   baseUrl: string
   modelAlias: string
+  modelId?: string | undefined
   apiKey?: string | undefined
   temperature?: number | undefined
   // Shared with the Evaluator when both are built together: the provider counts requests, not
@@ -41,6 +42,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       personaId: input.personaId,
       claim: input.claim,
       ...(input.story === undefined ? {} : { story: input.story }),
+      ...(input.design === undefined ? {} : { design: input.design }),
       transcript: input.transcript,
       seed: input.seed,
       round: input.round,
@@ -65,7 +67,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       this.config.baseUrl,
       this.config.apiKey,
       {
-        model: this.config.modelAlias,
+        model: this.config.modelId ?? this.config.modelAlias,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
@@ -121,7 +123,7 @@ export class OpenAiCompatibleConductor implements ConductorPort {
       this.config.baseUrl,
       this.config.apiKey,
       {
-        model: this.config.modelAlias,
+        model: this.config.modelId ?? this.config.modelAlias,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },

@@ -17,6 +17,7 @@ export interface ServerDeps {
   // Every store handed to a route is already scoped to one owner, so a route cannot forget to
   // filter (ADR-023).
   storeFor(owner: OwnerId | Principal): EventStore
+  sourceRelocation?: { from: string; to: string }
   clock: Clock
   ids: IdSource
   conductor: ConductorPort

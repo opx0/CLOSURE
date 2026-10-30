@@ -28,6 +28,8 @@ export const GapEntrySchema = Type.Object({
   competency: CompetencySchema,
   claimId: Type.Optional(Type.String({ minLength: 1 })),
   topicId: Type.Optional(Type.String({ minLength: 1 })),
+  snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+  artifactId: Type.Optional(Type.String({ minLength: 1 })),
   summary: Type.String({ minLength: 1 }),
   status: GapStatusSchema,
   // Carries the finding's citations forward — the ledger row must show the candidate's own words (§4.6's Evidence column).

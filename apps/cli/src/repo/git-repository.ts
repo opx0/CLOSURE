@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import type { Buffer } from 'node:buffer'
-import { resolve } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { Artifact, Snapshot } from '@levelhead/contracts'
 import {
   extractSymbols,
@@ -115,12 +115,27 @@ export interface GitRepositoryDeps {
   // Only `pinnedAt` needs it; pinning is a wall-clock act, so a real clock is a fine default.
   clock?: Clock
   limits?: Partial<GitRepositoryLimits>
+  sourceRelocation?: { from: string; to: string }
+}
+
+export function sourceRelocationFromEnv(
+  env: Record<string, string | undefined>,
+): { from: string; to: string } | undefined {
+  const from = env.LEVELHEAD_RESTORE_SOURCE_FROM
+  const to = env.LEVELHEAD_RESTORE_SOURCE_TO
+  if (from === undefined && to === undefined) return undefined
+  if (!from || !to || !isAbsolute(from) || !isAbsolute(to))
+    throw new Error(
+      'Source recovery requires both absolute LEVELHEAD_RESTORE_SOURCE_FROM and LEVELHEAD_RESTORE_SOURCE_TO paths',
+    )
+  return { from, to }
 }
 
 export class GitRepository implements RepositoryPort {
   readonly #ids: IdSource
   readonly #clock: Clock
   readonly #limits: GitRepositoryLimits
+  readonly #sourceRelocation: { from: string; to: string } | undefined
   // Keyed by snapshot id, not repo path — the path isn't the citation and the snapshot is deletable.
   readonly #pinned = new Map<string, PinnedAt>()
 
@@ -128,11 +143,27 @@ export class GitRepository implements RepositoryPort {
     this.#ids = deps.ids
     this.#clock = deps.clock ?? new SystemClock()
     this.#limits = { ...DEFAULT_LIMITS, ...deps.limits }
+    if (
+      deps.sourceRelocation &&
+      (!isAbsolute(deps.sourceRelocation.from) || !isAbsolute(deps.sourceRelocation.to))
+    )
+      throw new Error('Source relocation requires absolute paths')
+    this.#sourceRelocation = deps.sourceRelocation
   }
 
   // Needed because replay reconstructs state from events without ever calling `pin`.
   register(snapshot: Snapshot): void {
-    this.#pinned.set(snapshot.id, { repoPath: snapshot.repoPath, commit: snapshot.commit })
+    this.#pinned.delete(snapshot.id)
+    let repoPath = snapshot.repoPath
+    if (this.#sourceRelocation) {
+      const from = resolve(this.#sourceRelocation.from)
+      const path = resolve(repoPath)
+      const subpath = relative(from, path)
+      // Fail closed: in recovery mode never read an original repository outside the restored root.
+      if (subpath === '..' || subpath.startsWith(`..${sep}`) || isAbsolute(subpath)) return
+      repoPath = resolve(this.#sourceRelocation.to, subpath)
+    }
+    this.#pinned.set(snapshot.id, { repoPath, commit: snapshot.commit })
   }
 
   async pin(repoPath: string, ref: string): Promise<PinnedRepository> {

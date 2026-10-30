@@ -46,6 +46,7 @@ import type {
   Artifact,
   Claim,
   Story,
+  Design,
   Competency,
   EventOf,
   Evidence,
@@ -123,6 +124,7 @@ export interface PinnedContext {
 export interface RunSessionInput {
   claims: readonly Claim[]
   story?: Story
+  design?: Design
   // Replaces planning: each topic round asks exactly the given topics whose area belongs to it.
   topics?: readonly Topic[]
   // Topic ids asked in earlier sessions, so planning reaches for ones not asked yet.
@@ -308,6 +310,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     ...(input.timing === undefined ? {} : { timing: input.timing }),
     ...(input.pinned === undefined ? {} : { snapshotId: input.pinned.snapshot.id }),
     ...(input.story === undefined ? {} : { story: input.story }),
+    ...(input.design === undefined ? {} : { design: input.design }),
     ...((input.drillGap ?? input.transferGap) === undefined
       ? {}
       : { practiceGapId: (input.drillGap ?? input.transferGap)!.id }),
@@ -370,7 +373,8 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       artifacts: input.pinned.artifacts,
       evidence: input.pinned.evidence,
       claims: inPlay,
-    }).slice(0, subjectsPerRound(input.turnsPerRound))
+    }).filter(({ artifact }) => input.drillGap?.artifactId === undefined || artifact.id === input.drillGap.artifactId)
+      .slice(0, subjectsPerRound(input.turnsPerRound))
     const opened: Subject[] = []
     for (const { artifact, claim } of ranked) {
       const code = await input.pinned.repository.read(artifact)
@@ -451,6 +455,18 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     turn: number,
     reuseQuestion?: string,
   ): Promise<TurnResult | null> => {
+    const sourceAvailable = async (): Promise<boolean> => {
+      if (subject.kind !== 'artifact') return true
+      const pinned = input.pinned
+      const source = pinned?.artifacts.find((item) => item.id === subject.artifact.artifactId)
+      if (!pinned || !source || (await pinned.repository.read(source)) !== subject.artifact.code) {
+        deps.io.notice('The pinned source is no longer available. This question cannot be assessed.')
+        outcome.stoppedBy = 'end_topic'
+        return false
+      }
+      return true
+    }
+    if (!(await sourceAvailable())) return null
     // One attempt is one turn for budgeting: a drill/retry is charged its own turn, not the one that surfaced it.
     ceilings.beginTurn()
     const attemptId = deps.ids.next('att')
@@ -487,6 +503,9 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         personaId: input.personaId,
         claim,
         ...(round === 'behavioral' && input.story !== undefined ? { story: input.story } : {}),
+        ...(round === 'system_design' && input.design !== undefined
+          ? { design: input.design }
+          : {}),
         ...(topic === undefined
           ? {}
           : { topic: { id: topic.id, area: topic.area, title: topic.title, ask: topic.ask } }),
@@ -495,6 +514,7 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         ...(artifact === undefined ? {} : { artifact }),
       })
       ceilings.record(rendered.invocation)
+      if (!(await sourceAvailable())) return null
       text = rendered.text
       await log.append('question', {
         attemptId,
@@ -502,6 +522,9 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         invocation: rendered.invocation,
         ...(round === 'behavioral' && input.story !== undefined
           ? { storyId: input.story.id, storyRevision: input.story.revision }
+          : {}),
+        ...(round === 'system_design' && input.design !== undefined
+          ? { designId: input.design.id, designRevision: input.design.revision }
           : {}),
       })
     } else {
@@ -512,6 +535,9 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
         invocation: { ...(await lastQuestionInvocation()), id: deps.ids.next('inv') },
         ...(round === 'behavioral' && input.story !== undefined
           ? { storyId: input.story.id, storyRevision: input.story.revision }
+          : {}),
+        ...(round === 'system_design' && input.design !== undefined
+          ? { designId: input.design.id, designRevision: input.design.revision }
           : {}),
       })
     }
@@ -598,6 +624,9 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
     transcript.push({ role: 'candidate', text: answerText })
     await goto('answer_received')
 
+    // Keep the submitted answer, but never judge against a source deleted during capture.
+    if (!(await sourceAvailable())) return null
+
     ceilings.assertCanCall()
     const evaluated = await evaluateAnswer({
       attemptId,
@@ -616,8 +645,10 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       clock: deps.clock,
       ...(artifact === undefined ? {} : { artifact }),
       ...(topic === undefined ? {} : { topic }),
+      ...(round === 'system_design' && input.design !== undefined ? { design: input.design } : {}),
     })
     ceilings.record(evaluated.invocation)
+    if (!(await sourceAvailable())) return null
 
     if ('failed' in evaluated) {
       // Stop rather than continue judging nothing — that would leave a session that looks complete but isn't.
@@ -699,7 +730,8 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       findings,
       indexGaps([...gaps.values()]),
       { ids: deps.ids, clock: deps.clock },
-      subject.kind === 'topic' ? { topicId: subject.id } : {},
+      subject.kind === 'topic' ? { topicId: subject.id } : subject.kind === 'artifact' && input.pinned !== undefined
+        ? { snapshotId: input.pinned.snapshot.id, artifactId: subject.artifact.artifactId } : {},
     )
     for (const gap of opened) {
       await log.append('state_change', { change: 'gap_opened', gap })

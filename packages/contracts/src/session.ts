@@ -3,6 +3,7 @@ import { RoundKindSchema } from './round.ts'
 import { RoleIdSchema } from './role.ts'
 import { LevelSchema, RubricSetSchema } from './rubric.ts'
 import { StorySchema } from './story.ts'
+import { DesignSchema } from './design.ts'
 
 export const PreparationSelectionSchema = Type.Object(
   {
@@ -85,6 +86,7 @@ export const SessionSchema = Type.Object({
   practiceVariantId: Type.Optional(Type.String({ minLength: 1 })),
   practiceVariantVersion: Type.Optional(Type.Integer({ minimum: 1 })),
   story: Type.Optional(StorySchema),
+  design: Type.Optional(DesignSchema),
   startedAt: Type.String({ format: 'date-time' }),
 })
 export type Session = Static<typeof SessionSchema>

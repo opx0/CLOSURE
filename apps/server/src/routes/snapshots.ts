@@ -93,7 +93,13 @@ export function snapshotRoutes(deps: ServerDeps): FastifyPluginAsyncTypebox {
           return reply.code(404).send({ error: 'no such artifact', detail: `${id} ${artifactId}` })
         }
 
-        const repository = new GitRepository({ ids: deps.ids, clock: deps.clock })
+        const repository = new GitRepository({
+          ids: deps.ids,
+          clock: deps.clock,
+          ...(deps.sourceRelocation === undefined
+            ? {}
+            : { sourceRelocation: deps.sourceRelocation }),
+        })
         repository.register(entry.snapshot)
         const code = await repository.read(artifact)
         if (code === null) {

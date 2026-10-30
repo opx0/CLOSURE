@@ -22,6 +22,7 @@ const ANTHROPIC_VERSION = '2023-06-01'
 
 export interface StructuredEvaluatorConfig {
   modelAlias: string
+  localModelId?: string | undefined
   // Presence of a key picks Anthropic vs. the local OpenAI-compatible fallback. The local path is
   // for wiring only — not honesty-critical, and no calibration/agreement number may come from it.
   apiKey?: string | undefined
@@ -146,7 +147,7 @@ export class StructuredEvaluator implements EvaluatorPort {
       this.config.localBaseUrl,
       this.config.apiKey,
       {
-        model: this.config.modelAlias,
+        model: this.config.localModelId ?? this.config.modelAlias,
         max_tokens: request.maxOutputTokens,
         messages: [
           { role: 'system', content: request.system },

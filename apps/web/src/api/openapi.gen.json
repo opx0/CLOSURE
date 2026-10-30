@@ -2594,6 +2594,62 @@
                                   }
                                 }
                               },
+                              "design": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "revision",
+                                  "title",
+                                  "requirements",
+                                  "estimates",
+                                  "api",
+                                  "dataModel",
+                                  "diagram",
+                                  "constraint"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "revision": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  },
+                                  "title": {
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "type": "string"
+                                  },
+                                  "requirements": {
+                                    "minLength": 1,
+                                    "maxLength": 6000,
+                                    "type": "string"
+                                  },
+                                  "estimates": {
+                                    "maxLength": 4000,
+                                    "type": "string"
+                                  },
+                                  "api": {
+                                    "maxLength": 6000,
+                                    "type": "string"
+                                  },
+                                  "dataModel": {
+                                    "maxLength": 6000,
+                                    "type": "string"
+                                  },
+                                  "diagram": {
+                                    "maxLength": 6000,
+                                    "type": "string"
+                                  },
+                                  "constraint": {
+                                    "minLength": 1,
+                                    "maxLength": 2000,
+                                    "type": "string"
+                                  }
+                                }
+                              },
                               "startedAt": {
                                 "format": "date-time",
                                 "type": "string"
@@ -2679,6 +2735,10 @@
                     "minLength": 1,
                     "type": "string"
                   },
+                  "transferTopicId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
                   "snapshotId": {
                     "minLength": 1,
                     "type": "string"
@@ -2688,6 +2748,14 @@
                     "type": "string"
                   },
                   "storyRevision": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "designId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "designRevision": {
                     "minimum": 1,
                     "type": "integer"
                   },
@@ -7556,6 +7624,62 @@
                                 }
                               }
                             },
+                            "design": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "revision",
+                                "title",
+                                "requirements",
+                                "estimates",
+                                "api",
+                                "dataModel",
+                                "diagram",
+                                "constraint"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "revision": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                },
+                                "title": {
+                                  "minLength": 1,
+                                  "maxLength": 160,
+                                  "type": "string"
+                                },
+                                "requirements": {
+                                  "minLength": 1,
+                                  "maxLength": 6000,
+                                  "type": "string"
+                                },
+                                "estimates": {
+                                  "maxLength": 4000,
+                                  "type": "string"
+                                },
+                                "api": {
+                                  "maxLength": 6000,
+                                  "type": "string"
+                                },
+                                "dataModel": {
+                                  "maxLength": 6000,
+                                  "type": "string"
+                                },
+                                "diagram": {
+                                  "maxLength": 6000,
+                                  "type": "string"
+                                },
+                                "constraint": {
+                                  "minLength": 1,
+                                  "maxLength": 2000,
+                                  "type": "string"
+                                }
+                              }
+                            },
                             "startedAt": {
                               "format": "date-time",
                               "type": "string"
@@ -8583,6 +8707,14 @@
                             "type": "string"
                           },
                           "topicId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "artifactId": {
                             "minLength": 1,
                             "type": "string"
                           },
@@ -9828,6 +9960,14 @@
                                 "type": "string"
                               },
                               "storyRevision": {
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "designId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "designRevision": {
                                 "minimum": 1,
                                 "type": "integer"
                               }
@@ -11194,6 +11334,1105 @@
                                 "required": [
                                   "change",
                                   "requestId",
+                                  "attemptId",
+                                  "revision",
+                                  "findings",
+                                  "spans",
+                                  "evidence",
+                                  "invocation"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "answer_reassessed"
+                                    ]
+                                  },
+                                  "requestId": {
+                                    "minLength": 1,
+                                    "maxLength": 128,
+                                    "type": "string"
+                                  },
+                                  "attemptId": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "revision": {
+                                    "minimum": 2,
+                                    "type": "integer"
+                                  },
+                                  "findings": {
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "attemptId",
+                                            "rubric",
+                                            "level",
+                                            "rationale",
+                                            "confidence",
+                                            "modelVersion",
+                                            "promptVersion",
+                                            "transcriptSpanIds",
+                                            "evidenceIds",
+                                            "kind",
+                                            "claimId",
+                                            "verdict"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "rubric": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "version"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "version": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                }
+                                              }
+                                            },
+                                            "level": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "junior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mid"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "senior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "staff"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "rationale": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "confidence": {
+                                              "minimum": 0,
+                                              "maximum": 1,
+                                              "type": "number"
+                                            },
+                                            "modelVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "promptVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "transcriptSpanIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "evidenceIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "claim"
+                                              ]
+                                            },
+                                            "claimId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "verdict": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "supported"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "partially_supported"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "unsupported_by_available_evidence"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "contradicted"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "attemptId",
+                                            "rubric",
+                                            "level",
+                                            "rationale",
+                                            "confidence",
+                                            "modelVersion",
+                                            "promptVersion",
+                                            "transcriptSpanIds",
+                                            "evidenceIds",
+                                            "kind",
+                                            "claimId",
+                                            "abstention"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "rubric": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "version"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "version": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                }
+                                              }
+                                            },
+                                            "level": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "junior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mid"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "senior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "staff"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "rationale": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "confidence": {
+                                              "minimum": 0,
+                                              "maximum": 1,
+                                              "type": "number"
+                                            },
+                                            "modelVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "promptVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "transcriptSpanIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "evidenceIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "claim_abstained"
+                                              ]
+                                            },
+                                            "claimId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "abstention": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "insufficient_evidence"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "not_verifiable"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "attemptId",
+                                            "rubric",
+                                            "level",
+                                            "rationale",
+                                            "confidence",
+                                            "modelVersion",
+                                            "promptVersion",
+                                            "transcriptSpanIds",
+                                            "evidenceIds",
+                                            "kind",
+                                            "competency",
+                                            "signals"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "rubric": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "version"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "version": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                }
+                                              }
+                                            },
+                                            "level": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "junior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mid"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "senior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "staff"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "rationale": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "confidence": {
+                                              "minimum": 0,
+                                              "maximum": 1,
+                                              "type": "number"
+                                            },
+                                            "modelVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "promptVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "transcriptSpanIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "evidenceIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "composure"
+                                              ]
+                                            },
+                                            "competency": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mechanism"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "trade_offs"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "failure_modes"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "composure"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "signals": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "folding"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "fabricating"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "holding_ground"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "honest_yielding"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "coherence_after_interruption"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "escalation"
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "attemptId",
+                                            "rubric",
+                                            "level",
+                                            "rationale",
+                                            "confidence",
+                                            "modelVersion",
+                                            "promptVersion",
+                                            "transcriptSpanIds",
+                                            "evidenceIds",
+                                            "kind",
+                                            "competency",
+                                            "levelMet"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "rubric": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "version"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "version": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                }
+                                              }
+                                            },
+                                            "level": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "junior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mid"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "senior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "staff"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "rationale": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "confidence": {
+                                              "minimum": 0,
+                                              "maximum": 1,
+                                              "type": "number"
+                                            },
+                                            "modelVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "promptVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "transcriptSpanIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "evidenceIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "competency"
+                                              ]
+                                            },
+                                            "competency": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mechanism"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "trade_offs"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "failure_modes"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "composure"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "levelMet": {
+                                              "anyOf": [
+                                                {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "junior"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "mid"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "senior"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "staff"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "attemptId",
+                                            "rubric",
+                                            "level",
+                                            "rationale",
+                                            "confidence",
+                                            "modelVersion",
+                                            "promptVersion",
+                                            "transcriptSpanIds",
+                                            "evidenceIds",
+                                            "kind",
+                                            "competency",
+                                            "abstention"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "rubric": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "version"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "version": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                }
+                                              }
+                                            },
+                                            "level": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "junior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mid"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "senior"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "staff"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "rationale": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "confidence": {
+                                              "minimum": 0,
+                                              "maximum": 1,
+                                              "type": "number"
+                                            },
+                                            "modelVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "promptVersion": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "transcriptSpanIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "evidenceIds": {
+                                              "minItems": 1,
+                                              "type": "array",
+                                              "items": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "competency_abstained"
+                                              ]
+                                            },
+                                            "competency": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "mechanism"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "trade_offs"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "failure_modes"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "composure"
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "abstention": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "insufficient_evidence"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "not_verifiable"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "spans": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "sourceId",
+                                        "startByte",
+                                        "endByte",
+                                        "quoted"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        },
+                                        "sourceId": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        },
+                                        "startByte": {
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "endByte": {
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "quoted": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "subject",
+                                        "target",
+                                        "trust"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        },
+                                        "subject": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "required": [
+                                                "kind",
+                                                "claimId"
+                                              ],
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "claim"
+                                                  ]
+                                                },
+                                                "claimId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                }
+                                              }
+                                            },
+                                            {
+                                              "type": "object",
+                                              "required": [
+                                                "kind",
+                                                "attemptId"
+                                              ],
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "attempt"
+                                                  ]
+                                                },
+                                                "attemptId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        },
+                                        "target": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "required": [
+                                                "kind",
+                                                "spanId"
+                                              ],
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "span"
+                                                  ]
+                                                },
+                                                "spanId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                }
+                                              }
+                                            },
+                                            {
+                                              "type": "object",
+                                              "required": [
+                                                "kind",
+                                                "artifactId"
+                                              ],
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "artifact"
+                                                  ]
+                                                },
+                                                "artifactId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        },
+                                        "trust": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "candidate_asserted"
+                                              ]
+                                            },
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "repository_observed"
+                                              ]
+                                            },
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "transcript_observed"
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "invocation": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "port",
+                                      "modelAlias",
+                                      "promptId",
+                                      "promptVersion",
+                                      "promptHash",
+                                      "inputTokens",
+                                      "outputTokens",
+                                      "costUsd",
+                                      "stopReason",
+                                      "latencyMs",
+                                      "occurredAt"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "port": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "conductor"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "evaluator"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "modelAlias": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "promptId": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "promptVersion": {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      "promptHash": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "inputTokens": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      },
+                                      "outputTokens": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      },
+                                      "costUsd": {
+                                        "minimum": 0,
+                                        "type": "number"
+                                      },
+                                      "stopReason": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "end_turn"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "max_tokens"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "refusal"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "stop_sequence"
+                                            ]
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "other"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "latencyMs": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      },
+                                      "occurredAt": {
+                                        "format": "date-time",
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "requestId",
                                   "findingId",
                                   "state",
                                   "reason",
@@ -11457,6 +12696,77 @@
                                         "enum": [
                                           true
                                         ]
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "change",
+                                  "design"
+                                ],
+                                "properties": {
+                                  "change": {
+                                    "type": "string",
+                                    "enum": [
+                                      "design_saved"
+                                    ]
+                                  },
+                                  "design": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "revision",
+                                      "title",
+                                      "requirements",
+                                      "estimates",
+                                      "api",
+                                      "dataModel",
+                                      "diagram",
+                                      "constraint"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "revision": {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      "title": {
+                                        "minLength": 1,
+                                        "maxLength": 160,
+                                        "type": "string"
+                                      },
+                                      "requirements": {
+                                        "minLength": 1,
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "estimates": {
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "api": {
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "dataModel": {
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "diagram": {
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "constraint": {
+                                        "minLength": 1,
+                                        "maxLength": 2000,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -11801,6 +13111,62 @@
                                             "enum": [
                                               true
                                             ]
+                                          }
+                                        }
+                                      },
+                                      "design": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "revision",
+                                          "title",
+                                          "requirements",
+                                          "estimates",
+                                          "api",
+                                          "dataModel",
+                                          "diagram",
+                                          "constraint"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
+                                          "revision": {
+                                            "minimum": 1,
+                                            "type": "integer"
+                                          },
+                                          "title": {
+                                            "minLength": 1,
+                                            "maxLength": 160,
+                                            "type": "string"
+                                          },
+                                          "requirements": {
+                                            "minLength": 1,
+                                            "maxLength": 6000,
+                                            "type": "string"
+                                          },
+                                          "estimates": {
+                                            "maxLength": 4000,
+                                            "type": "string"
+                                          },
+                                          "api": {
+                                            "maxLength": 6000,
+                                            "type": "string"
+                                          },
+                                          "dataModel": {
+                                            "maxLength": 6000,
+                                            "type": "string"
+                                          },
+                                          "diagram": {
+                                            "maxLength": 6000,
+                                            "type": "string"
+                                          },
+                                          "constraint": {
+                                            "minLength": 1,
+                                            "maxLength": 2000,
+                                            "type": "string"
                                           }
                                         }
                                       },
@@ -12857,6 +14223,14 @@
                                         "type": "string"
                                       },
                                       "topicId": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "snapshotId": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "artifactId": {
                                         "minLength": 1,
                                         "type": "string"
                                       },
@@ -13994,6 +15368,14 @@
                             "type": "string"
                           },
                           "topicId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "artifactId": {
                             "minLength": 1,
                             "type": "string"
                           },
@@ -15419,6 +16801,14 @@
                                 "minLength": 1,
                                 "type": "string"
                               },
+                              "snapshotId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "artifactId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
                               "summary": {
                                 "minLength": 1,
                                 "type": "string"
@@ -15659,6 +17049,14 @@
                             "type": "string"
                           },
                           "topicId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "artifactId": {
                             "minLength": 1,
                             "type": "string"
                           },
@@ -19809,6 +21207,14 @@
                                 "minLength": 1,
                                 "type": "string"
                               },
+                              "snapshotId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "artifactId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
                               "summary": {
                                 "minLength": 1,
                                 "type": "string"
@@ -22950,6 +24356,141 @@
         }
       }
     },
+    "/sessions/{id}/reassess": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "attemptId",
+                  "revision"
+                ],
+                "properties": {
+                  "requestId": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "attemptId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 2,
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "revision",
+                    "findings"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "type": "integer"
+                    },
+                    "findings": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/preparation/goals": {
       "get": {
         "responses": {
@@ -23538,6 +25079,263 @@
                       "enum": [
                         true
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/designs": {
+      "get": {
+        "tags": [
+          "designs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "designs"
+                  ],
+                  "properties": {
+                    "designs": {
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "revision",
+                          "title",
+                          "requirements",
+                          "estimates",
+                          "api",
+                          "dataModel",
+                          "diagram",
+                          "constraint"
+                        ],
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "revision": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "title": {
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "type": "string"
+                          },
+                          "requirements": {
+                            "minLength": 1,
+                            "maxLength": 6000,
+                            "type": "string"
+                          },
+                          "estimates": {
+                            "maxLength": 4000,
+                            "type": "string"
+                          },
+                          "api": {
+                            "maxLength": 6000,
+                            "type": "string"
+                          },
+                          "dataModel": {
+                            "maxLength": 6000,
+                            "type": "string"
+                          },
+                          "diagram": {
+                            "maxLength": 6000,
+                            "type": "string"
+                          },
+                          "constraint": {
+                            "minLength": 1,
+                            "maxLength": 2000,
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "designs"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "previousRevision",
+                  "title",
+                  "requirements",
+                  "estimates",
+                  "api",
+                  "dataModel",
+                  "diagram",
+                  "constraint"
+                ],
+                "properties": {
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "previousRevision": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "type": "string"
+                  },
+                  "requirements": {
+                    "minLength": 1,
+                    "maxLength": 6000,
+                    "type": "string"
+                  },
+                  "estimates": {
+                    "maxLength": 4000,
+                    "type": "string"
+                  },
+                  "api": {
+                    "maxLength": 6000,
+                    "type": "string"
+                  },
+                  "dataModel": {
+                    "maxLength": 6000,
+                    "type": "string"
+                  },
+                  "diagram": {
+                    "maxLength": 6000,
+                    "type": "string"
+                  },
+                  "constraint": {
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "revision",
+                    "title",
+                    "requirements",
+                    "estimates",
+                    "api",
+                    "dataModel",
+                    "diagram",
+                    "constraint"
+                  ],
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "revision": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "title": {
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "type": "string"
+                    },
+                    "requirements": {
+                      "minLength": 1,
+                      "maxLength": 6000,
+                      "type": "string"
+                    },
+                    "estimates": {
+                      "maxLength": 4000,
+                      "type": "string"
+                    },
+                    "api": {
+                      "maxLength": 6000,
+                      "type": "string"
+                    },
+                    "dataModel": {
+                      "maxLength": 6000,
+                      "type": "string"
+                    },
+                    "diagram": {
+                      "maxLength": 6000,
+                      "type": "string"
+                    },
+                    "constraint": {
+                      "minLength": 1,
+                      "maxLength": 2000,
+                      "type": "string"
                     }
                   }
                 }
@@ -24480,6 +26278,62 @@
                                       }
                                     }
                                   },
+                                  "design": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "revision",
+                                      "title",
+                                      "requirements",
+                                      "estimates",
+                                      "api",
+                                      "dataModel",
+                                      "diagram",
+                                      "constraint"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      },
+                                      "revision": {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      "title": {
+                                        "minLength": 1,
+                                        "maxLength": 160,
+                                        "type": "string"
+                                      },
+                                      "requirements": {
+                                        "minLength": 1,
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "estimates": {
+                                        "maxLength": 4000,
+                                        "type": "string"
+                                      },
+                                      "api": {
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "dataModel": {
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "diagram": {
+                                        "maxLength": 6000,
+                                        "type": "string"
+                                      },
+                                      "constraint": {
+                                        "minLength": 1,
+                                        "maxLength": 2000,
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
                                   "startedAt": {
                                     "format": "date-time",
                                     "type": "string"
@@ -25152,6 +27006,14 @@
                                           "type": "string"
                                         },
                                         "storyRevision": {
+                                          "minimum": 1,
+                                          "type": "integer"
+                                        },
+                                        "designId": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        },
+                                        "designRevision": {
                                           "minimum": 1,
                                           "type": "integer"
                                         }
@@ -26518,6 +28380,1105 @@
                                           "required": [
                                             "change",
                                             "requestId",
+                                            "attemptId",
+                                            "revision",
+                                            "findings",
+                                            "spans",
+                                            "evidence",
+                                            "invocation"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "answer_reassessed"
+                                              ]
+                                            },
+                                            "requestId": {
+                                              "minLength": 1,
+                                              "maxLength": 128,
+                                              "type": "string"
+                                            },
+                                            "attemptId": {
+                                              "minLength": 1,
+                                              "type": "string"
+                                            },
+                                            "revision": {
+                                              "minimum": 2,
+                                              "type": "integer"
+                                            },
+                                            "findings": {
+                                              "type": "array",
+                                              "items": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "id",
+                                                      "attemptId",
+                                                      "rubric",
+                                                      "level",
+                                                      "rationale",
+                                                      "confidence",
+                                                      "modelVersion",
+                                                      "promptVersion",
+                                                      "transcriptSpanIds",
+                                                      "evidenceIds",
+                                                      "kind",
+                                                      "claimId",
+                                                      "verdict"
+                                                    ],
+                                                    "properties": {
+                                                      "id": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "attemptId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "rubric": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "id",
+                                                          "version"
+                                                        ],
+                                                        "properties": {
+                                                          "id": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          },
+                                                          "version": {
+                                                            "minimum": 1,
+                                                            "type": "integer"
+                                                          }
+                                                        }
+                                                      },
+                                                      "level": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "junior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mid"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "senior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "staff"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "rationale": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "confidence": {
+                                                        "minimum": 0,
+                                                        "maximum": 1,
+                                                        "type": "number"
+                                                      },
+                                                      "modelVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "promptVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "transcriptSpanIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "evidenceIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "kind": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "claim"
+                                                        ]
+                                                      },
+                                                      "claimId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "verdict": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "supported"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "partially_supported"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "unsupported_by_available_evidence"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "contradicted"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    }
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "id",
+                                                      "attemptId",
+                                                      "rubric",
+                                                      "level",
+                                                      "rationale",
+                                                      "confidence",
+                                                      "modelVersion",
+                                                      "promptVersion",
+                                                      "transcriptSpanIds",
+                                                      "evidenceIds",
+                                                      "kind",
+                                                      "claimId",
+                                                      "abstention"
+                                                    ],
+                                                    "properties": {
+                                                      "id": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "attemptId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "rubric": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "id",
+                                                          "version"
+                                                        ],
+                                                        "properties": {
+                                                          "id": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          },
+                                                          "version": {
+                                                            "minimum": 1,
+                                                            "type": "integer"
+                                                          }
+                                                        }
+                                                      },
+                                                      "level": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "junior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mid"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "senior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "staff"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "rationale": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "confidence": {
+                                                        "minimum": 0,
+                                                        "maximum": 1,
+                                                        "type": "number"
+                                                      },
+                                                      "modelVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "promptVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "transcriptSpanIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "evidenceIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "kind": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "claim_abstained"
+                                                        ]
+                                                      },
+                                                      "claimId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "abstention": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "insufficient_evidence"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "not_verifiable"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    }
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "id",
+                                                      "attemptId",
+                                                      "rubric",
+                                                      "level",
+                                                      "rationale",
+                                                      "confidence",
+                                                      "modelVersion",
+                                                      "promptVersion",
+                                                      "transcriptSpanIds",
+                                                      "evidenceIds",
+                                                      "kind",
+                                                      "competency",
+                                                      "signals"
+                                                    ],
+                                                    "properties": {
+                                                      "id": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "attemptId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "rubric": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "id",
+                                                          "version"
+                                                        ],
+                                                        "properties": {
+                                                          "id": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          },
+                                                          "version": {
+                                                            "minimum": 1,
+                                                            "type": "integer"
+                                                          }
+                                                        }
+                                                      },
+                                                      "level": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "junior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mid"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "senior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "staff"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "rationale": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "confidence": {
+                                                        "minimum": 0,
+                                                        "maximum": 1,
+                                                        "type": "number"
+                                                      },
+                                                      "modelVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "promptVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "transcriptSpanIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "evidenceIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "kind": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "composure"
+                                                        ]
+                                                      },
+                                                      "competency": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mechanism"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "trade_offs"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "failure_modes"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "composure"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "signals": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "folding"
+                                                              ]
+                                                            },
+                                                            {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "fabricating"
+                                                              ]
+                                                            },
+                                                            {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "holding_ground"
+                                                              ]
+                                                            },
+                                                            {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "honest_yielding"
+                                                              ]
+                                                            },
+                                                            {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "coherence_after_interruption"
+                                                              ]
+                                                            },
+                                                            {
+                                                              "type": "string",
+                                                              "enum": [
+                                                                "escalation"
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "id",
+                                                      "attemptId",
+                                                      "rubric",
+                                                      "level",
+                                                      "rationale",
+                                                      "confidence",
+                                                      "modelVersion",
+                                                      "promptVersion",
+                                                      "transcriptSpanIds",
+                                                      "evidenceIds",
+                                                      "kind",
+                                                      "competency",
+                                                      "levelMet"
+                                                    ],
+                                                    "properties": {
+                                                      "id": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "attemptId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "rubric": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "id",
+                                                          "version"
+                                                        ],
+                                                        "properties": {
+                                                          "id": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          },
+                                                          "version": {
+                                                            "minimum": 1,
+                                                            "type": "integer"
+                                                          }
+                                                        }
+                                                      },
+                                                      "level": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "junior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mid"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "senior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "staff"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "rationale": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "confidence": {
+                                                        "minimum": 0,
+                                                        "maximum": 1,
+                                                        "type": "number"
+                                                      },
+                                                      "modelVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "promptVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "transcriptSpanIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "evidenceIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "kind": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "competency"
+                                                        ]
+                                                      },
+                                                      "competency": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mechanism"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "trade_offs"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "failure_modes"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "composure"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "levelMet": {
+                                                        "anyOf": [
+                                                          {
+                                                            "anyOf": [
+                                                              {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                  "junior"
+                                                                ]
+                                                              },
+                                                              {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                  "mid"
+                                                                ]
+                                                              },
+                                                              {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                  "senior"
+                                                                ]
+                                                              },
+                                                              {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                  "staff"
+                                                                ]
+                                                              }
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "null"
+                                                          }
+                                                        ]
+                                                      }
+                                                    }
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "id",
+                                                      "attemptId",
+                                                      "rubric",
+                                                      "level",
+                                                      "rationale",
+                                                      "confidence",
+                                                      "modelVersion",
+                                                      "promptVersion",
+                                                      "transcriptSpanIds",
+                                                      "evidenceIds",
+                                                      "kind",
+                                                      "competency",
+                                                      "abstention"
+                                                    ],
+                                                    "properties": {
+                                                      "id": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "attemptId": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "rubric": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "id",
+                                                          "version"
+                                                        ],
+                                                        "properties": {
+                                                          "id": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          },
+                                                          "version": {
+                                                            "minimum": 1,
+                                                            "type": "integer"
+                                                          }
+                                                        }
+                                                      },
+                                                      "level": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "junior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mid"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "senior"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "staff"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "rationale": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "confidence": {
+                                                        "minimum": 0,
+                                                        "maximum": 1,
+                                                        "type": "number"
+                                                      },
+                                                      "modelVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "promptVersion": {
+                                                        "minLength": 1,
+                                                        "type": "string"
+                                                      },
+                                                      "transcriptSpanIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "evidenceIds": {
+                                                        "minItems": 1,
+                                                        "type": "array",
+                                                        "items": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "kind": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "competency_abstained"
+                                                        ]
+                                                      },
+                                                      "competency": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "mechanism"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "trade_offs"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "failure_modes"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "composure"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      },
+                                                      "abstention": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "insufficient_evidence"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "not_verifiable"
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "spans": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "required": [
+                                                  "id",
+                                                  "sourceId",
+                                                  "startByte",
+                                                  "endByte",
+                                                  "quoted"
+                                                ],
+                                                "properties": {
+                                                  "id": {
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  },
+                                                  "sourceId": {
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  },
+                                                  "startByte": {
+                                                    "minimum": 0,
+                                                    "type": "integer"
+                                                  },
+                                                  "endByte": {
+                                                    "minimum": 0,
+                                                    "type": "integer"
+                                                  },
+                                                  "quoted": {
+                                                    "type": "string"
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "evidence": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "required": [
+                                                  "id",
+                                                  "subject",
+                                                  "target",
+                                                  "trust"
+                                                ],
+                                                "properties": {
+                                                  "id": {
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  },
+                                                  "subject": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "kind",
+                                                          "claimId"
+                                                        ],
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "claim"
+                                                            ]
+                                                          },
+                                                          "claimId": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "kind",
+                                                          "attemptId"
+                                                        ],
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "attempt"
+                                                            ]
+                                                          },
+                                                          "attemptId": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      }
+                                                    ]
+                                                  },
+                                                  "target": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "kind",
+                                                          "spanId"
+                                                        ],
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "span"
+                                                            ]
+                                                          },
+                                                          "spanId": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "kind",
+                                                          "artifactId"
+                                                        ],
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                              "artifact"
+                                                            ]
+                                                          },
+                                                          "artifactId": {
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      }
+                                                    ]
+                                                  },
+                                                  "trust": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "candidate_asserted"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "repository_observed"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "transcript_observed"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "invocation": {
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "port",
+                                                "modelAlias",
+                                                "promptId",
+                                                "promptVersion",
+                                                "promptHash",
+                                                "inputTokens",
+                                                "outputTokens",
+                                                "costUsd",
+                                                "stopReason",
+                                                "latencyMs",
+                                                "occurredAt"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "port": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "conductor"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "evaluator"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "modelAlias": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "promptId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "promptVersion": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                },
+                                                "promptHash": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "inputTokens": {
+                                                  "minimum": 0,
+                                                  "type": "integer"
+                                                },
+                                                "outputTokens": {
+                                                  "minimum": 0,
+                                                  "type": "integer"
+                                                },
+                                                "costUsd": {
+                                                  "minimum": 0,
+                                                  "type": "number"
+                                                },
+                                                "stopReason": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "end_turn"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "max_tokens"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "refusal"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "stop_sequence"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "string",
+                                                      "enum": [
+                                                        "other"
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                "latencyMs": {
+                                                  "minimum": 0,
+                                                  "type": "integer"
+                                                },
+                                                "occurredAt": {
+                                                  "format": "date-time",
+                                                  "type": "string"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "requestId",
                                             "findingId",
                                             "state",
                                             "reason",
@@ -26781,6 +29742,77 @@
                                                   "enum": [
                                                     true
                                                   ]
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "change",
+                                            "design"
+                                          ],
+                                          "properties": {
+                                            "change": {
+                                              "type": "string",
+                                              "enum": [
+                                                "design_saved"
+                                              ]
+                                            },
+                                            "design": {
+                                              "additionalProperties": false,
+                                              "type": "object",
+                                              "required": [
+                                                "id",
+                                                "revision",
+                                                "title",
+                                                "requirements",
+                                                "estimates",
+                                                "api",
+                                                "dataModel",
+                                                "diagram",
+                                                "constraint"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "revision": {
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                },
+                                                "title": {
+                                                  "minLength": 1,
+                                                  "maxLength": 160,
+                                                  "type": "string"
+                                                },
+                                                "requirements": {
+                                                  "minLength": 1,
+                                                  "maxLength": 6000,
+                                                  "type": "string"
+                                                },
+                                                "estimates": {
+                                                  "maxLength": 4000,
+                                                  "type": "string"
+                                                },
+                                                "api": {
+                                                  "maxLength": 6000,
+                                                  "type": "string"
+                                                },
+                                                "dataModel": {
+                                                  "maxLength": 6000,
+                                                  "type": "string"
+                                                },
+                                                "diagram": {
+                                                  "maxLength": 6000,
+                                                  "type": "string"
+                                                },
+                                                "constraint": {
+                                                  "minLength": 1,
+                                                  "maxLength": 2000,
+                                                  "type": "string"
                                                 }
                                               }
                                             }
@@ -27125,6 +30157,62 @@
                                                       "enum": [
                                                         true
                                                       ]
+                                                    }
+                                                  }
+                                                },
+                                                "design": {
+                                                  "additionalProperties": false,
+                                                  "type": "object",
+                                                  "required": [
+                                                    "id",
+                                                    "revision",
+                                                    "title",
+                                                    "requirements",
+                                                    "estimates",
+                                                    "api",
+                                                    "dataModel",
+                                                    "diagram",
+                                                    "constraint"
+                                                  ],
+                                                  "properties": {
+                                                    "id": {
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    },
+                                                    "revision": {
+                                                      "minimum": 1,
+                                                      "type": "integer"
+                                                    },
+                                                    "title": {
+                                                      "minLength": 1,
+                                                      "maxLength": 160,
+                                                      "type": "string"
+                                                    },
+                                                    "requirements": {
+                                                      "minLength": 1,
+                                                      "maxLength": 6000,
+                                                      "type": "string"
+                                                    },
+                                                    "estimates": {
+                                                      "maxLength": 4000,
+                                                      "type": "string"
+                                                    },
+                                                    "api": {
+                                                      "maxLength": 6000,
+                                                      "type": "string"
+                                                    },
+                                                    "dataModel": {
+                                                      "maxLength": 6000,
+                                                      "type": "string"
+                                                    },
+                                                    "diagram": {
+                                                      "maxLength": 6000,
+                                                      "type": "string"
+                                                    },
+                                                    "constraint": {
+                                                      "minLength": 1,
+                                                      "maxLength": 2000,
+                                                      "type": "string"
                                                     }
                                                   }
                                                 },
@@ -28181,6 +31269,14 @@
                                                   "type": "string"
                                                 },
                                                 "topicId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "snapshotId": {
+                                                  "minLength": 1,
+                                                  "type": "string"
+                                                },
+                                                "artifactId": {
                                                   "minLength": 1,
                                                   "type": "string"
                                                 },
@@ -30267,6 +33363,14 @@
                                   "type": "string"
                                 },
                                 "topicId": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "snapshotId": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "artifactId": {
                                   "minLength": 1,
                                   "type": "string"
                                 },

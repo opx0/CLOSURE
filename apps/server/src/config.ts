@@ -1,5 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
+import { isAbsolute } from 'node:path'
 
 const LogLevel = Type.Union(
   [
@@ -23,6 +24,8 @@ const ConfigSchema = Type.Object({
   LOG_LEVEL: LogLevel,
   // Same JSONL directory the CLI writes, so both callers read one event log.
   LEVELHEAD_EVENT_DIR: Type.String({ minLength: 1, default: '.levelhead/events' }),
+  LEVELHEAD_RESTORE_SOURCE_FROM: Type.Optional(Type.String({ minLength: 1 })),
+  LEVELHEAD_RESTORE_SOURCE_TO: Type.Optional(Type.String({ minLength: 1 })),
   LEVELHEAD_EXPORT_DIR: Type.String({ minLength: 1, default: '.levelhead/exports' }),
   LEVELHEAD_STORE: Type.Union([Type.Literal('jsonl'), Type.Literal('postgres')], {
     default: 'jsonl',
@@ -54,6 +57,19 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   const withDefaults = Value.Default(ConfigSchema, { ...source })
   const coerced = Value.Convert(ConfigSchema, withDefaults)
   if (Value.Check(ConfigSchema, coerced)) {
+    if (
+      (coerced.LEVELHEAD_RESTORE_SOURCE_FROM === undefined) !==
+        (coerced.LEVELHEAD_RESTORE_SOURCE_TO === undefined) ||
+      (coerced.LEVELHEAD_RESTORE_SOURCE_FROM !== undefined &&
+        !isAbsolute(coerced.LEVELHEAD_RESTORE_SOURCE_FROM)) ||
+      (coerced.LEVELHEAD_RESTORE_SOURCE_TO !== undefined &&
+        !isAbsolute(coerced.LEVELHEAD_RESTORE_SOURCE_TO))
+    ) {
+      process.stderr.write(
+        'Source recovery requires both absolute LEVELHEAD_RESTORE_SOURCE_FROM and LEVELHEAD_RESTORE_SOURCE_TO paths.\n',
+      )
+      process.exit(1)
+    }
     if (coerced.LEVELHEAD_STORE === 'postgres' && coerced.DATABASE_URL === undefined) {
       process.stderr.write('LEVELHEAD_STORE=postgres needs DATABASE_URL.\n')
       process.exit(1)

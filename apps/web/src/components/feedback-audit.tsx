@@ -17,6 +17,8 @@ export function FeedbackAudit({ sessionId }: { sessionId: string }) {
   const [findingId, setFindingId] = useState('')
   const [reason, setReason] = useState('')
   const [sources, setSources] = useState('')
+  const reviewRequest = useRef<{ signature: string; id: string } | null>(null)
+  const reassessRequest = useRef<{ signature: string; id: string } | null>(null)
   const refresh = async () => {
     await Promise.all(
       ['feedback', 'session', 'debrief', 'ledger', 'schedule', 'review'].map((key) =>
@@ -25,17 +27,31 @@ export function FeedbackAudit({ sessionId }: { sessionId: string }) {
     )
   }
   const review = useMutation({
-    mutationFn: (state: 'pending' | 'upheld' | 'confirmed_error') =>
-      api.reviewFinding(sessionId, {
-        requestId: crypto.randomUUID(),
+    mutationFn: (state: 'pending' | 'upheld' | 'confirmed_error') => {
+      const sourceRefs = sources
+        .split('\n')
+        .map((source) => source.trim())
+        .filter(Boolean)
+      const signature = JSON.stringify([findingId, state, reason.trim(), sourceRefs])
+      if (reviewRequest.current?.signature !== signature)
+        reviewRequest.current = { signature, id: crypto.randomUUID() }
+      return api.reviewFinding(sessionId, {
+        requestId: reviewRequest.current.id,
         findingId,
         state,
         reason: reason.trim(),
-        sourceRefs: sources
-          .split('\n')
-          .map((source) => source.trim())
-          .filter(Boolean),
-      }),
+        sourceRefs,
+      })
+    },
+    onSuccess: refresh,
+  })
+  const reassess = useMutation({
+    mutationFn: ({ attemptId, revision }: { attemptId: string; revision: number }) => {
+      const signature = JSON.stringify([attemptId, revision])
+      if (reassessRequest.current?.signature !== signature)
+        reassessRequest.current = { signature, id: crypto.randomUUID() }
+      return api.reassessAnswer(sessionId, { attemptId, revision, requestId: reassessRequest.current.id })
+    },
     onSuccess: refresh,
   })
   if (audit.isPending || session.isPending) return <Loading what="feedback audit" />
@@ -87,6 +103,12 @@ export function FeedbackAudit({ sessionId }: { sessionId: string }) {
             initial={selected.text}
             refresh={refresh}
           />
+          {revision > 1 && audit.data.pendingReassessment && (
+            <Button disabled={reassess.isPending} onClick={() => reassess.mutate({ attemptId: selected.attemptId, revision })}>
+              Reassess this revision
+            </Button>
+          )}
+          {reassess.isError && <Failed error={reassess.error} />}
         </div>
       )}
       {findings.length > 0 && (
@@ -192,7 +214,7 @@ function CorrectionForm({
   const request = useRef<{ signature: string; id: string } | null>(null)
   const correction = useMutation({
     mutationFn: () => {
-      const signature = JSON.stringify([text, reason, revision])
+      const signature = JSON.stringify([text, reason.trim(), revision])
       if (request.current?.signature !== signature)
         request.current = { signature, id: crypto.randomUUID() }
       return api.correctAnswer(sessionId, {

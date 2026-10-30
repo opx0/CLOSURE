@@ -694,6 +694,17 @@ export interface paths {
                                         /** @enum {boolean} */
                                         confirmed: true;
                                     };
+                                    design?: {
+                                        id: string;
+                                        revision: number;
+                                        title: string;
+                                        requirements: string;
+                                        estimates: string;
+                                        api: string;
+                                        dataModel: string;
+                                        diagram: string;
+                                        constraint: string;
+                                    };
                                     /** Format: date-time */
                                     startedAt: string;
                                 };
@@ -721,9 +732,12 @@ export interface paths {
                         topicIds?: string[];
                         claimIds?: string[];
                         gapId?: string;
+                        transferTopicId?: string;
                         snapshotId?: string;
                         storyId?: string;
                         storyRevision?: number;
+                        designId?: string;
+                        designRevision?: number;
                         mode?: "simulation" | "coach" | "drill" | "transfer" | "review";
                         level?: "junior" | "mid" | "senior" | "staff";
                         personaId?: "collaborator" | "skeptic" | "bar_raiser" | "rusher";
@@ -1536,6 +1550,17 @@ export interface paths {
                                     /** @enum {boolean} */
                                     confirmed: true;
                                 };
+                                design?: {
+                                    id: string;
+                                    revision: number;
+                                    title: string;
+                                    requirements: string;
+                                    estimates: string;
+                                    api: string;
+                                    dataModel: string;
+                                    diagram: string;
+                                    constraint: string;
+                                };
                                 /** Format: date-time */
                                 startedAt: string;
                             } | null;
@@ -1647,6 +1672,8 @@ export interface paths {
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 claimId?: string;
                                 topicId?: string;
+                                snapshotId?: string;
+                                artifactId?: string;
                                 summary: string;
                                 status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                 findingIds: string[];
@@ -1854,6 +1881,8 @@ export interface paths {
                                 };
                                 storyId?: string;
                                 storyRevision?: number;
+                                designId?: string;
+                                designRevision?: number;
                             };
                         } | {
                             eventId: string;
@@ -2055,6 +2084,147 @@ export interface paths {
                                 reason: string;
                             } | {
                                 /** @enum {string} */
+                                change: "answer_reassessed";
+                                requestId: string;
+                                attemptId: string;
+                                revision: number;
+                                findings: ({
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "claim";
+                                    claimId: string;
+                                    verdict: "supported" | "partially_supported" | "unsupported_by_available_evidence" | "contradicted";
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "claim_abstained";
+                                    claimId: string;
+                                    abstention: "insufficient_evidence" | "not_verifiable";
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "composure";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    signals: ("folding" | "fabricating" | "holding_ground" | "honest_yielding" | "coherence_after_interruption" | "escalation")[];
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "competency";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                } | {
+                                    id: string;
+                                    attemptId: string;
+                                    rubric: {
+                                        id: string;
+                                        version: number;
+                                    };
+                                    level: "junior" | "mid" | "senior" | "staff";
+                                    rationale: string;
+                                    confidence: number;
+                                    modelVersion: string;
+                                    promptVersion: string;
+                                    transcriptSpanIds: string[];
+                                    evidenceIds: string[];
+                                    /** @enum {string} */
+                                    kind: "competency_abstained";
+                                    competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                    abstention: "insufficient_evidence" | "not_verifiable";
+                                })[];
+                                spans: {
+                                    id: string;
+                                    sourceId: string;
+                                    startByte: number;
+                                    endByte: number;
+                                    quoted: string;
+                                }[];
+                                evidence: {
+                                    id: string;
+                                    subject: {
+                                        /** @enum {string} */
+                                        kind: "claim";
+                                        claimId: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "attempt";
+                                        attemptId: string;
+                                    };
+                                    target: {
+                                        /** @enum {string} */
+                                        kind: "span";
+                                        spanId: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        kind: "artifact";
+                                        artifactId: string;
+                                    };
+                                    trust: "candidate_asserted" | "repository_observed" | "transcript_observed";
+                                }[];
+                                invocation: {
+                                    id: string;
+                                    port: "conductor" | "evaluator";
+                                    modelAlias: string;
+                                    promptId: string;
+                                    promptVersion: number;
+                                    promptHash: string;
+                                    inputTokens: number;
+                                    outputTokens: number;
+                                    costUsd: number;
+                                    stopReason: "end_turn" | "max_tokens" | "refusal" | "stop_sequence" | "other";
+                                    latencyMs: number;
+                                    /** Format: date-time */
+                                    occurredAt: string;
+                                };
+                            } | {
+                                /** @enum {string} */
                                 change: "finding_reviewed";
                                 requestId: string;
                                 findingId: string;
@@ -2101,6 +2271,20 @@ export interface paths {
                                 };
                             } | {
                                 /** @enum {string} */
+                                change: "design_saved";
+                                design: {
+                                    id: string;
+                                    revision: number;
+                                    title: string;
+                                    requirements: string;
+                                    estimates: string;
+                                    api: string;
+                                    dataModel: string;
+                                    diagram: string;
+                                    constraint: string;
+                                };
+                            } | {
+                                /** @enum {string} */
                                 change: "practice_plan_saved";
                                 gapId: string;
                                 mode: "drill" | "transfer";
@@ -2138,6 +2322,17 @@ export interface paths {
                                         result: string;
                                         /** @enum {boolean} */
                                         confirmed: true;
+                                    };
+                                    design?: {
+                                        id: string;
+                                        revision: number;
+                                        title: string;
+                                        requirements: string;
+                                        estimates: string;
+                                        api: string;
+                                        dataModel: string;
+                                        diagram: string;
+                                        constraint: string;
                                     };
                                     /** Format: date-time */
                                     startedAt: string;
@@ -2294,6 +2489,8 @@ export interface paths {
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
                                     topicId?: string;
+                                    snapshotId?: string;
+                                    artifactId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];
@@ -2618,6 +2815,8 @@ export interface paths {
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 claimId?: string;
                                 topicId?: string;
+                                snapshotId?: string;
+                                artifactId?: string;
                                 summary: string;
                                 status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                 findingIds: string[];
@@ -2920,6 +3119,8 @@ export interface paths {
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
                                     topicId?: string;
+                                    snapshotId?: string;
+                                    artifactId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];
@@ -2951,6 +3152,8 @@ export interface paths {
                                 competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                 claimId?: string;
                                 topicId?: string;
+                                snapshotId?: string;
+                                artifactId?: string;
                                 summary: string;
                                 status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                 findingIds: string[];
@@ -3846,6 +4049,8 @@ export interface paths {
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
                                     topicId?: string;
+                                    snapshotId?: string;
+                                    artifactId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];
@@ -4299,6 +4504,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{id}/reassess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        requestId: string;
+                        attemptId: string;
+                        revision: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            revision: number;
+                            findings: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preparation/goals": {
         parameters: {
             query?: never;
@@ -4584,6 +4873,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/designs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            designs: {
+                                id: string;
+                                revision: number;
+                                title: string;
+                                requirements: string;
+                                estimates: string;
+                                api: string;
+                                dataModel: string;
+                                diagram: string;
+                                constraint: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        id?: string;
+                        previousRevision: number;
+                        title: string;
+                        requirements: string;
+                        estimates: string;
+                        api: string;
+                        dataModel: string;
+                        diagram: string;
+                        constraint: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            revision: number;
+                            title: string;
+                            requirements: string;
+                            estimates: string;
+                            api: string;
+                            dataModel: string;
+                            diagram: string;
+                            constraint: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            detail?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mirror": {
         parameters: {
             query?: never;
@@ -4781,6 +5184,17 @@ export interface paths {
                                         /** @enum {boolean} */
                                         confirmed: true;
                                     };
+                                    design?: {
+                                        id: string;
+                                        revision: number;
+                                        title: string;
+                                        requirements: string;
+                                        estimates: string;
+                                        api: string;
+                                        dataModel: string;
+                                        diagram: string;
+                                        constraint: string;
+                                    };
                                     /** Format: date-time */
                                     startedAt: string;
                                 } | null;
@@ -4855,6 +5269,8 @@ export interface paths {
                                         };
                                         storyId?: string;
                                         storyRevision?: number;
+                                        designId?: string;
+                                        designRevision?: number;
                                     };
                                 } | {
                                     eventId: string;
@@ -5056,6 +5472,147 @@ export interface paths {
                                         reason: string;
                                     } | {
                                         /** @enum {string} */
+                                        change: "answer_reassessed";
+                                        requestId: string;
+                                        attemptId: string;
+                                        revision: number;
+                                        findings: ({
+                                            id: string;
+                                            attemptId: string;
+                                            rubric: {
+                                                id: string;
+                                                version: number;
+                                            };
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            rationale: string;
+                                            confidence: number;
+                                            modelVersion: string;
+                                            promptVersion: string;
+                                            transcriptSpanIds: string[];
+                                            evidenceIds: string[];
+                                            /** @enum {string} */
+                                            kind: "claim";
+                                            claimId: string;
+                                            verdict: "supported" | "partially_supported" | "unsupported_by_available_evidence" | "contradicted";
+                                        } | {
+                                            id: string;
+                                            attemptId: string;
+                                            rubric: {
+                                                id: string;
+                                                version: number;
+                                            };
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            rationale: string;
+                                            confidence: number;
+                                            modelVersion: string;
+                                            promptVersion: string;
+                                            transcriptSpanIds: string[];
+                                            evidenceIds: string[];
+                                            /** @enum {string} */
+                                            kind: "claim_abstained";
+                                            claimId: string;
+                                            abstention: "insufficient_evidence" | "not_verifiable";
+                                        } | {
+                                            id: string;
+                                            attemptId: string;
+                                            rubric: {
+                                                id: string;
+                                                version: number;
+                                            };
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            rationale: string;
+                                            confidence: number;
+                                            modelVersion: string;
+                                            promptVersion: string;
+                                            transcriptSpanIds: string[];
+                                            evidenceIds: string[];
+                                            /** @enum {string} */
+                                            kind: "composure";
+                                            competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                            signals: ("folding" | "fabricating" | "holding_ground" | "honest_yielding" | "coherence_after_interruption" | "escalation")[];
+                                        } | {
+                                            id: string;
+                                            attemptId: string;
+                                            rubric: {
+                                                id: string;
+                                                version: number;
+                                            };
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            rationale: string;
+                                            confidence: number;
+                                            modelVersion: string;
+                                            promptVersion: string;
+                                            transcriptSpanIds: string[];
+                                            evidenceIds: string[];
+                                            /** @enum {string} */
+                                            kind: "competency";
+                                            competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                            levelMet: ("junior" | "mid" | "senior" | "staff") | null;
+                                        } | {
+                                            id: string;
+                                            attemptId: string;
+                                            rubric: {
+                                                id: string;
+                                                version: number;
+                                            };
+                                            level: "junior" | "mid" | "senior" | "staff";
+                                            rationale: string;
+                                            confidence: number;
+                                            modelVersion: string;
+                                            promptVersion: string;
+                                            transcriptSpanIds: string[];
+                                            evidenceIds: string[];
+                                            /** @enum {string} */
+                                            kind: "competency_abstained";
+                                            competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
+                                            abstention: "insufficient_evidence" | "not_verifiable";
+                                        })[];
+                                        spans: {
+                                            id: string;
+                                            sourceId: string;
+                                            startByte: number;
+                                            endByte: number;
+                                            quoted: string;
+                                        }[];
+                                        evidence: {
+                                            id: string;
+                                            subject: {
+                                                /** @enum {string} */
+                                                kind: "claim";
+                                                claimId: string;
+                                            } | {
+                                                /** @enum {string} */
+                                                kind: "attempt";
+                                                attemptId: string;
+                                            };
+                                            target: {
+                                                /** @enum {string} */
+                                                kind: "span";
+                                                spanId: string;
+                                            } | {
+                                                /** @enum {string} */
+                                                kind: "artifact";
+                                                artifactId: string;
+                                            };
+                                            trust: "candidate_asserted" | "repository_observed" | "transcript_observed";
+                                        }[];
+                                        invocation: {
+                                            id: string;
+                                            port: "conductor" | "evaluator";
+                                            modelAlias: string;
+                                            promptId: string;
+                                            promptVersion: number;
+                                            promptHash: string;
+                                            inputTokens: number;
+                                            outputTokens: number;
+                                            costUsd: number;
+                                            stopReason: "end_turn" | "max_tokens" | "refusal" | "stop_sequence" | "other";
+                                            latencyMs: number;
+                                            /** Format: date-time */
+                                            occurredAt: string;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
                                         change: "finding_reviewed";
                                         requestId: string;
                                         findingId: string;
@@ -5102,6 +5659,20 @@ export interface paths {
                                         };
                                     } | {
                                         /** @enum {string} */
+                                        change: "design_saved";
+                                        design: {
+                                            id: string;
+                                            revision: number;
+                                            title: string;
+                                            requirements: string;
+                                            estimates: string;
+                                            api: string;
+                                            dataModel: string;
+                                            diagram: string;
+                                            constraint: string;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
                                         change: "practice_plan_saved";
                                         gapId: string;
                                         mode: "drill" | "transfer";
@@ -5139,6 +5710,17 @@ export interface paths {
                                                 result: string;
                                                 /** @enum {boolean} */
                                                 confirmed: true;
+                                            };
+                                            design?: {
+                                                id: string;
+                                                revision: number;
+                                                title: string;
+                                                requirements: string;
+                                                estimates: string;
+                                                api: string;
+                                                dataModel: string;
+                                                diagram: string;
+                                                constraint: string;
                                             };
                                             /** Format: date-time */
                                             startedAt: string;
@@ -5295,6 +5877,8 @@ export interface paths {
                                             competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                             claimId?: string;
                                             topicId?: string;
+                                            snapshotId?: string;
+                                            artifactId?: string;
                                             summary: string;
                                             status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                             findingIds: string[];
@@ -5598,6 +6182,8 @@ export interface paths {
                                     competency: "mechanism" | "trade_offs" | "failure_modes" | "composure";
                                     claimId?: string;
                                     topicId?: string;
+                                    snapshotId?: string;
+                                    artifactId?: string;
                                     summary: string;
                                     status: "open" | "drilled" | "unverified" | "closed_under_transfer";
                                     findingIds: string[];

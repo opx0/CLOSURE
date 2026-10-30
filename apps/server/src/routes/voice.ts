@@ -180,12 +180,14 @@ export function voiceRoutes(
         let sentDone: Extract<VoiceClientMessage, { kind: 'done' }> | null = null
         let timer: ReturnType<typeof setTimeout> | null = null
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+        let unsubscribe = () => {}
         const send = (message: VoiceServerMessage) => {
           if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
         }
         const dispose = () => {
           if (timer !== null) clearTimeout(timer)
           if (reconnectTimer !== null) clearTimeout(reconnectTimer)
+          unsubscribe()
           queue.stop()
           sidecar.close()
           active.delete(key)
@@ -210,6 +212,7 @@ export function voiceRoutes(
           pendingDone = null
         }
         sidecar.addEventListener('message', (event) => {
+          if (finished) return
           let message: unknown
           try {
             message = JSON.parse(String(event.data))
@@ -236,6 +239,8 @@ export function voiceRoutes(
             send(message)
             if (message.final) {
               finished = true
+              if (timer !== null) clearTimeout(timer)
+              timer = null
               if (socket?.readyState === WebSocket.OPEN) socket.close(1000)
             }
           } else if (message.kind === 'error') fail(message.code, message.detail)
@@ -261,6 +266,10 @@ export function voiceRoutes(
                 else fail('out_of_order', 'Conflicting retransmitted audio')
                 return
               }
+            }
+            if (pendingDone !== null || sentDone !== null) {
+              fail('stopped', 'Audio arrived after Done')
+              return
             }
             if (paused) {
               send({
@@ -339,7 +348,10 @@ export function voiceRoutes(
             state.attached = true
             if (reconnectTimer !== null) clearTimeout(reconnectTimer)
             reconnectTimer = null
-            next.on('message', onMessage)
+            next.on('message', (data, binary) => {
+              if (socket !== next || finished) return
+              onMessage(data as Buffer, binary)
+            })
             next.on('close', () => {
               if (socket !== next) return
               socket = null
@@ -358,6 +370,16 @@ export function voiceRoutes(
         }
         active.set(key, state)
         state.attach(incoming)
+        // The recognizer belongs to one question. A typed answer, Stop, or a new question
+        // invalidates its stream even when the browser forgot to close the recording UI.
+        unsubscribe =
+          host.get(ticket.sessionId, ticket.principal.ownerId)?.subscribe((update) => {
+            if (update.status === 'closed' || update.question?.attemptId !== ticket.attemptId) {
+              finished = true
+              if (socket?.readyState === WebSocket.OPEN) socket.close(1000, 'question changed')
+              else dispose()
+            }
+          }) ?? (() => {})
       },
     )
   }

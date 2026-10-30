@@ -322,7 +322,7 @@ test('the request carries the versioned prompt and the level anchors the turn ca
 
   const request = requests[0]
   expect(request?.promptId).toBe('answer-evaluation')
-  expect(request?.promptVersion).toBe(2)
+  expect(request?.promptVersion).toBe(3)
   expect(request?.promptHash).toHaveLength(16)
   expect(request?.user).toContain('failure_modes (v1)')
   expect(request?.user).toContain('claim_status (v1)')

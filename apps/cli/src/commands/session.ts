@@ -24,7 +24,7 @@ import type {
   RoundKind,
 } from '@levelhead/contracts'
 import type { ArtifactContext, PressureLevel } from '@levelhead/core'
-import { GitRepository } from '../repo/git-repository.ts'
+import { GitRepository, sourceRelocationFromEnv } from '../repo/git-repository.ts'
 import { REPO_SESSION } from './repo.ts'
 import { ask } from '../terminal.ts'
 import { openStore } from '../store.ts'
@@ -219,7 +219,11 @@ export async function session(argv: readonly string[]): Promise<number> {
       line('a code walkthrough needs a pinned repository — run: levelhead repo <path>')
       return 1
     }
-    const repository = new GitRepository({ ids: new RandomIds() })
+    const sourceRelocation = sourceRelocationFromEnv(process.env)
+    const repository = new GitRepository({
+      ids: new RandomIds(),
+      ...(sourceRelocation === undefined ? {} : { sourceRelocation }),
+    })
     // Re-registers the earlier process's pin, so the walkthrough reads that commit, not today's tree.
     repository.register(entry.snapshot)
     pinned = {

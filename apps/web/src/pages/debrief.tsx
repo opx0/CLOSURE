@@ -131,6 +131,14 @@ export function DebriefPage() {
         description="Review recorded gaps and the rounds your schedule suggests."
         icon="improve"
       />
+      {session.data?.session?.snapshotId !== undefined && (
+        <JourneyLink
+          to={`/session?rounds=code_walkthrough&snapshotId=${encodeURIComponent(session.data.session.snapshotId)}`}
+          title="Revisit this project"
+          description="Start another walkthrough using this pinned revision, if it is still available."
+          icon="file"
+        />
+      )}
       {session.data?.session?.story !== undefined && (
         <details className="card p-5">
           <summary className="cursor-pointer text-sm font-medium">
@@ -148,6 +156,27 @@ export function DebriefPage() {
           <p className="mt-2 text-xs text-quiet">
             This is your confirmed story, not an independently verified fact.
           </p>
+        </details>
+      )}
+      {session.data?.session?.design !== undefined && (
+        <details className="card p-5">
+          <summary className="cursor-pointer text-sm font-medium">
+            Design used · {session.data.session.design.title} · revision{' '}
+            {session.data.session.design.revision}
+          </summary>
+          {(
+            ['requirements', 'estimates', 'api', 'dataModel', 'diagram', 'constraint'] as const
+          ).map((field) => (
+            <section key={field} className="mt-3 text-sm">
+              <h3 className="font-medium">{field === 'dataModel' ? 'Data model' : field}</h3>
+              <pre className="whitespace-pre-wrap break-words font-sans text-muted">
+                {session.data!.session!.design![field]}
+              </pre>
+            </section>
+          ))}
+          <Link className="mt-3 inline-block text-xs underline" to="/designs">
+            Open design workspace
+          </Link>
         </details>
       )}
       <div className="report-note">

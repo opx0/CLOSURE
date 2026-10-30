@@ -16,6 +16,7 @@ export interface AdapterEnv {
   LLAMA_BASE_URL?: string | undefined
   MODEL_ID?: string | undefined
   MODEL_PROVIDER_API_KEY?: string | undefined
+  LOCAL_MODEL_ID?: string | undefined
   [key: string]: string | undefined
 }
 
@@ -28,6 +29,8 @@ export function fromEnv(env: AdapterEnv = process.env): Adapters {
   checkLocalGeneration(env)
   const localBaseUrl = env.LLAMA_BASE_URL ?? 'http://localhost:8081/v1'
   const apiKey = env.MODEL_PROVIDER_API_KEY || undefined
+  const localModelId = env.LOCAL_MODEL_ID?.trim() || undefined
+  const localAlias = localModelId === undefined ? LOCAL_MODEL_ALIAS : `local/${localModelId}`
   // One limiter across both ports: the provider counts requests, not which port made them
   // (STACK §9.4).
   const resilience = defaultResilience(Number(env.MODEL_MAX_IN_FLIGHT ?? String(DEFAULT_IN_FLIGHT)))
@@ -36,13 +39,15 @@ export function fromEnv(env: AdapterEnv = process.env): Adapters {
     // Always local: latency matters in the conversational path, determinism doesn't.
     conductor: new OpenAiCompatibleConductor({
       baseUrl: localBaseUrl,
-      modelAlias: LOCAL_MODEL_ALIAS,
+      modelAlias: localAlias,
+      modelId: localModelId,
       resilience,
     }),
     // Alias falls back with the endpoint — billing MODEL_ID's price for local-model tokens would
     // corrupt the session cost ceiling.
     evaluator: new StructuredEvaluator({
-      modelAlias: apiKey ? (env.MODEL_ID ?? 'claude-opus-5') : LOCAL_MODEL_ALIAS,
+      modelAlias: apiKey ? (env.MODEL_ID ?? 'claude-opus-5') : localAlias,
+      localModelId,
       apiKey,
       localBaseUrl,
       resilience,

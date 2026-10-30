@@ -40,6 +40,7 @@ export interface TranscriptEntry {
 
 export interface SessionView {
   readonly answerCorrections?: readonly (AnswerCorrection & { at: string })[]
+  readonly reassessedRevisions?: ReadonlyMap<string, number>
   readonly findingReviews?: readonly (FindingReview & { at: string })[]
   readonly supersededFindings?: ReadonlyMap<string, string>
   readonly historicalFindings?: readonly Finding[]
@@ -100,6 +101,7 @@ export function replay(events: readonly AnyEvent[]): SessionView {
   const findingReviews: (FindingReview & { at: string })[] = []
   const supersededFindings = new Map<string, string>()
   const revisions = new Map<string, number>()
+  const reassessedRevisions = new Map<string, number>()
   const requests = new Map<string, string>()
   const gaps = new Map<string, GapEntry>()
   const invocations: InvocationRecord[] = []
@@ -218,6 +220,24 @@ export function replay(events: readonly AnyEvent[]): SessionView {
             answerCorrections.push({ ...change, at: event.occurredAt })
             break
           }
+          case 'answer_reassessed': {
+            const receipt = JSON.stringify(change)
+            if (requests.has(change.requestId)) {
+              if (requests.get(change.requestId) !== receipt) throw new Error('Reassessment request collision')
+              break
+            }
+            if (revisions.get(change.attemptId) !== change.revision ||
+                reassessedRevisions.get(change.attemptId) === change.revision ||
+                change.findings.some((finding) => finding.attemptId !== change.attemptId))
+              throw new Error('Reassessment revision conflict')
+            requests.set(change.requestId, receipt)
+            reassessedRevisions.set(change.attemptId, change.revision)
+            findings.push(...(change.findings as unknown as readonly Finding[]))
+            for (const span of change.spans) spans.set(span.id, span)
+            for (const link of change.evidence) evidence.set(link.id, link)
+            invocations.push(change.invocation)
+            break
+          }
           case 'finding_reviewed': {
             const receipt = JSON.stringify(change)
             if (requests.has(change.requestId)) {
@@ -241,6 +261,7 @@ export function replay(events: readonly AnyEvent[]): SessionView {
           case 'preparation_saved':
           case 'preparation_goals_saved':
           case 'story_saved':
+          case 'design_saved':
           case 'practice_plan_saved':
             break
           case 'session_started':
@@ -429,6 +450,7 @@ export function replay(events: readonly AnyEvent[]): SessionView {
     findings: findings.filter((finding) => !supersededFindings.has(finding.id)),
     historicalFindings: findings,
     answerCorrections,
+    reassessedRevisions,
     findingReviews,
     supersededFindings,
     supersededAttempts,

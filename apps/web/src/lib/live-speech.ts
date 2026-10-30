@@ -88,6 +88,10 @@ export async function startLiveSpeech(
       return
     }
     if (message.kind === 'ack' && typeof message.seq === 'number') {
+      if (!Number.isSafeInteger(message.seq) || message.seq < 0 || message.seq >= seq) {
+        fail('Recognizer acknowledged audio that was not sent')
+        return
+      }
       for (const key of unacknowledged.keys()) if (key <= message.seq) unacknowledged.delete(key)
       for (const key of sent) if (key <= message.seq) sent.delete(key)
       flush()
@@ -124,6 +128,7 @@ export async function startLiveSpeech(
         reject(new Error('Recognizer did not become ready'))
       }, 5_000)
       current.onmessage = (event) => {
+        if (socket !== current || stopped || reported) return
         try {
           if (JSON.parse(String(event.data)).kind === 'ready') {
             if (connecting) {
@@ -182,8 +187,16 @@ export async function startLiveSpeech(
   try {
     await connect()
     stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    if (reported || stopped || final) {
+      cleanup()
+      throw new Error('Speech connection closed while the microphone was starting')
+    }
     context = new AudioContext()
     await context.audioWorklet.addModule(`${import.meta.env.BASE_URL}pcm-worklet.js`)
+    if (reported || stopped || final) {
+      cleanup()
+      throw new Error('Speech connection closed while the microphone was starting')
+    }
     source = context.createMediaStreamSource(stream)
     capture = new AudioWorkletNode(context, 'levelhead-pcm-capture')
     capture.port.onmessage = (event) => {
@@ -225,6 +238,10 @@ export async function startLiveSpeech(
     source.connect(capture)
     capture.connect(context.destination)
     await context.resume()
+    if (reported || stopped || final) {
+      cleanup()
+      throw new Error('Speech connection closed while the microphone was starting')
+    }
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error))
     throw error

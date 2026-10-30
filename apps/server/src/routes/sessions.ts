@@ -35,6 +35,7 @@ import {
 import type { EventStore, PinnedContext, PressureLevel } from '@levelhead/core'
 import { CLAIM_SET_SESSION } from '../../../cli/src/commands/claims.ts'
 import { REPO_SESSION } from '../../../cli/src/commands/repo.ts'
+import { DESIGN_LOG } from './design.ts'
 import { GitRepository } from '../../../cli/src/repo/git-repository.ts'
 import type { ServerDeps } from '../deps.ts'
 import type { SessionHost } from '../session-host.ts'
@@ -170,13 +171,28 @@ async function openSnapshot(
 ): Promise<PinnedContext | undefined> {
   const entry = openPinned(await store.read(REPO_SESSION), snapshotId)
   if (entry === undefined) return undefined
-  const repository = new GitRepository({ ids: deps.ids, clock: deps.clock })
+  const repository = new GitRepository({
+    ids: deps.ids,
+    clock: deps.clock,
+    ...(deps.sourceRelocation === undefined ? {} : { sourceRelocation: deps.sourceRelocation }),
+  })
   repository.register(entry.snapshot)
   return {
     snapshot: entry.snapshot,
     artifacts: entry.artifacts,
     evidence: entry.evidence,
-    repository,
+    repository: {
+      pin: (path, ref) => repository.pin(path, ref),
+      read: async (artifact) => {
+        // The snapshot can be deleted while an interview is suspended between turns.
+        const current = openPinned(await store.read(REPO_SESSION), entry.snapshot.id)
+        if (!current?.artifacts.some((item) => item.id === artifact.id)) return null
+        const code = await repository.read(artifact)
+        // Recheck after I/O so deletion during the Git read is not treated as live context.
+        const stillLive = openPinned(await store.read(REPO_SESSION), entry.snapshot.id)
+        return stillLive?.artifacts.some((item) => item.id === artifact.id) ? code : null
+      },
+    },
   }
 }
 
@@ -237,9 +253,12 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             topicIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             claimIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
             gapId: Type.Optional(Type.String({ minLength: 1 })),
+            transferTopicId: Type.Optional(Type.String({ minLength: 1 })),
             snapshotId: Type.Optional(Type.String({ minLength: 1 })),
             storyId: Type.Optional(Type.String({ minLength: 1 })),
             storyRevision: Type.Optional(Type.Integer({ minimum: 1 })),
+            designId: Type.Optional(Type.String({ minLength: 1 })),
+            designRevision: Type.Optional(Type.Integer({ minimum: 1 })),
             mode: Type.Optional(ModeSchema),
             level: Type.Optional(LevelSchema),
             personaId: Type.Optional(PersonaIdSchema),
@@ -276,6 +295,36 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                 error: 'Select an exact story version',
                 detail: 'Both story ID and revision are required.',
               })
+            if ((body.designId === undefined) !== (body.designRevision === undefined))
+              return reply.code(400).send({
+                error: 'Select an exact design version',
+                detail: 'Both design ID and revision are required.',
+              })
+            if (
+              body.designId !== undefined &&
+              (body.gapId !== undefined || body.mode === 'drill' || body.mode === 'transfer')
+            )
+              return reply.code(400).send({
+                error: 'Design rehearsal cannot be combined with a gap retest',
+              })
+            const design =
+              body.designId === undefined
+                ? undefined
+                : (await store.read(DESIGN_LOG)).flatMap((event) =>
+                    event.kind === 'state_change' &&
+                    event.payload.change === 'design_saved' &&
+                    event.payload.design.id === body.designId &&
+                    event.payload.design.revision === body.designRevision
+                      ? [event.payload.design]
+                      : [],
+                  )[0]
+            if (body.designId !== undefined && design === undefined)
+              return reply.code(400).send({
+                error: 'Design version unavailable',
+                detail: 'Choose a design version owned by you.',
+              })
+            if (design !== undefined && !body.rounds?.includes('system_design'))
+              return reply.code(400).send({ error: 'Design requires a system design round' })
             if (
               body.storyId !== undefined &&
               (body.gapId !== undefined || body.mode === 'drill' || body.mode === 'transfer')
@@ -320,7 +369,7 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                   error: 'Select an owned open gap for a drill, or a drilled gap for Transfer',
                   detail: body.gapId ?? 'gapId is required',
                 })
-              if (target.topicId === undefined && target.claimId === undefined)
+              if (target.topicId === undefined && target.claimId === undefined && !(target.snapshotId && target.artifactId))
                 return reply.code(400).send({
                   error: 'This gap has no available topic or claim target',
                   detail: target.id,
@@ -330,8 +379,16 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                   .code(400)
                   .send({ error: 'The target topic is unavailable', detail: target.topicId })
             }
-            const targetTopic =
-              target?.topicId === undefined ? undefined : topicById(target.topicId)
+            if (body.transferTopicId !== undefined &&
+              (body.mode !== 'transfer' || target?.artifactId === undefined))
+              return reply.code(400).send({ error: 'Transfer topic is only selectable for a project gap' })
+            if (body.mode === 'transfer' && target?.artifactId !== undefined && body.transferTopicId === undefined)
+              return reply.code(400).send({ error: 'Choose an unfamiliar topic for this independent retest' })
+            const transferTopicId = target?.artifactId !== undefined && body.mode === 'transfer'
+              ? body.transferTopicId : target?.topicId
+            const targetTopic = transferTopicId === undefined ? undefined : topicById(transferTopicId)
+            if (transferTopicId !== undefined && targetTopic === undefined)
+              return reply.code(400).send({ error: 'The retest topic is unavailable', detail: transferTopicId })
             if (
               target !== undefined &&
               history.some(
@@ -373,7 +430,9 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                 target === undefined
                   ? body.rounds
                   : [
-                      targetTopic === undefined
+                      target?.snapshotId !== undefined && body.mode === 'drill'
+                        ? 'code_walkthrough'
+                        : targetTopic === undefined
                         ? 'project_deep_dive'
                         : AREA_ROUND[targetTopic.area],
                     ],
@@ -400,7 +459,8 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
             if (resolved.needsClaims && confirmed.length === 0)
               return reply.code(409).send(NO_CLAIMS)
 
-            const wanted = target?.claimId === undefined ? body.claimIds : [target.claimId]
+            const wanted = body.mode === 'transfer' && target?.artifactId !== undefined
+              ? undefined : target?.claimId === undefined ? body.claimIds : [target.claimId]
             const selected =
               wanted === undefined
                 ? confirmed
@@ -415,7 +475,7 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
 
             let pinned: PinnedContext | undefined
             if (resolved.needsSnapshot) {
-              pinned = await openSnapshot(store, deps, body.snapshotId)
+              pinned = await openSnapshot(store, deps, target?.snapshotId ?? body.snapshotId)
               if (pinned === undefined) {
                 return reply.code(400).send({
                   error: 'pin a repository first',
@@ -425,12 +485,15 @@ export function sessionRoutes(deps: ServerDeps, host: SessionHost): FastifyPlugi
                       : `${body.snapshotId} is not a pinned snapshot, or it was deleted`,
                 })
               }
+              if (target?.artifactId !== undefined && !pinned.artifacts.some((artifact) => artifact.id === target.artifactId))
+                return reply.code(400).send({ error: 'Practice source is no longer available', detail: target.artifactId })
             }
 
             const update = await host.start({
               principal: request.principal,
               claims: resolved.readsClaims ? selected : [],
               ...(story === undefined ? {} : { story }),
+              ...(design === undefined ? {} : { design }),
               rounds,
               role: roleId,
               ...(topics === undefined ? {} : { topics }),
