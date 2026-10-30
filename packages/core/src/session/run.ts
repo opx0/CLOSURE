@@ -373,7 +373,11 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       artifacts: input.pinned.artifacts,
       evidence: input.pinned.evidence,
       claims: inPlay,
-    }).filter(({ artifact }) => input.drillGap?.artifactId === undefined || artifact.id === input.drillGap.artifactId)
+    })
+      .filter(
+        ({ artifact }) =>
+          input.drillGap?.artifactId === undefined || artifact.id === input.drillGap.artifactId,
+      )
       .slice(0, subjectsPerRound(input.turnsPerRound))
     const opened: Subject[] = []
     for (const { artifact, claim } of ranked) {
@@ -460,7 +464,9 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       const pinned = input.pinned
       const source = pinned?.artifacts.find((item) => item.id === subject.artifact.artifactId)
       if (!pinned || !source || (await pinned.repository.read(source)) !== subject.artifact.code) {
-        deps.io.notice('The pinned source is no longer available. This question cannot be assessed.')
+        deps.io.notice(
+          'The pinned source is no longer available. This question cannot be assessed.',
+        )
         outcome.stoppedBy = 'end_topic'
         return false
       }
@@ -730,8 +736,11 @@ export async function runSession(input: RunSessionInput): Promise<SessionResult>
       findings,
       indexGaps([...gaps.values()]),
       { ids: deps.ids, clock: deps.clock },
-      subject.kind === 'topic' ? { topicId: subject.id } : subject.kind === 'artifact' && input.pinned !== undefined
-        ? { snapshotId: input.pinned.snapshot.id, artifactId: subject.artifact.artifactId } : {},
+      subject.kind === 'topic'
+        ? { topicId: subject.id }
+        : subject.kind === 'artifact' && input.pinned !== undefined
+          ? { snapshotId: input.pinned.snapshot.id, artifactId: subject.artifact.artifactId }
+          : {},
     )
     for (const gap of opened) {
       await log.append('state_change', { change: 'gap_opened', gap })

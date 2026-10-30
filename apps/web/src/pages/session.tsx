@@ -378,7 +378,10 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
   const practiceGap = practice.data?.gaps.find((gap) => gap.id === gapId)
   const preparationState = usePreparation()
   const snapshotId =
-    practiceGap?.snapshotId ?? params.get('snapshotId') ?? preparationState.data?.selection?.snapshotId ?? null
+    practiceGap?.snapshotId ??
+    params.get('snapshotId') ??
+    preparationState.data?.selection?.snapshotId ??
+    null
   const selectedClaimIds = preparationState.data?.selection?.claimIds
 
   const updateSetup = (key: string, value: string) =>
@@ -439,9 +442,12 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       : interviewRounds
 
   const loop = role.defaultRounds.filter((round) => interviewRounds.includes(round))
-  const targetTopic = data.topics.find((topic) =>
-    topic.id === (mode === 'transfer' && practiceGap?.artifactId !== undefined
-      ? transferTopicId : practiceGap?.topicId),
+  const targetTopic = data.topics.find(
+    (topic) =>
+      topic.id ===
+      (mode === 'transfer' && practiceGap?.artifactId !== undefined
+        ? transferTopicId
+        : practiceGap?.topicId),
   )
   const requestedTopicId = params.get('topicId')
   const requestedTopic =
@@ -450,7 +456,11 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       : data.topics.find((topic) => topic.id === requestedTopicId)
   const rounds =
     gapId !== null && practiceGap !== undefined
-      ? [practiceGap.snapshotId !== undefined && mode === 'drill' ? 'code_walkthrough' : (targetTopic?.round ?? 'project_deep_dive')]
+      ? [
+          practiceGap.snapshotId !== undefined && mode === 'drill'
+            ? 'code_walkthrough'
+            : (targetTopic?.round ?? 'project_deep_dive'),
+        ]
       : params.has('rounds')
         ? requested
         : loop.slice(0, 1)
@@ -483,7 +493,8 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
       roleId: role.id,
       ...(gapId === null ? {} : { gapId }),
       ...(mode === 'transfer' && practiceGap?.artifactId !== undefined && transferTopicId !== null
-        ? { transferTopicId } : {}),
+        ? { transferTopicId }
+        : {}),
       ...(story === undefined ? {} : { storyId: story.id, storyRevision: story.revision }),
       ...(design === undefined ? {} : { designId: design.id, designRevision: design.revision }),
       ...(gapId === null && requestedTopic !== undefined && rounds.includes(requestedTopic.round)
@@ -555,13 +566,28 @@ function Setup({ onOpened }: { onOpened: (opening: Opening) => void }) {
               {mode === 'transfer' && practiceGap.artifactId !== undefined && (
                 <label className="mt-3 block text-sm">
                   Choose an unfamiliar topic that tests the same skill
-                  <select className="journey-select mt-2" value={transferTopicId ?? ''}
-                    onChange={(event) => updateSetup('transferTopicId', event.target.value)}>
+                  <select
+                    className="journey-select mt-2"
+                    value={transferTopicId ?? ''}
+                    onChange={(event) => updateSetup('transferTopicId', event.target.value)}
+                  >
                     <option value="">Choose a topic</option>
-                    {data.topics.filter((topic) => [
-                      'dbms.indexes', 'dsa.hash_maps', 'dsa.bfs_dfs',
-                      'dbms.transactions_isolation', 'os.deadlock', 'backend.rest_idempotency',
-                    ].includes(topic.id)).map((topic) => <option key={topic.id} value={topic.id}>{topic.title}</option>)}
+                    {data.topics
+                      .filter((topic) =>
+                        [
+                          'dbms.indexes',
+                          'dsa.hash_maps',
+                          'dsa.bfs_dfs',
+                          'dbms.transactions_isolation',
+                          'os.deadlock',
+                          'backend.rest_idempotency',
+                        ].includes(topic.id),
+                      )
+                      .map((topic) => (
+                        <option key={topic.id} value={topic.id}>
+                          {topic.title}
+                        </option>
+                      ))}
                   </select>
                 </label>
               )}
@@ -1026,8 +1052,7 @@ function InterviewRoom({
         void speak(update.question.text).catch(() =>
           setSpeechError('Question audio could not play. The question remains available as text.'),
         )
-      }
-      else cancelSpeech()
+      } else cancelSpeech()
       void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'topics' })
     },
   })
@@ -1287,7 +1312,11 @@ function InterviewRoom({
                       read questions aloud and let me answer by voice
                     </label>
                   </div>
-                  {speechError !== null && <p role="alert" className="mt-2 text-xs text-broken">{speechError}</p>}
+                  {speechError !== null && (
+                    <p role="alert" className="mt-2 text-xs text-broken">
+                      {speechError}
+                    </p>
+                  )}
                   {voice && (
                     <div className="mt-2 space-y-3">
                       <LiveRecorder

@@ -223,12 +223,15 @@ export function replay(events: readonly AnyEvent[]): SessionView {
           case 'answer_reassessed': {
             const receipt = JSON.stringify(change)
             if (requests.has(change.requestId)) {
-              if (requests.get(change.requestId) !== receipt) throw new Error('Reassessment request collision')
+              if (requests.get(change.requestId) !== receipt)
+                throw new Error('Reassessment request collision')
               break
             }
-            if (revisions.get(change.attemptId) !== change.revision ||
-                reassessedRevisions.get(change.attemptId) === change.revision ||
-                change.findings.some((finding) => finding.attemptId !== change.attemptId))
+            if (
+              revisions.get(change.attemptId) !== change.revision ||
+              reassessedRevisions.get(change.attemptId) === change.revision ||
+              change.findings.some((finding) => finding.attemptId !== change.attemptId)
+            )
               throw new Error('Reassessment revision conflict')
             requests.set(change.requestId, receipt)
             reassessedRevisions.set(change.attemptId, change.revision)

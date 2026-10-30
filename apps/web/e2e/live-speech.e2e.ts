@@ -170,9 +170,7 @@ test('a dropped browser socket reconnects to the same recognizer before finalizi
       .check()
     await page.getByRole('button', { name: 'Start live speech' }).click()
     await expect(page.getByText('Live text: before disconnect')).toBeVisible()
-    await page.evaluate(() =>
-      (window as Window & { liveSocket?: WebSocket }).liveSocket?.close(1001),
-    )
+    await page.evaluate(() => (window as Window & { liveSocket?: WebSocket }).liveSocket?.close())
     await expect(page.getByRole('button', { name: 'Done speaking' })).toBeVisible()
     await page.getByRole('button', { name: 'Done speaking' }).click()
     await expect(page.getByPlaceholder('Answer in your own words')).toHaveValue('reconnected final')
